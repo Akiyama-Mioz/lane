@@ -18,6 +18,7 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include <ArduinoJson.h>
+#include <map>
 
 extern "C" { void app_main(); }
 
@@ -26,7 +27,9 @@ auto esp_name = "e-track 011";
 const int scanTime = 1; //In seconds
 const int LoopInterval = 50;
 // string is array as well
-const int capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(62);
+const int capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(31);
+//auto devs = etl::make_map<std::string, std::string>();
+std::map<std::string, std::string> devs;
 
 std::string to_hex(const std::basic_string<char> &s) {
   std::string res;
@@ -37,20 +40,30 @@ std::string to_hex(const std::basic_string<char> &s) {
 }
 
 class AdCallback : public BLEAdvertisedDeviceCallbacks {
+  NimBLECharacteristic *characteristic = nullptr;
+
   void onResult(BLEAdvertisedDevice *advertisedDevice) override {
     if (advertisedDevice->getName().find("T03") != std::string::npos) {
-      std::string output;
-      StaticJsonDocument<capacity> doc;
-      doc["name"] = advertisedDevice->getName();
-      doc["rssi"] = advertisedDevice->getRSSI();
-      auto arr = doc.createNestedArray("data");
-      for (auto c: advertisedDevice->getManufacturerData()) {
-        arr.add(c);
+      fmt::print("Name: {}, Data: {}, RSSI: {}\n", advertisedDevice->getName(),
+                 to_hex(advertisedDevice->getManufacturerData()),
+                 advertisedDevice->getRSSI());
+
+//      auto head = std::basic_string<char>{0x08, static_cast<char>(advertisedDevice->getName().length())};
+//      auto msg = head + advertisedDevice->getName() + advertisedDevice->getManufacturerData();
+      // Name: fixed length 7
+      // ManufacturerData: rest (fixed length)
+      // last byte is RSSI
+      // TODO: use class and toString method to generate message, like struct
+      auto msg = advertisedDevice->getName() + advertisedDevice->getManufacturerData() + std::string{static_cast<char>(advertisedDevice->getRSSI())};
+      if (this->characteristic != nullptr) {
+        this->characteristic->setValue(msg);
+        this->characteristic->notify();
       }
-      serializeJson(doc, output);
-      printf("%s\n", output.c_str());
     }
   }
+
+public:
+  explicit AdCallback(NimBLECharacteristic *c): characteristic(c) {}
 };
 
 
@@ -67,6 +80,36 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
   vTaskDelete(nullptr);
 }
 
+class ServerCallbacks: public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer* pServer) override{
+    fmt::print("Client connected. ");
+    fmt::print("Multi-connect support: start advertising\n");
+    NimBLEDevice::startAdvertising();
+  };
+  /** Alternative onConnect() method to extract details of the connection.
+   *  See: src/ble_gap.h for the details of the ble_gap_conn_desc struct.
+   */
+  void onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) override{
+    printf("Client address: ");
+    fmt::print(NimBLEAddress(desc->peer_ota_addr).toString());
+    /** We can use the connection handle here to ask for different connection parameters.
+     *  Args: connection handle, min connection interval, max connection interval
+     *  latency, supervision timeout.
+     *  Units; Min/Max Intervals: 1.25 millisecond increments.
+     *  Latency: number of intervals allowed to skip.
+     *  Timeout: 10 millisecond increments, try for 5x interval time for best results.
+     */
+    pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
+  };
+  void onDisconnect(NimBLEServer* pServer) override{
+    printf("Client disconnected - start advertising\n");
+    NimBLEDevice::startAdvertising();
+  };
+  void onMTUChange(uint16_t MTU, ble_gap_conn_desc* desc) override{
+    printf("MTU updated: %u for connection ID: %u\n", MTU, desc->conn_handle);
+  };
+};
+
 const char *SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const char *CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
@@ -79,25 +122,22 @@ void app_main(void) {
   auto pService = pServer->createService(SERVICE_UUID);
   auto pCharacteristic = pService->createCharacteristic(
       CHARACTERISTIC_UUID,
-      /***** Enum Type NIMBLE_PROPERTY now *****
-            BLECharacteristic::PROPERTY_READ   |
-            BLECharacteristic::PROPERTY_WRITE
-            );
-      *****************************************/
       NIMBLE_PROPERTY::READ |
-      NIMBLE_PROPERTY::WRITE
+      NIMBLE_PROPERTY::NOTIFY
   );
+  pServer->setCallbacks(new ServerCallbacks());
 
-  pCharacteristic->setValue("Hello World says Neil");
+  pCharacteristic->setValue(std::string{0x00});
   pService->start();
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);
-  pAdvertising->addServiceUUID(SERVICE_UUID);
+//  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setAppearance(0x0340);
   pAdvertising->setScanResponse(false);
 
   auto pBLEScan = NimBLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new AdCallback());
+  pBLEScan->setAdvertisedDeviceCallbacks(new AdCallback(pCharacteristic));
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
   pBLEScan->setDuplicateFilter(false);
   pBLEScan->setFilterPolicy(BLE_HCI_SCAN_FILT_NO_WL);
