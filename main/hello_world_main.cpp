@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: CC0-1.0
  */
 
+// necessary for using fmt library
+#define FMT_HEADER_ONLY
 #include <cstdio>
+#include <functional>
 #include <memory>
+#include "fmt/core.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -14,25 +18,26 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 
-extern "C"{void app_main();}
+extern "C" { void app_main(); }
 
-int scanTime = 5; //In seconds
-BLEScan* pBLEScan;
+const int scanTime = 5; //In seconds
+const int LoopInterval = 100;
 
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-  void onResult(BLEAdvertisedDevice* advertisedDevice) override {
-    printf("Advertised Device: %s \n", advertisedDevice->toString().c_str());
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+  void onResult(BLEAdvertisedDevice *advertisedDevice) override {
+//    printf("Advertised Device: %s \n", advertisedDevice->toString().c_str());
+    fmt::print("Advertised Device: {}\n", advertisedDevice->toString());
   }
 };
 
-[[noreturn]] void scanTask (void * parameter){
-  for(;;) {
+[[noreturn]] void scanTask(BLEScan *pBLEScan) {
+  for (;;) {
     // put your main code here, to run repeatedly:
     BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
     printf("Devices found: %d\n", foundDevices.getCount());
     printf("Scan done!\n");
     pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-    vTaskDelay(2000/portTICK_PERIOD_MS); // Delay a second between loops.
+    vTaskDelay(LoopInterval / portTICK_PERIOD_MS); // Delay a second between loops.
   }
 
   vTaskDelete(nullptr);
@@ -43,10 +48,19 @@ void app_main() {
   printf("Hello world!\n");
 
   NimBLEDevice::init("crosstyan");
-  pBLEScan = BLEDevice::getScan(); //create new scan
+  // return a pointer
+  // the actual resource won't be released by RAII
+  auto pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
+  pBLEScan->setActiveScan(false); //active scan uses more power, but get results faster
+  pBLEScan->setDuplicateFilter(false);
+  pBLEScan->setFilterPolicy(BLE_HCI_SCAN_FILT_NO_WL);
   pBLEScan->setInterval(100);
-  pBLEScan->setWindow(99);  // less or equal setInterval value
-  xTaskCreate(scanTask, "scanTask", 5000, nullptr, 1, nullptr);
+  // Active scan time
+  // less or equal setInterval value
+  // pBLEScan->setWindow(10);
+  xTaskCreate(reinterpret_cast<TaskFunction_t>(scanTask),
+              "scanTask", 5000,
+              static_cast<void *>(pBLEScan), 1,
+              nullptr);
 }
