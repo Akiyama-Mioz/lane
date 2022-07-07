@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: CC0-1.0
  */
 
-#include <stdio.h>
+#include <cstdio>
 #include <memory>
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
