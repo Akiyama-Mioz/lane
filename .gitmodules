@@ -13,3 +13,6 @@
 [submodule "components/ArduinoJson"]
 	path = components/ArduinoJson
 	url = https://github.com/bblanchon/ArduinoJson.git
+[submodule "components/arduino-libs/NimBLE-Arduino"]
+	path = components/arduino-libs/NimBLE-Arduino
+	url = https://github.com/h2zero/NimBLE-Arduino
