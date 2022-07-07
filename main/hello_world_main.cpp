@@ -17,8 +17,6 @@
 #include "freertos/task.h"
 #include "Arduino.h"
 #include "NimBLEDevice.h"
-#include <iomanip>
-#include <sstream>
 #include <ArduinoJson.h>
 
 extern "C" { void app_main(); }
@@ -28,14 +26,14 @@ auto esp_name = "cross-esp";
 const int scanTime = 1; //In seconds
 const int LoopInterval = 50;
 // string is array as well
-const int capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(31);
+const int capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(62);
 
 std::string to_hex(const std::basic_string<char>& s) {
-  std::stringstream ss;
+  std::string res;
   for (auto c: s) {
-    ss << std::hex << std::setfill('0') << std::setw(2) << (int) c;
+    res += fmt::format("{:02x}", c);
   }
-  return ss.str();
+  return res;
 }
 
 class AdCallback : public BLEAdvertisedDeviceCallbacks {
@@ -51,9 +49,6 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
       }
       serializeJson(doc, output);
       printf("%s\n", output.c_str());
-//      fmt::print("Name: {}, Data: {}, RSSI: {}\n", advertisedDevice->getName(),
-//                 to_hex(advertisedDevice->getManufacturerData()),
-//                 advertisedDevice->getRSSI());
     }
   }
 };
