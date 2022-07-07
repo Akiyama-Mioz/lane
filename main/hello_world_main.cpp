@@ -67,36 +67,36 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
   vTaskDelete(nullptr);
 }
 
-const char *service_uuid = "00001801-0000-1000-8000-00805f9b34fb";
-const char *characteristic_uuid = "00002a00-0000-1000-8000-00805f9b34fb";
+const char *SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const char *CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-void app_main() {
+void app_main(void) {
+  printf("Starting BLE work!\n");
   initArduino();
 
   NimBLEDevice::init(esp_name);
-//  NimBLEDevice::setPower(ESP_PWR_LVL_P9);
-  NimBLEDevice::setPower(ESP_PWR_LVL_N3);
-  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
-
-
   auto pServer = NimBLEDevice::createServer();
-  auto pService = pServer->createService(service_uuid);
+  auto pService = pServer->createService(SERVICE_UUID);
   auto pCharacteristic = pService->createCharacteristic(
-      characteristic_uuid,
-      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE
+      CHARACTERISTIC_UUID,
+      /***** Enum Type NIMBLE_PROPERTY now *****
+            BLECharacteristic::PROPERTY_READ   |
+            BLECharacteristic::PROPERTY_WRITE
+            );
+      *****************************************/
+      NIMBLE_PROPERTY::READ |
+      NIMBLE_PROPERTY::WRITE
   );
-  pCharacteristic->setValue("233");
-  pServer->start();
+
+  pCharacteristic->setValue("Hello World says Neil");
+  pService->start();
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
-  pAdvertising->setScanResponse(false);
   pAdvertising->setName(esp_name);
-  pAdvertising->setAppearance(1154);
-  pAdvertising->start();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(false);
 
-  // return a pointer
-  // the actual resource won't be released by RAII
-  auto pBLEScan = BLEDevice::getScan();
+  auto pBLEScan = NimBLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new AdCallback());
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
   pBLEScan->setDuplicateFilter(false);
@@ -110,4 +110,7 @@ void app_main() {
               "scanTask", 5000,
               static_cast<void *>(pBLEScan), 1,
               nullptr);
+
+  NimBLEDevice::startAdvertising();
+  printf("Characteristic defined! Now you can read it in your phone!\n");
 }
