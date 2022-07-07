@@ -16,3 +16,6 @@
 [submodule "components/arduino-libs/NimBLE-Arduino"]
 	path = components/arduino-libs/NimBLE-Arduino
 	url = https://github.com/h2zero/NimBLE-Arduino
+[submodule "components/esp-nimble-cpp"]
+	path = components/esp-nimble-cpp
+	url = https://github.com/h2zero/esp-nimble-cpp

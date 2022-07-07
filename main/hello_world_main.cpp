@@ -86,7 +86,7 @@ void app_main() {
       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE
   );
   pCharacteristic->setValue("233");
-//  pServer->start();
+  pServer->start();
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setScanResponse(false);
