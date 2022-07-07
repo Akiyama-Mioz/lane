@@ -10,3 +10,6 @@
 [submodule "components/fmtlib/fmt"]
 	path = components/fmtlib/fmt
 	url = https://github.com/fmtlib/fmt
+[submodule "components/ArduinoJson"]
+	path = components/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson.git

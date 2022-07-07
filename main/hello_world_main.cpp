@@ -23,16 +23,39 @@
 #include <PubSubClient.h>
 #include <iomanip>
 #include <sstream>
+#include <ArduinoJson.h>
 
 extern "C" { void app_main(); }
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+auto esp_name = "cross-esp";
+
+void MQTT_reconnect(PubSubClient pubSubClient) {
+  while (!pubSubClient.connected()) {
+    printf("Attempting MQTT connection...\n");
+    if (pubSubClient.connect(esp_name)) {
+      printf("connected\n");
+    } else {
+      printf("failed, rc=");
+      printf("%d",pubSubClient.state());
+      printf(" try again in 5 seconds\n");
+      // Wait 5 seconds before retrying
+      vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+  }
+}
 
 const char *ssid = "ilikong24g";
 const char *password = "1234567890";
 
-const char *mqtt_server = "23.249.16.149:1883";
+const char *mqtt_host = "23.249.16.149";
+const int mqtt_port = 1883;
 
 const int scanTime = 1; //In seconds
 const int LoopInterval = 50;
+// string is array as well
+const int capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(31);
 
 std::string to_hex(const std::basic_string<char>& s) {
   std::stringstream ss;
@@ -42,13 +65,25 @@ std::string to_hex(const std::basic_string<char>& s) {
   return ss.str();
 }
 
-class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+class AdCallback : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice *advertisedDevice) override {
-//    printf("Advertised Device: %s \n", advertisedDevice->toString().c_str());
     if (advertisedDevice->getName().find("T03") != std::string::npos) {
-      fmt::print("Name: {}, Data: {}, RSSI: {}\n", advertisedDevice->getName(),
-                 to_hex(advertisedDevice->getManufacturerData()),
-                 advertisedDevice->getRSSI());
+      std::string output;
+      StaticJsonDocument<capacity> doc;
+      doc["name"] = advertisedDevice->getName();
+      doc["rssi"] = advertisedDevice->getRSSI();
+      auto arr = doc.createNestedArray("data");
+      for(auto c: advertisedDevice->getManufacturerData()) {
+        arr.add(c);
+      }
+      serializeJson(doc, output);
+      printf("%s\n", output.c_str());
+      if (WiFi.status() == WL_CONNECTED){
+        client.publish(advertisedDevice->getName().c_str(), output.c_str());
+      }
+//      fmt::print("Name: {}, Data: {}, RSSI: {}\n", advertisedDevice->getName(),
+//                 to_hex(advertisedDevice->getManufacturerData()),
+//                 advertisedDevice->getRSSI());
     }
   }
 };
@@ -67,15 +102,34 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
   vTaskDelete(nullptr);
 }
 
+[[noreturn]] void WiFiStatusCheck() {
+  const int wifi_check_interval = 1000;
+  for (;;){
+    if (likely(WiFi.status() == WL_CONNECTED)) {
+      if (unlikely(!client.connected())) {
+        MQTT_reconnect(client);
+      }
+      client.loop();
+    } else {
+      WiFi.begin(ssid, password);
+    }
+    vTaskDelay(wifi_check_interval / portTICK_PERIOD_MS);
+  }
+}
+
 void app_main() {
   initArduino();
   printf("Hello world!\n");
 
-  NimBLEDevice::init("crosstyan");
+  WiFi.begin(ssid, password);
+  client.setServer(mqtt_host, mqtt_port);
+  client.connect(esp_name);
+
+  NimBLEDevice::init(esp_name);
   // return a pointer
   // the actual resource won't be released by RAII
   auto pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setAdvertisedDeviceCallbacks(new AdCallback());
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
   pBLEScan->setDuplicateFilter(false);
   pBLEScan->setFilterPolicy(BLE_HCI_SCAN_FILT_NO_WL);
@@ -86,5 +140,9 @@ void app_main() {
   xTaskCreate(reinterpret_cast<TaskFunction_t>(scanTask),
               "scanTask", 5000,
               static_cast<void *>(pBLEScan), 1,
+              nullptr);
+  xTaskCreate(reinterpret_cast<TaskFunction_t>(WiFiStatusCheck),
+              "WiFiStatusCheck", 5 * 1024,
+              nullptr, 1,
               nullptr);
 }
