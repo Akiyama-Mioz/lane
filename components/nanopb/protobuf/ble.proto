@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+message BLEAdvertisingData {
+  string name = 1;
+  bytes manufactureData = 2;
+  sint32 rssi = 3;
+}

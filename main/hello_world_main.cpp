@@ -20,6 +20,9 @@
 #include <ArduinoJson.h>
 #include <map>
 
+#include <pb_encode.h>
+#include "ble.pb.h"
+
 extern "C" { void app_main(); }
 
 auto esp_name = "e-track 011";
@@ -48,22 +51,38 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
                  to_hex(advertisedDevice->getManufacturerData()),
                  advertisedDevice->getRSSI());
 
-//      auto head = std::basic_string<char>{0x08, static_cast<char>(advertisedDevice->getName().length())};
-//      auto msg = head + advertisedDevice->getName() + advertisedDevice->getManufacturerData();
-      // Name: fixed length 7
-      // ManufacturerData: rest (fixed length)
-      // last byte is RSSI
-      // TODO: use class and toString method to generate message, like struct
-      auto msg = advertisedDevice->getName() + advertisedDevice->getManufacturerData() + std::string{static_cast<char>(advertisedDevice->getRSSI())};
-      if (this->characteristic != nullptr) {
-        this->characteristic->setValue(msg);
+      uint8_t buffer[128];
+      BLEAdvertisingData data = BLEAdvertisingData_init_zero;
+      // See https://stackoverflow.com/questions/57569586/how-to-encode-a-string-when-it-is-a-pb-callback-t-type
+      auto encode_string = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
+        const char *str = reinterpret_cast<const char *>(*arg);
+        if (!pb_encode_tag_for_field(stream, field)) {
+          return false;
+        } else {
+          return pb_encode_string(stream, (uint8_t *) str, strlen(str));
+        }
+      };
+      pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+      data.name.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getName().c_str()));
+      data.name.funcs.encode = encode_string;
+      data.manufactureData.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getManufacturerData().c_str()));
+      data.manufactureData.funcs.encode = encode_string;
+      data.rssi = advertisedDevice->getRSSI();
+      bool status = pb_encode(&stream, BLEAdvertisingData_fields, &data);
+      auto length = stream.bytes_written;
+      if (this->characteristic != nullptr && status) {
+        this->characteristic->setValue(buffer, length);
         this->characteristic->notify();
+        std::string buf = std::string(reinterpret_cast<char *>(buffer), length);
+        fmt::print("Protobuf: {}, Length: {}\n", to_hex(buf), length);
+      } else {
+        fmt::print("Error: {}\n", status);
       }
     }
   }
 
 public:
-  explicit AdCallback(NimBLECharacteristic *c): characteristic(c) {}
+  explicit AdCallback(NimBLECharacteristic *c) : characteristic(c) {}
 };
 
 
@@ -80,16 +99,17 @@ public:
   vTaskDelete(nullptr);
 }
 
-class ServerCallbacks: public NimBLEServerCallbacks {
-  void onConnect(NimBLEServer* pServer) override{
+class ServerCallbacks : public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer *pServer) override {
     fmt::print("Client connected. ");
     fmt::print("Multi-connect support: start advertising\n");
     NimBLEDevice::startAdvertising();
   };
+
   /** Alternative onConnect() method to extract details of the connection.
    *  See: src/ble_gap.h for the details of the ble_gap_conn_desc struct.
    */
-  void onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) override{
+  void onConnect(NimBLEServer *pServer, ble_gap_conn_desc *desc) override {
     printf("Client address: ");
     fmt::print(NimBLEAddress(desc->peer_ota_addr).toString());
     /** We can use the connection handle here to ask for different connection parameters.
@@ -101,11 +121,13 @@ class ServerCallbacks: public NimBLEServerCallbacks {
      */
     pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
   };
-  void onDisconnect(NimBLEServer* pServer) override{
+
+  void onDisconnect(NimBLEServer *pServer) override {
     printf("Client disconnected - start advertising\n");
     NimBLEDevice::startAdvertising();
   };
-  void onMTUChange(uint16_t MTU, ble_gap_conn_desc* desc) override{
+
+  void onMTUChange(uint16_t MTU, ble_gap_conn_desc *desc) override {
     printf("MTU updated: %u for connection ID: %u\n", MTU, desc->conn_handle);
   };
 };
