@@ -42,18 +42,27 @@ std::string to_hex(const std::basic_string<char> &s) {
   return res;
 }
 
+std::string to_hex(const char *s, size_t len) {
+  std::string res;
+  for (size_t i = 0; i < len; i++) {
+    res += fmt::format("{:02x}", s[i]);
+  }
+  return res;
+}
+
 class AdCallback : public BLEAdvertisedDeviceCallbacks {
   NimBLECharacteristic *characteristic = nullptr;
 
   void onResult(BLEAdvertisedDevice *advertisedDevice) override {
     if (advertisedDevice->getName().find("T03") != std::string::npos) {
       fmt::print("Name: {}, Data: {}, RSSI: {}\n", advertisedDevice->getName(),
-                 to_hex(advertisedDevice->getManufacturerData()),
+                 to_hex(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31),
                  advertisedDevice->getRSSI());
 
       uint8_t buffer[128];
       BLEAdvertisingData data = BLEAdvertisingData_init_zero;
       // See https://stackoverflow.com/questions/57569586/how-to-encode-a-string-when-it-is-a-pb-callback-t-type
+      // zero ended string
       auto encode_string = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
         const char *str = reinterpret_cast<const char *>(*arg);
         if (!pb_encode_tag_for_field(stream, field)) {
@@ -62,11 +71,21 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
           return pb_encode_string(stream, (uint8_t *) str, strlen(str));
         }
       };
+
+      // fixed size array of 31 elements
+      auto encode_ble_ad = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
+        const char *str = reinterpret_cast<const char *>(*arg);
+        if (!pb_encode_tag_for_field(stream, field)) {
+          return false;
+        } else {
+          return pb_encode_string(stream, (uint8_t *) str, 31);
+        }
+      };
       pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
       data.name.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getName().c_str()));
       data.name.funcs.encode = encode_string;
-      data.manufactureData.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getManufacturerData().c_str()));
-      data.manufactureData.funcs.encode = encode_string;
+      data.manufactureData.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getPayload()));
+      data.manufactureData.funcs.encode = encode_ble_ad;
       data.rssi = advertisedDevice->getRSSI();
       bool status = pb_encode(&stream, BLEAdvertisingData_fields, &data);
       auto length = stream.bytes_written;
