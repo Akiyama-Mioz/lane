@@ -1,7 +1,9 @@
 syntax = "proto3";
 
+// https://gist.github.com/shankarshastri/c1b4d920188da78a0dbc9fc707e82996
 message BLEAdvertisingData {
   string name = 1;
   bytes manufactureData = 2;
+  // Uses Variable Length Encoding. They are efficient in encoding for negative numbers.
   sint32 rssi = 3;
 }
