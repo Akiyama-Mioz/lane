@@ -1,9 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: CC0-1.0
- */
-
 // necessary for using fmt library
 #define FMT_HEADER_ONLY
 
@@ -17,8 +11,8 @@
 #include "freertos/task.h"
 #include "Arduino.h"
 #include "NimBLEDevice.h"
-#include <ArduinoJson.h>
 #include <map>
+#include <Adafruit_NeoPixel.h>
 
 #include <pb_encode.h>
 #include "ble.pb.h"
@@ -29,10 +23,6 @@ auto esp_name = "e-track 011";
 
 const int scanTime = 1; //In seconds
 const int LoopInterval = 50;
-// string is array as well
-const int capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(31);
-//auto devs = etl::make_map<std::string, std::string>();
-std::map<std::string, std::string> devs;
 
 std::string to_hex(const std::basic_string<char> &s) {
   std::string res;
