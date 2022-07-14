@@ -12,10 +12,10 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include <map>
-#include <Adafruit_NeoPixel.h>
 
 #include <pb_encode.h>
 #include "ble.pb.h"
+#include "Strip.h"
 
 extern "C" { void app_main(); }
 
@@ -163,8 +163,8 @@ void app_main(void) {
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);
-//  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setAppearance(0x0340);
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+//  pAdvertising->setAppearance(0x0340);
   pAdvertising->setScanResponse(false);
 
   auto pBLEScan = NimBLEDevice::getScan();
@@ -181,7 +181,12 @@ void app_main(void) {
               "scanTask", 5000,
               static_cast<void *>(pBLEScan), 1,
               nullptr);
+  xTaskCreate(reinterpret_cast<TaskFunction_t>(stripTask),
+              "stripTask", 5000,
+              nullptr, 2,
+              nullptr);
 
   NimBLEDevice::startAdvertising();
   printf("Characteristic defined! Now you can read it in your phone!\n");
 }
+
