@@ -145,6 +145,8 @@ const char *SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const char *CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 void app_main(void) {
+  const int NUM_LEDS = 45;
+  const int LED_PIN = 14;
   printf("Starting BLE work!\n");
   initArduino();
 
@@ -157,8 +159,13 @@ void app_main(void) {
       NIMBLE_PROPERTY::NOTIFY
   );
   pServer->setCallbacks(new ServerCallbacks());
-
   pCharacteristic->setValue(std::string{0x00});
+
+  auto pStrip = new Strip(NUM_LEDS, LED_PIN);
+  auto pFunc = [](Strip *pStrip){
+    pStrip->stripTask();
+  };
+  pStrip->registerBLE(pServer);
   pService->start();
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
@@ -181,9 +188,9 @@ void app_main(void) {
               "scanTask", 5000,
               static_cast<void *>(pBLEScan), 1,
               nullptr);
-  xTaskCreate(reinterpret_cast<TaskFunction_t>(stripTask),
+  xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
               "stripTask", 5000,
-              nullptr, 2,
+              pStrip, 2,
               nullptr);
 
   NimBLEDevice::startAdvertising();
