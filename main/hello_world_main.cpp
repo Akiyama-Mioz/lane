@@ -170,8 +170,8 @@ void app_main(void) {
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-//  pAdvertising->setAppearance(0x0340);
+//  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setAppearance(0x0340);
   pAdvertising->setScanResponse(false);
 
   auto pBLEScan = NimBLEDevice::getScan();

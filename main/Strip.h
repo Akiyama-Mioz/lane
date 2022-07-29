@@ -10,6 +10,13 @@
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
 
+enum class StripStatus {
+  AUTO = 0,
+  FORWARD,
+  REVERSE,
+  STOP,
+};
+
 class Strip {
 public:
 //const int fps = 10;  // refresh each 100ms
@@ -19,8 +26,12 @@ public:
 // 45 for 2 meters.
   int max_leds;
   int delay_ms = 500;
-  uint32_t color = Adafruit_NeoPixel::Color(0, 255, 255);
+  uint32_t count = 0;
+  uint8_t brightness = 32;
+  uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255);
   Adafruit_NeoPixel *pixels;
+  StripStatus status = StripStatus::AUTO;
+  NimBLECharacteristic * count_char = nullptr;
 
   const char *LIGHT_SERVICE_UUID = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
   const char *LIGHT_CHAR_COLOR_UUID = "87a11e36-7c0e-44aa-a8ca-85307f52ce1e";
@@ -33,9 +44,13 @@ public:
   Strip(int max_leds, int PIN);
 
   [[noreturn]]
-  void stripTask() const;
+  void stripTask();
   void registerBLE(NimBLEServer *server);
   void updateMaxLength(int new_max_leds);
+
+  void fillForward(int fill_count) const;
+
+  void fillReverse(int fill_count) const;
 };
 
 class ColorCharCallback : public NimBLECharacteristicCallbacks {
@@ -58,5 +73,20 @@ public:
   void onWrite(NimBLECharacteristic *characteristic) override;
   explicit DelayCharCallback(Strip &strip);
 };
+
+class LengthCharCallback : public NimBLECharacteristicCallbacks {
+  Strip &strip;
+public:
+  void onWrite(NimBLECharacteristic *characteristic) override;
+  explicit LengthCharCallback(Strip &strip);
+};
+
+class StatusCharCallback : public NimBLECharacteristicCallbacks {
+  Strip &strip;
+public:
+  void onWrite(NimBLECharacteristic *characteristic) override;
+  explicit StatusCharCallback(Strip &strip);
+};
+
 
 #endif //HELLO_WORLD_STRIP_H
