@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
 
+#define StripStatus_LENGTH 4
 enum class StripStatus {
   AUTO = 0,
   FORWARD,
@@ -25,7 +26,7 @@ public:
 // 24v:10 leds/m
 // 45 for 2 meters.
   int max_leds;
-  int delay_ms = 500;
+  int delay_ms = 100;
   uint32_t count = 0;
   uint8_t brightness = 32;
   uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255);

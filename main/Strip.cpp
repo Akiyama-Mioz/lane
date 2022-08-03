@@ -30,6 +30,7 @@ void Strip::stripTask() {
   pixels->clear();
   pixels->show();
   auto fill_count = 10;
+  // a delay that will be applied to the finish each loop.
   auto halt_delay = 500;
   for (;;) {
     if (status == StripStatus::FORWARD) {
@@ -45,11 +46,15 @@ void Strip::stripTask() {
     } else if (status == StripStatus::STOP) {
       pixels->clear();
       pixels->show();
-      vTaskDelay(halt_delay / portTICK_PERIOD_MS);
     }
+    vTaskDelay(halt_delay / portTICK_PERIOD_MS);
     // after a round record the count and notify the client.
     if (count_char != nullptr && status != StripStatus::STOP) {
-      count++;
+      if (count < UINT32_MAX){
+        count++;
+      } else {
+        count = 0;
+      }
       count_char->setValue(count);
       count_char->notify();
     }
@@ -172,7 +177,7 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   uint8_t status = data[0];
   // remember to change this when modify StripStatus enum
   // here is a magic number which is the length of StripStatus enum
-  if (status <= 3) {
+  if (status < StripStatus_LENGTH) {
     auto s = StripStatus(status);
     strip.status = s;
   } else {

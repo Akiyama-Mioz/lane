@@ -42,11 +42,19 @@ std::string to_hex(const char *s, size_t len) {
 
 class AdCallback : public BLEAdvertisedDeviceCallbacks {
   NimBLECharacteristic *characteristic = nullptr;
+// deviceName, payload
+  std::map<std::string, std::string> lastDevices;
 
   void onResult(BLEAdvertisedDevice *advertisedDevice) override {
+    auto name = advertisedDevice->getName();
+    auto payload = std::string(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31);
+    if(lastDevices[name] == payload) {
+      ESP_LOGI("MAIN_AdCallback_onResult", "Duplicate");
+      return;
+    }
     if (advertisedDevice->getName().find("T03") != std::string::npos) {
-      fmt::print("Name: {}, Data: {}, RSSI: {}\n", advertisedDevice->getName(),
-                 to_hex(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31),
+      fmt::print("Name: {}, Data: {}, RSSI: {}\n", name,
+                 to_hex(payload.c_str(), 31),
                  advertisedDevice->getRSSI());
 
       uint8_t buffer[128];
@@ -71,8 +79,9 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
           return pb_encode_string(stream, (uint8_t *) str, 31);
         }
       };
+
       pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
-      data.name.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getName().c_str()));
+      data.name.arg = const_cast<void *>(reinterpret_cast<const void *>(name.c_str()));
       data.name.funcs.encode = encode_string;
       data.manufactureData.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getPayload()));
       data.manufactureData.funcs.encode = encode_ble_ad;
@@ -87,6 +96,7 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
       } else {
         fmt::print("Error: {}\n", status);
       }
+      lastDevices.insert_or_assign(name, payload);
     }
   }
 
