@@ -72,7 +72,12 @@ Strip::Strip(int max_leds, int pin) {
 /// update max length of strip.
 void Strip::updateMaxLength(int new_max_leds) {
   max_leds = new_max_leds;
+  // delete already checks if the pointer is still pointing to a valid memory location.
+  // If it is already nullptr, then it does nothing
+  // free up the allocated memory from new
   delete pixels;
+  // prevent dangling pointer
+  pixels = nullptr;
   pixels = new Adafruit_NeoPixel(max_leds, pin, NEO_GRB + NEO_KHZ800);
   pixels->begin();
 }
@@ -136,7 +141,11 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   if (data.length() >= 1) {
     uint8_t brightness = data[0];
     strip.brightness = brightness;
-    strip.pixels->setBrightness(brightness);
+    // update the brightness of the strip.
+    // it may be nullptr during update max length.
+    if (strip.pixels != nullptr) {
+      strip.pixels->setBrightness(brightness);
+    }
   } else {
     ESP_LOGE("BrightnessCharCallback", "Invalid data length: %d", data.length());
     characteristic->setValue(strip.pixels->getBrightness());

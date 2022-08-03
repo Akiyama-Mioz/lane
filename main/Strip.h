@@ -44,6 +44,7 @@ public:
 
   Strip(int max_leds, int PIN);
 
+  // you should call this in creatTask or something in RTOS.
   [[noreturn]]
   void stripTask();
   void registerBLE(NimBLEServer *server);

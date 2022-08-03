@@ -22,7 +22,7 @@ extern "C" { void app_main(); }
 auto esp_name = "e-track 011";
 
 const int scanTime = 1; //In seconds
-const int LoopInterval = 50;
+const int ScanInterval = 50;
 
 std::string to_hex(const std::basic_string<char> &s) {
   std::string res;
@@ -112,7 +112,7 @@ public:
     printf("Devices found: %d\n", foundDevices.getCount());
     printf("Scan done!\n");
     pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-    vTaskDelay(LoopInterval / portTICK_PERIOD_MS); // Delay a second between loops.
+    vTaskDelay(ScanInterval / portTICK_PERIOD_MS); // Delay a second between loops.
   }
 
   vTaskDelete(nullptr);
@@ -171,7 +171,12 @@ void app_main(void) {
   pServer->setCallbacks(new ServerCallbacks());
   pCharacteristic->setValue(std::string{0x00});
 
+  // You have to "new" it or RAII will take care of it.
+  // Strip should not be released until the program is terminated.
   auto pStrip = new Strip(NUM_LEDS, LED_PIN);
+  // an aux function used to let FreeRTOS do it work.
+  // since FreeRTOS is implemented in C, we can't have lambda capture, so pStrip must be
+  // passed as parameter.
   auto pFunc = [](Strip *pStrip){
     pStrip->stripTask();
   };
