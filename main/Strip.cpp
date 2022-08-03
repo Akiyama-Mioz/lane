@@ -4,7 +4,7 @@
 
 #include "Strip.h"
 
-void Strip::fillForward(int fill_count = 10) const{
+void Strip::fillForward(int fill_count = 10) const {
   for (int i = 0; i < max_leds; i++) {
     // Stupid OEM
     // RGB -> BRG
@@ -33,24 +33,26 @@ void Strip::stripTask() {
   // a delay that will be applied to the finish each loop.
   auto halt_delay = 500;
   for (;;) {
-    if (status == StripStatus::FORWARD) {
-      fillForward(fill_count);
-    } else if (status == StripStatus::REVERSE) {
-      fillReverse(fill_count);
-    } else if (status == StripStatus::AUTO) {
-      if (count % 2 == 0) {
+    if (pixels != nullptr) {
+      if (status == StripStatus::FORWARD) {
         fillForward(fill_count);
-      } else {
+      } else if (status == StripStatus::REVERSE) {
         fillReverse(fill_count);
+      } else if (status == StripStatus::AUTO) {
+        if (count % 2 == 0) {
+          fillForward(fill_count);
+        } else {
+          fillReverse(fill_count);
+        }
+      } else if (status == StripStatus::STOP) {
+        pixels->clear();
+        pixels->show();
       }
-    } else if (status == StripStatus::STOP) {
-      pixels->clear();
-      pixels->show();
     }
     vTaskDelay(halt_delay / portTICK_PERIOD_MS);
     // after a round record the count and notify the client.
-    if (count_char != nullptr && status != StripStatus::STOP) {
-      if (count < UINT32_MAX){
+    if (pixels != nullptr && count_char != nullptr && status != StripStatus::STOP) {
+      if (count < UINT32_MAX) {
         count++;
       } else {
         count = 0;
