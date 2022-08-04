@@ -1,11 +1,10 @@
 // necessary for using fmt library
 #define FMT_HEADER_ONLY
 
+// fmt library should be included first
+#include "utils.h"
 #include <cstdio>
-#include <functional>
 #include <vector>
-#include <memory>
-#include "fmt/core.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,9 +12,8 @@
 #include "NimBLEDevice.h"
 #include <map>
 
-#include <pb_encode.h>
-#include "ble.pb.h"
 #include "Strip.h"
+#include "AdCallback.h"
 
 extern "C" { void app_main(); }
 
@@ -24,88 +22,8 @@ auto esp_name = "e-track 011";
 const int scanTime = 1; //In seconds
 const int ScanInterval = 50;
 
-std::string to_hex(const std::basic_string<char> &s) {
-  std::string res;
-  for (auto c: s) {
-    res += fmt::format("{:02x}", c);
-  }
-  return res;
-}
-
-std::string to_hex(const char *s, size_t len) {
-  std::string res;
-  for (size_t i = 0; i < len; i++) {
-    res += fmt::format("{:02x}", s[i]);
-  }
-  return res;
-}
-
-class AdCallback : public BLEAdvertisedDeviceCallbacks {
-  NimBLECharacteristic *characteristic = nullptr;
-// deviceName, payload
-  std::map<std::string, std::string> lastDevices;
-
-  void onResult(BLEAdvertisedDevice *advertisedDevice) override {
-    auto name = advertisedDevice->getName();
-    auto payload = std::string(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31);
-    if(lastDevices[name] == payload) {
-      ESP_LOGI("MAIN_AdCallback_onResult", "Duplicate");
-      return;
-    }
-    if (advertisedDevice->getName().find("T03") != std::string::npos) {
-      fmt::print("Name: {}, Data: {}, RSSI: {}\n", name,
-                 to_hex(payload.c_str(), 31),
-                 advertisedDevice->getRSSI());
-
-      uint8_t buffer[128];
-      BLEAdvertisingData data = BLEAdvertisingData_init_zero;
-      // See https://stackoverflow.com/questions/57569586/how-to-encode-a-string-when-it-is-a-pb-callback-t-type
-      // zero ended string
-      auto encode_string = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
-        const char *str = reinterpret_cast<const char *>(*arg);
-        if (!pb_encode_tag_for_field(stream, field)) {
-          return false;
-        } else {
-          return pb_encode_string(stream, (uint8_t *) str, strlen(str));
-        }
-      };
-
-      // fixed size array of 31 elements
-      auto encode_ble_ad = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
-        const char *str = reinterpret_cast<const char *>(*arg);
-        if (!pb_encode_tag_for_field(stream, field)) {
-          return false;
-        } else {
-          return pb_encode_string(stream, (uint8_t *) str, 31);
-        }
-      };
-
-      pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
-      data.name.arg = const_cast<void *>(reinterpret_cast<const void *>(name.c_str()));
-      data.name.funcs.encode = encode_string;
-      data.manufactureData.arg = const_cast<void *>(reinterpret_cast<const void *>(advertisedDevice->getPayload()));
-      data.manufactureData.funcs.encode = encode_ble_ad;
-      data.rssi = advertisedDevice->getRSSI();
-      bool status = pb_encode(&stream, BLEAdvertisingData_fields, &data);
-      auto length = stream.bytes_written;
-      if (this->characteristic != nullptr && status) {
-        this->characteristic->setValue(buffer, length);
-        this->characteristic->notify();
-        std::string buf = std::string(reinterpret_cast<char *>(buffer), length);
-        fmt::print("Protobuf: {}, Length: {}\n", to_hex(buf), length);
-      } else {
-        fmt::print("Error: {}\n", status);
-      }
-      lastDevices.insert_or_assign(name, payload);
-    }
-  }
-
-public:
-  explicit AdCallback(NimBLECharacteristic *c) : characteristic(c) {}
-};
-
-
-[[noreturn]] void scanTask(BLEScan *pBLEScan) {
+[[noreturn]]
+void scanTask(BLEScan *pBLEScan) {
   for (;;) {
     // put your main code here, to run repeatedly:
     BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
@@ -118,47 +36,22 @@ public:
   vTaskDelete(nullptr);
 }
 
-class ServerCallbacks : public NimBLEServerCallbacks {
-  void onConnect(NimBLEServer *pServer) override {
-    fmt::print("Client connected. ");
-    fmt::print("Multi-connect support: start advertising\n");
-    NimBLEDevice::startAdvertising();
-  };
-
-  /** Alternative onConnect() method to extract details of the connection.
-   *  See: src/ble_gap.h for the details of the ble_gap_conn_desc struct.
-   */
-  void onConnect(NimBLEServer *pServer, ble_gap_conn_desc *desc) override {
-    printf("Client address: ");
-    fmt::print(NimBLEAddress(desc->peer_ota_addr).toString());
-    /** We can use the connection handle here to ask for different connection parameters.
-     *  Args: connection handle, min connection interval, max connection interval
-     *  latency, supervision timeout.
-     *  Units; Min/Max Intervals: 1.25 millisecond increments.
-     *  Latency: number of intervals allowed to skip.
-     *  Timeout: 10 millisecond increments, try for 5x interval time for best results.
-     */
-    pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
-  };
-
-  void onDisconnect(NimBLEServer *pServer) override {
-    printf("Client disconnected - start advertising\n");
-    NimBLEDevice::startAdvertising();
-  };
-
-  void onMTUChange(uint16_t MTU, ble_gap_conn_desc *desc) override {
-    printf("MTU updated: %u for connection ID: %u\n", MTU, desc->conn_handle);
-  };
-};
-
 const char *SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const char *CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 void app_main(void) {
-  const int NUM_LEDS = 45;
+  const int DEFAULT_NUM_LEDS = 45;
   const int LED_PIN = 14;
-  printf("Starting BLE work!\n");
   initArduino();
+
+  Preferences pref;
+  pref.begin("record", true);
+  auto max_leds = pref.getInt("max_leds", DEFAULT_NUM_LEDS);
+  auto color = pref.getUInt("color", Adafruit_NeoPixel::Color(255, 0, 255));
+  auto brightness = pref.getUChar("brightness", 32);
+  printf("max_leds stored in pref: %d\n", max_leds);
+  printf("color stored in pref: %x\n", color);
+  printf("brightness stored in pref: %d\n", brightness);
 
   NimBLEDevice::init(esp_name);
   auto pServer = NimBLEDevice::createServer();
@@ -173,7 +66,7 @@ void app_main(void) {
 
   // You have to "new" it or RAII will take care of it.
   // Strip should not be released until the program is terminated.
-  auto pStrip = new Strip(NUM_LEDS, LED_PIN);
+  auto pStrip = new Strip(max_leds, LED_PIN, color, brightness);
   // an aux function used to let FreeRTOS do it work.
   // since FreeRTOS is implemented in C, we can't have lambda capture, so pStrip must be
   // passed as parameter.
@@ -192,7 +85,7 @@ void app_main(void) {
   auto pBLEScan = NimBLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new AdCallback(pCharacteristic));
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
-  pBLEScan->setDuplicateFilter(false);
+  pBLEScan->setDuplicateFilter(false); // maybe I should enable it
   pBLEScan->setFilterPolicy(BLE_HCI_SCAN_FILT_NO_WL);
   pBLEScan->setInterval(100);
   // Active scan time
@@ -210,5 +103,6 @@ void app_main(void) {
 
   NimBLEDevice::startAdvertising();
   printf("Characteristic defined! Now you can read it in your phone!\n");
+  pref.end();
 }
 

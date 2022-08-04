@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
+#include "Preferences.h"
 
 #define StripStatus_LENGTH 4
 enum class StripStatus {
@@ -20,6 +21,7 @@ enum class StripStatus {
 
 class Strip {
 public:
+  Preferences pref;
 //const int fps = 10;  // refresh each 100ms
 // 14
   int pin;
@@ -29,25 +31,36 @@ public:
   int delay_ms = 100;
   uint32_t count = 0;
   uint8_t brightness = 32;
-  uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255);
+  uint32_t color;
   Adafruit_NeoPixel *pixels;
   StripStatus status = StripStatus::AUTO;
-  NimBLECharacteristic * count_char = nullptr;
+  NimBLECharacteristic *count_char = nullptr;
+  NimBLECharacteristic *color_char = nullptr;
+  NimBLECharacteristic *status_char = nullptr;
+  NimBLECharacteristic *brightness_char = nullptr;
+  NimBLECharacteristic *max_leds_char = nullptr;
+  NimBLECharacteristic *delay_char = nullptr;
+  NimBLEService *service = nullptr;
 
   const char *LIGHT_SERVICE_UUID = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
   const char *LIGHT_CHAR_COLOR_UUID = "87a11e36-7c0e-44aa-a8ca-85307f52ce1e";
   const char *LIGHT_CHAR_BRIGHTNESS_UUID = "e3ce8b08-4bb9-4696-b862-3e62a1100adc";
   const char *LIGHT_CHAR_STATUS_UUID = "24207642-0d98-40cd-84bb-910008579114";
-  const char *LIGHT_CHAR_LENGTH_UUID = "28734897-4356-4c4a-af3d-8359ea4657cd";
+  const char *LIGHT_CHAR_MAX_LEDS_UUID = "28734897-4356-4c4a-af3d-8359ea4657cd";
   const char *LIGHT_CHAR_DELAY_UUID = "adbbac7f-2c08-4a8d-b3f7-d38d7bd5bc41";
   const char *LIGHT_CHAR_COUNT_UUID = "b972471a-139c-4211-a591-28c4ec1936f6";
 
-  Strip(int max_leds, int PIN);
+  Strip(int max_leds, int PIN, uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255), uint8_t brightness = 32);
+
+  // usually you won't destruct it because it's running in MCU.
+  ~Strip() = delete;
 
   // you should call this in creatTask or something in RTOS.
   [[noreturn]]
   void stripTask();
+
   void registerBLE(NimBLEServer *server);
+
   void updateMaxLength(int new_max_leds);
 
   void fillForward(int fill_count) const;
@@ -59,6 +72,7 @@ class ColorCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
+
   explicit ColorCharCallback(Strip &strip);
 };
 
@@ -66,6 +80,7 @@ class BrightnessCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
+
   explicit BrightnessCharCallback(Strip &strip);
 };
 
@@ -73,20 +88,23 @@ class DelayCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
+
   explicit DelayCharCallback(Strip &strip);
 };
 
-class LengthCharCallback : public NimBLECharacteristicCallbacks {
+class MaxLedsCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
-  explicit LengthCharCallback(Strip &strip);
+
+  explicit MaxLedsCharCallback(Strip &strip);
 };
 
 class StatusCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
+
   explicit StatusCharCallback(Strip &strip);
 };
 

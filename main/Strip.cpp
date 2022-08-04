@@ -63,9 +63,12 @@ void Strip::stripTask() {
   }
 }
 
-Strip::Strip(int max_leds, int pin) {
+Strip::Strip(int max_leds, int pin, uint32_t color, uint8_t brightness) {
+  pref.begin("record", false);
+  this->color = color;
   this->max_leds = max_leds;
   this->pin = pin;
+  this->brightness = brightness;
   pixels = new Adafruit_NeoPixel(max_leds, pin, NEO_GRB + NEO_KHZ800);
   pixels->begin();
   pixels->setBrightness(brightness);
@@ -85,51 +88,54 @@ void Strip::updateMaxLength(int new_max_leds) {
 }
 
 void Strip::registerBLE(NimBLEServer *server) {
-  auto pService = server->createService(LIGHT_SERVICE_UUID);
-  auto color_char = pService->createCharacteristic(LIGHT_CHAR_COLOR_UUID,
+  service = server->createService(LIGHT_SERVICE_UUID);
+  color_char = service->createCharacteristic(LIGHT_CHAR_COLOR_UUID,
                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   auto colorCharCallback = new ColorCharCallback(*this);
   color_char->setValue(color);
   color_char->setCallbacks(colorCharCallback);
 
-  auto brightness_char = pService->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
+  brightness_char = service->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
                                                         NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   auto brightnessCharCallback = new BrightnessCharCallback(*this);
   brightness_char->setValue(brightness);
   brightness_char->setCallbacks(brightnessCharCallback);
 
-  auto delay_char = pService->createCharacteristic(LIGHT_CHAR_DELAY_UUID,
+  delay_char = service->createCharacteristic(LIGHT_CHAR_DELAY_UUID,
                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   auto delayCharCallback = new DelayCharCallback(*this);
   delay_char->setValue(delay_ms);
   delay_char->setCallbacks(delayCharCallback);
 
-  auto length_char = pService->createCharacteristic(LIGHT_CHAR_LENGTH_UUID,
+  max_leds_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDS_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-  auto lengthCharCallback = new LengthCharCallback(*this);
-  length_char->setValue(max_leds);
-  length_char->setCallbacks(lengthCharCallback);
+  auto maxLedsCharCallback = new MaxLedsCharCallback(*this);
+  max_leds_char->setValue(max_leds);
+  max_leds_char->setCallbacks(maxLedsCharCallback);
 
-  auto status_char = pService->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
+  status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   auto statusCharCallback = new StatusCharCallback(*this);
   status_char->setValue(status);
   status_char->setCallbacks(statusCharCallback);
 
-  this->count_char = pService->createCharacteristic(LIGHT_CHAR_COUNT_UUID,
+  this->count_char = service->createCharacteristic(LIGHT_CHAR_COUNT_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   count_char->setValue(count);
 
-  pService->start();
+  service->start();
 }
 
 void ColorCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   if (data.length() >= 3) {
-//    uint32_t color = data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3];
-// BGR
+    // BGR
     auto color = Adafruit_NeoPixel::Color(data[0], data[1], data[2]);
     strip.color = color;
+    [[maybe_unused]]
+    auto size = strip.pref.putUInt("color", strip.color);
+//    auto c = strip.pref.getUInt("color", Adafruit_NeoPixel::Color(255, 255, 255));
+//    printf("[ColorCharCallback] color stored in pref: %x, size: %d\n", c, size);
   } else {
     ESP_LOGE("ColorCharCallback", "Invalid data length: %d", data.length());
     characteristic->setValue(strip.color);
@@ -148,6 +154,9 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     if (strip.pixels != nullptr) {
       strip.pixels->setBrightness(brightness);
     }
+    [[maybe_unused]]
+    auto size = strip.pref.putUChar("brightness", strip.brightness);
+//    printf("[BrightnessCharCallback] brightness stored in pref: %d, size: %d\n", brightness, size);
   } else {
     ESP_LOGE("BrightnessCharCallback", "Invalid data length: %d", data.length());
     characteristic->setValue(strip.pixels->getBrightness());
@@ -169,18 +178,19 @@ void DelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 DelayCharCallback::DelayCharCallback(Strip &strip) : strip(strip) {}
 
-void LengthCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+void MaxLedsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   if (data.length() >= 2) {
-    uint16_t length = data[0] | data[1] << 8;
-    strip.updateMaxLength(length);
+    uint16_t max_leds = data[0] | data[1] << 8;
+    strip.updateMaxLength(max_leds);
+    strip.pref.putInt("max_leds", max_leds);
   } else {
     ESP_LOGE("LengthCharCallback", "Invalid data length: %d", data.length());
     characteristic->setValue(strip.max_leds);
   }
 }
 
-LengthCharCallback::LengthCharCallback(Strip &strip) : strip(strip) {}
+MaxLedsCharCallback::MaxLedsCharCallback(Strip &strip) : strip(strip) {}
 
 
 void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
