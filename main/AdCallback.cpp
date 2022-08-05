@@ -37,9 +37,9 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     const struct {
       uint8_t *content;
       size_t size;
-    } payload_data {
-      reinterpret_cast<uint8_t *>(advertisedDevice->getPayload()),
-      31 // payload size, here it's fixed since bluetooth advertisement payload is 31 bytes.
+    } payload_data{
+        advertisedDevice->getPayload(),
+        31 // payload size, here it's fixed since bluetooth advertisement payload is 31 bytes.
     };
 
     /**
