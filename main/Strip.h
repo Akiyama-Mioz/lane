@@ -19,21 +19,30 @@ enum class StripStatus {
   STOP,
 };
 
+enum class StripError {
+  OK = 0,
+  ERROR,
+  HAS_INITIALIZED,
+};
+
 class Strip {
+protected:
+  bool is_initialized = false;
+  bool is_ble_initialized = false;
 public:
   Preferences pref;
-//const int fps = 10;  // refresh each 100ms
-// 14
-  int pin;
-// 24v:10 leds/m
-// 45 for 2 meters.
-  int max_leds;
-  int delay_ms = 100;
+  int pin = 14;
+  // 10 LEDs/m foo 24v
+  int max_leds = 50;
   uint32_t count = 0;
   uint8_t brightness = 32;
-  uint32_t color;
-  Adafruit_NeoPixel *pixels;
+  Adafruit_NeoPixel *pixels = nullptr;
   StripStatus status = StripStatus::AUTO;
+  int delay_ms = 100;
+  uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255);
+  // I don't know how to release the memory of the NimBLECharacteristic
+  // or other BLE stuff. So I choose to not free the memory. (the device
+  // should be always alive with BLE anyway.)
   NimBLECharacteristic *count_char = nullptr;
   NimBLECharacteristic *color_char = nullptr;
   NimBLECharacteristic *status_char = nullptr;
@@ -50,24 +59,42 @@ public:
   const char *LIGHT_CHAR_DELAY_UUID = "adbbac7f-2c08-4a8d-b3f7-d38d7bd5bc41";
   const char *LIGHT_CHAR_COUNT_UUID = "b972471a-139c-4211-a591-28c4ec1936f6";
 
-  Strip(int max_leds, int PIN, uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255), uint8_t brightness = 32);
-
-  // usually you won't destruct it because it's running in MCU.
-  ~Strip() = delete;
 
   // you should call this in creatTask or something in RTOS.
   [[noreturn]]
   void stripTask();
 
-  void registerBLE(NimBLEServer *server);
+  StripError initBLE(NimBLEServer *server);
 
-  void updateMaxLength(int new_max_leds);
+  void setMaxLeds(int new_max_leds);
+
+  void setBrightness(uint8_t new_brightness);
 
   void fillForward(int fill_count) const;
 
   void fillReverse(int fill_count) const;
+
+  static Strip *get();
+
+  Strip(Strip const &) = delete;
+
+  Strip &operator=(Strip const &) = delete;
+
+  Strip(Strip &&) = delete;
+
+  Strip &operator=(Strip &&) = delete;
+
+  // usually you won't destruct it because it's running in MCU.
+  ~Strip() = delete;
+
+  StripError
+  begin(int max_leds, int16_t PIN, uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255), uint8_t brightness = 32);
+
+protected:
+  Strip() = default;
 };
 
+// Maybe I should use factory pattern.
 class ColorCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:

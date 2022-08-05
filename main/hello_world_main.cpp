@@ -19,13 +19,13 @@ extern "C" { void app_main(); }
 
 auto esp_name = "e-track 011";
 
-const int scanTime = 1; //In seconds
+//In seconds
+const int scanTime = 1;
 const int ScanInterval = 50;
 
 [[noreturn]]
 void scanTask(BLEScan *pBLEScan) {
   for (;;) {
-    // put your main code here, to run repeatedly:
     BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
     printf("Devices found: %d\n", foundDevices.getCount());
     printf("Scan done!\n");
@@ -36,8 +36,8 @@ void scanTask(BLEScan *pBLEScan) {
   vTaskDelete(nullptr);
 }
 
-const char *SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-const char *CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+auto SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+auto CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 void app_main(void) {
   const int DEFAULT_NUM_LEDS = 45;
@@ -63,25 +63,27 @@ void app_main(void) {
   );
   pServer->setCallbacks(new ServerCallbacks());
   pCharacteristic->setValue(std::string{0x00});
+  pService->start();
 
-  // You have to "new" it or RAII will take care of it.
-  // Strip should not be released until the program is terminated.
-  auto pStrip = new Strip(max_leds, LED_PIN, color, brightness);
-  // an aux function used to let FreeRTOS do it work.
-  // since FreeRTOS is implemented in C, we can't have lambda capture, so pStrip must be
-  // passed as parameter.
+  // Initialize NeoPixel.
+  /* an aux function used to let FreeRTOS do it work.
+   * since FreeRTOS is implemented in C, we can't have lambda capture, so pStrip must be
+   * passed as parameter.
+  */
   auto pFunc = [](Strip *pStrip){
     pStrip->stripTask();
   };
-  pStrip->registerBLE(pServer);
-  pService->start();
+  // using singleton pattern to avoid memory leak
+  auto pStrip = Strip::get();
+  pStrip->begin(max_leds, LED_PIN, color, brightness);
+  pStrip->initBLE(pServer);
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);
-//  pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->setAppearance(0x0340);
   pAdvertising->setScanResponse(false);
 
+  // Initialize BLE Scanner.
   auto pBLEScan = NimBLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new AdCallback(pCharacteristic));
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster

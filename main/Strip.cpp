@@ -6,8 +6,6 @@
 
 void Strip::fillForward(int fill_count = 10) const {
   for (int i = 0; i < max_leds; i++) {
-    // Stupid OEM
-    // RGB -> BRG
     pixels->clear();
     pixels->fill(color, i, fill_count);
     pixels->show();
@@ -17,8 +15,6 @@ void Strip::fillForward(int fill_count = 10) const {
 
 void Strip::fillReverse(int fill_count = 10) const {
   for (int i = max_leds - 1; i >= 0; i--) {
-    // Stupid OEM
-    // RGB -> BRG
     pixels->clear();
     pixels->fill(color, i, fill_count);
     pixels->show();
@@ -30,7 +26,7 @@ void Strip::stripTask() {
   pixels->clear();
   pixels->show();
   auto fill_count = 10;
-  // a delay that will be applied to the finish each loop.
+  // a delay that will be applied to the end of each loop.
   auto halt_delay = 500;
   for (;;) {
     if (pixels != nullptr) {
@@ -63,19 +59,8 @@ void Strip::stripTask() {
   }
 }
 
-Strip::Strip(int max_leds, int pin, uint32_t color, uint8_t brightness) {
-  pref.begin("record", false);
-  this->color = color;
-  this->max_leds = max_leds;
-  this->pin = pin;
-  this->brightness = brightness;
-  pixels = new Adafruit_NeoPixel(max_leds, pin, NEO_GRB + NEO_KHZ800);
-  pixels->begin();
-  pixels->setBrightness(brightness);
-}
-
 /// update max length of strip.
-void Strip::updateMaxLength(int new_max_leds) {
+void Strip::setMaxLeds(int new_max_leds) {
   max_leds = new_max_leds;
   // delete already checks if the pointer is still pointing to a valid memory location.
   // If it is already nullptr, then it does nothing
@@ -87,43 +72,84 @@ void Strip::updateMaxLength(int new_max_leds) {
   pixels->begin();
 }
 
-void Strip::registerBLE(NimBLEServer *server) {
-  service = server->createService(LIGHT_SERVICE_UUID);
-  color_char = service->createCharacteristic(LIGHT_CHAR_COLOR_UUID,
-                                                   NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-  auto colorCharCallback = new ColorCharCallback(*this);
-  color_char->setValue(color);
-  color_char->setCallbacks(colorCharCallback);
+StripError Strip::initBLE(NimBLEServer *server) {
+  if (server == nullptr) {
+    return StripError::ERROR;
+  }
+  if(!is_ble_initialized){
+    service = server->createService(LIGHT_SERVICE_UUID);
+    color_char = service->createCharacteristic(LIGHT_CHAR_COLOR_UUID,
+                                               NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto colorCharCallback = new ColorCharCallback(*this);
+    color_char->setValue(color);
+    color_char->setCallbacks(colorCharCallback);
 
-  brightness_char = service->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
-                                                        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-  auto brightnessCharCallback = new BrightnessCharCallback(*this);
-  brightness_char->setValue(brightness);
-  brightness_char->setCallbacks(brightnessCharCallback);
-
-  delay_char = service->createCharacteristic(LIGHT_CHAR_DELAY_UUID,
-                                                   NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-  auto delayCharCallback = new DelayCharCallback(*this);
-  delay_char->setValue(delay_ms);
-  delay_char->setCallbacks(delayCharCallback);
-
-  max_leds_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDS_UUID,
+    brightness_char = service->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-  auto maxLedsCharCallback = new MaxLedsCharCallback(*this);
-  max_leds_char->setValue(max_leds);
-  max_leds_char->setCallbacks(maxLedsCharCallback);
+    auto brightnessCharCallback = new BrightnessCharCallback(*this);
+    brightness_char->setValue(brightness);
+    brightness_char->setCallbacks(brightnessCharCallback);
 
-  status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
-                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-  auto statusCharCallback = new StatusCharCallback(*this);
-  status_char->setValue(status);
-  status_char->setCallbacks(statusCharCallback);
+    delay_char = service->createCharacteristic(LIGHT_CHAR_DELAY_UUID,
+                                               NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto delayCharCallback = new DelayCharCallback(*this);
+    delay_char->setValue(delay_ms);
+    delay_char->setCallbacks(delayCharCallback);
 
-  this->count_char = service->createCharacteristic(LIGHT_CHAR_COUNT_UUID,
-                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-  count_char->setValue(count);
+    max_leds_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDS_UUID,
+                                                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto maxLedsCharCallback = new MaxLedsCharCallback(*this);
+    max_leds_char->setValue(max_leds);
+    max_leds_char->setCallbacks(maxLedsCharCallback);
 
-  service->start();
+    status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
+                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto statusCharCallback = new StatusCharCallback(*this);
+    status_char->setValue(status);
+    status_char->setCallbacks(statusCharCallback);
+
+    this->count_char = service->createCharacteristic(LIGHT_CHAR_COUNT_UUID,
+                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    count_char->setValue(count);
+
+    service->start();
+    is_ble_initialized = true;
+    return StripError::OK;
+  } else {
+    return StripError::HAS_INITIALIZED;
+  }
+}
+
+Strip *Strip::get() {
+  static auto *strip = new Strip();
+  return strip;
+}
+
+StripError Strip::begin(int max_leds, int16_t PIN, uint32_t color, uint8_t brightness) {
+  if (!is_initialized){
+    pref.begin("record", false);
+    this->color = color;
+    this->max_leds = max_leds;
+    this->pin = PIN;
+    this->brightness = brightness;
+    pixels = new Adafruit_NeoPixel(max_leds, PIN, NEO_GRB + NEO_KHZ800);
+    pixels->begin();
+    pixels->setBrightness(brightness);
+    is_initialized = true;
+    return StripError::OK;
+  } else {
+    return StripError::HAS_INITIALIZED;
+  }
+}
+
+void Strip::setBrightness(const uint8_t new_brightness) {
+  if (pixels != nullptr) {
+    brightness = new_brightness;
+    pixels->setBrightness(brightness);
+    if (brightness_char != nullptr) {
+      brightness_char->setValue(brightness);
+    }
+  }
 }
 
 void ColorCharCallback::onWrite(NimBLECharacteristic *characteristic) {
@@ -182,7 +208,7 @@ void MaxLedsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   if (data.length() >= 2) {
     uint16_t max_leds = data[0] | data[1] << 8;
-    strip.updateMaxLength(max_leds);
+    strip.setMaxLeds(max_leds);
     strip.pref.putInt("max_leds", max_leds);
   } else {
     ESP_LOGE("LengthCharCallback", "Invalid data length: %d", data.length());
