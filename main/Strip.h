@@ -98,54 +98,5 @@ protected:
   Strip() = default;
 };
 
-// Maybe I should use factory pattern.
-class ColorCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit ColorCharCallback(Strip &strip);
-};
-
-class BrightnessCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit BrightnessCharCallback(Strip &strip);
-};
-
-class DelayCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit DelayCharCallback(Strip &strip);
-};
-
-class MaxLEDsCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit MaxLEDsCharCallback(Strip &strip);
-};
-
-class StatusCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit StatusCharCallback(Strip &strip);
-};
-
-class HaltDelayCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit HaltDelayCharCallback(Strip &strip);
-};
-
 
 #endif //HELLO_WORLD_STRIP_H
