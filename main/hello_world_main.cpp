@@ -66,7 +66,7 @@ void app_main(void) {
 
   // Initialize NeoPixel.
   /** an aux function used to let FreeRTOS do it work.
-   * since FreeRTOS is implemented in C, we can't have lambda capture, so pStrip must be
+   * since FreeRTOS is implemented in C where we can't have lambda capture, so pStrip must be
    * passed as parameter.
   **/
   auto pFunc = [](Strip *pStrip){
