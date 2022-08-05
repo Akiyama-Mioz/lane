@@ -1,12 +1,12 @@
-[submodule "components/pubsubclient"]
-	path = components/pubsubclient
+[submodule "nanopb"]
+	path = components/nanopb/nanopb
+	url = https://github.com/nanopb/nanopb
+[submodule "nanopb_cpp"]
+	path = components/nanopb/nanopb_cpp
+	url = https://github.com/nanopb/nanopb_cpp
+[submodule "components/arduino-libs/pubsubclient"]
+	path = components/arduino-libs/pubsubclient
 	url = https://github.com/knolleary/pubsubclient
-[submodule "components/fmt-esp32"]
-	path = components/fmt-esp32
-	url = https://github.com/SelaliAdobor/fmt-esp32
-[submodule "components/fmt"]
-	path = components/fmt
-	url = https://github.com/fmtlib/fmt/
 [submodule "components/fmtlib/fmt"]
 	path = components/fmtlib/fmt
 	url = https://github.com/fmtlib/fmt
