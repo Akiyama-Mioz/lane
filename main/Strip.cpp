@@ -98,7 +98,7 @@ StripError Strip::initBLE(NimBLEServer *server) {
 
     max_leds_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDS_UUID,
                                                   NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto maxLedsCharCallback = new MaxLedsCharCallback(*this);
+    auto maxLedsCharCallback = new MaxLEDsCharCallback(*this);
     max_leds_char->setValue(max_leds);
     max_leds_char->setCallbacks(maxLedsCharCallback);
 
@@ -204,7 +204,7 @@ void DelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 DelayCharCallback::DelayCharCallback(Strip &strip) : strip(strip) {}
 
-void MaxLedsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   if (data.length() >= 2) {
     uint16_t max_leds = data[0] | data[1] << 8;
@@ -216,7 +216,7 @@ void MaxLedsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   }
 }
 
-MaxLedsCharCallback::MaxLedsCharCallback(Strip &strip) : strip(strip) {}
+MaxLEDsCharCallback::MaxLEDsCharCallback(Strip &strip) : strip(strip) {}
 
 
 void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {

@@ -36,8 +36,8 @@ void scanTask(BLEScan *pBLEScan) {
   vTaskDelete(nullptr);
 }
 
-auto SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-auto CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+const char * SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const char * CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 void app_main(void) {
   const int DEFAULT_NUM_LEDS = 45;
@@ -63,7 +63,6 @@ void app_main(void) {
   );
   pServer->setCallbacks(new ServerCallbacks());
   pCharacteristic->setValue(std::string{0x00});
-  pService->start();
 
   // Initialize NeoPixel.
   /* an aux function used to let FreeRTOS do it work.
@@ -77,6 +76,8 @@ void app_main(void) {
   auto pStrip = Strip::get();
   pStrip->begin(max_leds, LED_PIN, color, brightness);
   pStrip->initBLE(pServer);
+  // Ad service must start after Strip service? why?
+  pService->start();
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);

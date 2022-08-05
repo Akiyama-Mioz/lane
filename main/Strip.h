@@ -119,12 +119,12 @@ public:
   explicit DelayCharCallback(Strip &strip);
 };
 
-class MaxLedsCharCallback : public NimBLECharacteristicCallbacks {
+class MaxLEDsCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit MaxLedsCharCallback(Strip &strip);
+  explicit MaxLEDsCharCallback(Strip &strip);
 };
 
 class StatusCharCallback : public NimBLECharacteristicCallbacks {
