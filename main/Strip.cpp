@@ -27,7 +27,6 @@ void Strip::stripTask() {
   pixels->show();
   auto fill_count = 10;
   // a delay that will be applied to the end of each loop.
-  auto halt_delay = 500;
   for (;;) {
     if (pixels != nullptr) {
       if (status == StripStatus::FORWARD) {
@@ -45,7 +44,12 @@ void Strip::stripTask() {
         pixels->show();
       }
     }
-    vTaskDelay(halt_delay / portTICK_PERIOD_MS);
+    const auto stop_halt_delay = 500;
+    if (status == StripStatus::STOP) {
+      vTaskDelay(stop_halt_delay / portTICK_PERIOD_MS);
+    } else {
+      vTaskDelay(halt_delay / portTICK_PERIOD_MS);
+    }
     // after a round record the count and notify the client.
     if (pixels != nullptr && count_char != nullptr && status != StripStatus::STOP) {
       if (count < UINT32_MAX) {
@@ -59,7 +63,10 @@ void Strip::stripTask() {
   }
 }
 
-/// update max length of strip.
+/**
+ * @brief sets the maximum number of LEDs that can be used.
+ * @param new_max_leds
+ */
 void Strip::setMaxLeds(int new_max_leds) {
   max_leds = new_max_leds;
   // delete already checks if the pointer is still pointing to a valid memory location.
@@ -112,6 +119,13 @@ StripError Strip::initBLE(NimBLEServer *server) {
                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
     count_char->setValue(count);
 
+
+    halt_delay_char = service->createCharacteristic(LIGHT_CHAR_HALT_DELAY_UUID,
+                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto halt_cb = new HaltDelayCharCallback(*this);
+    halt_delay_char->setValue(status);
+    halt_delay_char->setCallbacks(halt_cb);
+
     service->start();
     is_ble_initialized = true;
     return StripError::OK;
@@ -120,11 +134,23 @@ StripError Strip::initBLE(NimBLEServer *server) {
   }
 }
 
+/**
+ * @brief Get the instance/pointer of the strip.
+ * @return
+ */
 Strip *Strip::get() {
   static auto *strip = new Strip();
   return strip;
 }
 
+/**
+ * @brief initialize the strip. this function should only be called once.
+ * @param max_leds
+ * @param PIN the pin of strip, default is 14.
+ * @param color the default color of the strip. default is Cyan (0x00FF00).
+ * @param brightness the default brightness of the strip. default is 32.
+ * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
+ */
 StripError Strip::begin(int max_leds, int16_t PIN, uint32_t color, uint8_t brightness) {
   if (!is_initialized){
     pref.begin("record", false);
@@ -207,6 +233,9 @@ DelayCharCallback::DelayCharCallback(Strip &strip) : strip(strip) {}
 void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   if (data.length() >= 2) {
+    /** TODO: make a function to convert uint8 array to uint16_t
+     *   both big endian and little endian.
+    **/
     uint16_t max_leds = data[0] | data[1] << 8;
     strip.setMaxLeds(max_leds);
     strip.pref.putInt("max_leds", max_leds);
@@ -222,8 +251,6 @@ MaxLEDsCharCallback::MaxLEDsCharCallback(Strip &strip) : strip(strip) {}
 void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   uint8_t status = data[0];
-  // remember to change this when modify StripStatus enum
-  // here is a magic number which is the length of StripStatus enum
   if (status < StripStatus_LENGTH) {
     auto s = StripStatus(status);
     strip.status = s;
@@ -234,3 +261,17 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 }
 
 StatusCharCallback::StatusCharCallback(Strip &strip) : strip(strip) {}
+
+void HaltDelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+  auto data = characteristic->getValue();
+  if (data.length() >= 2) {
+    uint16_t delay_ms = data[0] | data[1] << 8;
+    strip.halt_delay = delay_ms;
+  } else {
+    ESP_LOGE("HaltDelayCharCallback", "Invalid data length: %d", data.length());
+    characteristic->setValue(strip.halt_delay);
+  }
+}
+
+HaltDelayCharCallback::HaltDelayCharCallback(Strip &strip): strip(strip) {}
+

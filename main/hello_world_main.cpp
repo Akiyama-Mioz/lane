@@ -17,11 +17,11 @@
 
 extern "C" { void app_main(); }
 
-auto esp_name = "e-track 011";
+static auto esp_name = "e-track 011";
 
 //In seconds
-const int scanTime = 1;
-const int ScanInterval = 50;
+static const int scanTime = 1;
+static const int scanInterval = 50;
 
 [[noreturn]]
 void scanTask(BLEScan *pBLEScan) {
@@ -30,7 +30,7 @@ void scanTask(BLEScan *pBLEScan) {
     printf("Devices found: %d\n", foundDevices.getCount());
     printf("Scan done!\n");
     pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-    vTaskDelay(ScanInterval / portTICK_PERIOD_MS); // Delay a second between loops.
+    vTaskDelay(scanInterval / portTICK_PERIOD_MS); // Delay a second between loops.
   }
 
   vTaskDelete(nullptr);
@@ -65,10 +65,10 @@ void app_main(void) {
   pCharacteristic->setValue(std::string{0x00});
 
   // Initialize NeoPixel.
-  /* an aux function used to let FreeRTOS do it work.
+  /** an aux function used to let FreeRTOS do it work.
    * since FreeRTOS is implemented in C, we can't have lambda capture, so pStrip must be
    * passed as parameter.
-  */
+  **/
   auto pFunc = [](Strip *pStrip){
     pStrip->stripTask();
   };
