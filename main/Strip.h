@@ -64,13 +64,19 @@ public:
   const char *LIGHT_CHAR_HALT_DELAY_UUID = "00923454-81de-4e74-b2e0-a873f2cbddcc";
 
 
-  // you should call this in creatTask or something in RTOS.
+  /**
+   * @brief Loop the strip.
+   * @warning This function will never return and you should call this in creatTask/Thread
+   *          or something equivalent in RTOS.
+   * @param void void
+   * @return No return
+   */
   [[noreturn]]
   void stripTask();
 
   StripError initBLE(NimBLEServer *server);
 
-  void setMaxLeds(int new_max_leds);
+  void setMaxLEDs(int new_max_LEDs);
 
   void setBrightness(uint8_t new_brightness);
 
@@ -88,7 +94,7 @@ public:
 
   Strip &operator=(Strip &&) = delete;
 
-  // usually you won't destruct it because it's running in MCU.
+  // usually you won't destruct it because it's running in MCU and the resource will be released
   ~Strip() = delete;
 
   StripError

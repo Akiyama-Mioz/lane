@@ -64,10 +64,11 @@ void Strip::stripTask() {
 
 /**
  * @brief sets the maximum number of LEDs that can be used.
- * @param new_max_leds
+ * @warning This function will not set the corresponding bluetooth characteristic value.
+ * @param new_max_LEDs
  */
-void Strip::setMaxLeds(int new_max_leds) {
-  max_leds = new_max_leds;
+void Strip::setMaxLEDs(int new_max_LEDs) {
+  max_leds = new_max_LEDs;
   // delete already checks if the pointer is still pointing to a valid memory location.
   // If it is already nullptr, then it does nothing
   // free up the allocated memory from new
@@ -75,6 +76,7 @@ void Strip::setMaxLeds(int new_max_leds) {
   // prevent dangling pointer
   pixels = nullptr;
   pixels = new Adafruit_NeoPixel(max_leds, pin, NEO_GRB + NEO_KHZ800);
+  pixels->setBrightness(brightness);
   pixels->begin();
 }
 
@@ -86,33 +88,33 @@ StripError Strip::initBLE(NimBLEServer *server) {
     service = server->createService(LIGHT_SERVICE_UUID);
     color_char = service->createCharacteristic(LIGHT_CHAR_COLOR_UUID,
                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto colorCharCallback = new ColorCharCallback(*this);
+    auto color_cb = new ColorCharCallback(*this);
     color_char->setValue(color);
-    color_char->setCallbacks(colorCharCallback);
+    color_char->setCallbacks(color_cb);
 
     brightness_char = service->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto brightnessCharCallback = new BrightnessCharCallback(*this);
+    auto brightness_cb = new BrightnessCharCallback(*this);
     brightness_char->setValue(brightness);
-    brightness_char->setCallbacks(brightnessCharCallback);
+    brightness_char->setCallbacks(brightness_cb);
 
     delay_char = service->createCharacteristic(LIGHT_CHAR_DELAY_UUID,
                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto delayCharCallback = new DelayCharCallback(*this);
+    auto delay_cb = new DelayCharCallback(*this);
     delay_char->setValue(delay_ms);
-    delay_char->setCallbacks(delayCharCallback);
+    delay_char->setCallbacks(delay_cb);
 
     max_leds_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDS_UUID,
                                                   NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto maxLedsCharCallback = new MaxLEDsCharCallback(*this);
+    auto max_LEDs_cb = new MaxLEDsCharCallback(*this);
     max_leds_char->setValue(max_leds);
-    max_leds_char->setCallbacks(maxLedsCharCallback);
+    max_leds_char->setCallbacks(max_LEDs_cb);
 
     status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto statusCharCallback = new StatusCharCallback(*this);
+    auto status_cb = new StatusCharCallback(*this);
     status_char->setValue(status);
-    status_char->setCallbacks(statusCharCallback);
+    status_char->setCallbacks(status_cb);
 
     this->count_char = service->createCharacteristic(LIGHT_CHAR_COUNT_UUID,
                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
@@ -167,12 +169,14 @@ StripError Strip::begin(int max_leds, int16_t PIN, uint32_t color, uint8_t brigh
   }
 }
 
+/**
+ * @brief set the color of the strip.
+ * @warning This function will not set the corresponding bluetooth characteristic value.
+ * @param color the color of the strip.
+ */
 void Strip::setBrightness(const uint8_t new_brightness) {
   if (pixels != nullptr) {
     brightness = new_brightness;
     pixels->setBrightness(brightness);
-    if (brightness_char != nullptr) {
-      brightness_char->setValue(brightness);
-    }
   }
 }

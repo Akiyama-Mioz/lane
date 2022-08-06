@@ -4,7 +4,6 @@
 
 #include "AdCallback.h"
 
-
 void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   auto name = advertisedDevice->getName();
   auto payload = std::string(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31);
@@ -21,12 +20,12 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     BLEAdvertisingData data = BLEAdvertisingData_init_zero;
 
     /**
-     * @brief a function to encode a string to a pb_ostream_t with zero-terminator.
+     * @brief a function to encode a string with zero-terminator to a pb_ostream_t
      * @see <a href="https://stackoverflow.com/questions/57569586/how-to-encode-a-string-when-it-is-a-pb-callback-t-type">How to encode a string when it is a pb_callback_t type</a>
      * @param[in] arg the string to encode, should be char or uint8_t or something equivalent.
      */
-    auto encode_string = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
-      const char *str = reinterpret_cast<const char *>(*arg);
+    auto encode_string = [](pb_ostream_t *stream, const pb_field_t *field, const char *const *arg) {
+      auto str = (*arg);
       if (!pb_encode_tag_for_field(stream, field)) {
         return false;
       } else {
@@ -34,12 +33,14 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
       }
     };
 
-    const struct {
+    auto encode_string_callback = PbCallback<const char *>{
+      .arg = name.c_str(),
+      .func = encode_string
+    };
+
+    struct Payload {
       uint8_t *content;
       size_t size;
-    } payload_data{
-        advertisedDevice->getPayload(),
-        31 // payload size, here it's fixed since bluetooth advertisement payload is 31 bytes.
     };
 
     /**
@@ -51,12 +52,8 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
      * @see <a href="https://martin-ueding.de/posts/currying-in-c/">Currying in C </a>
      * @param[in] arg should be a struct with contains a field named content (uint8_t*) and a field named size (size_t).
      */
-    auto encode_str_with_len = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
-      struct Payload {
-        uint8_t *content;
-        size_t size;
-      };
-      auto payload = static_cast<Payload *>(*arg);
+    auto encode_str_with_len = [](pb_ostream_t *stream, const pb_field_t *field, Payload *const *arg) {
+      auto payload = (*arg);
       if (!pb_encode_tag_for_field(stream, field)) {
         return false;
       } else {
@@ -64,11 +61,20 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
       }
     };
 
+    auto payload_data = Payload{
+        advertisedDevice->getPayload(),
+        31 // payload size, here it's fixed since bluetooth advertisement payload is 31 bytes.
+    };
+    auto encode_str_with_len_callback = PbCallback<Payload *>{
+        .arg = &payload_data,
+        .func = encode_str_with_len,
+    };
+
     pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
-    data.name.arg = const_cast<void *>(reinterpret_cast<const void *>(name.c_str()));
-    data.name.funcs.encode = encode_string;
-    data.manufactureData.arg = const_cast<void *>(reinterpret_cast<const void *>(&payload_data));
-    data.manufactureData.funcs.encode = encode_str_with_len;
+    data.name.arg = encode_string_callback.arg_to_void();
+    data.name.funcs.encode = encode_string_callback.func_to_void();
+    data.manufactureData.arg = encode_str_with_len_callback.arg_to_void();
+    data.manufactureData.funcs.encode = encode_str_with_len_callback.func_to_void();
     data.rssi = advertisedDevice->getRSSI();
     bool status = pb_encode(&stream, BLEAdvertisingData_fields, &data);
     auto length = stream.bytes_written;
@@ -83,6 +89,7 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     lastDevices.insert_or_assign(name, payload);
   }
 }
+
 
 void ServerCallbacks::onConnect(NimBLEServer *pServer, ble_gap_conn_desc *desc) {
   printf("Client address: ");

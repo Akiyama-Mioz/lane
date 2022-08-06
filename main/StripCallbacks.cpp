@@ -62,7 +62,7 @@ void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
      *   both big endian and little endian.
     **/
     uint16_t max_leds = data[0] | data[1] << 8;
-    strip.setMaxLeds(max_leds);
+    strip.setMaxLEDs(max_leds);
     strip.pref.putInt("max_leds", max_leds);
   } else {
     ESP_LOGE("LengthCharCallback", "Invalid data length: %d", data.length());
