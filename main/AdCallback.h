@@ -20,6 +20,7 @@
 
 /**
  * @brief A auxiliary class to handle the callback of nanopb encoding.
+ *        This exists because the need for
  * @warning: T must be a pointer type (with a little star behind it)
  */
 template<class T>
@@ -38,15 +39,15 @@ struct PbCallback {
    * @brief cast the function to the type of PbEncodeCallbackVoid.
    * @return a function pointer of bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
    */
-  PbEncodeCallbackVoid func_to_void() {
-    return reinterpret_cast<PbEncodeCallbackVoid>(*func);
+  inline PbEncodeCallbackVoid func_to_void() {
+    return reinterpret_cast<PbEncodeCallbackVoid>(func);
   }
   /**
-   * @brief cast the arg to void *.
+   * @brief cast the arg (which should already be a pointer) to void *.
    * @return void *
    */
-  void * arg_to_void() {
-    return std::addressof(arg);
+  inline void * arg_to_void() {
+    return const_cast<void *>(reinterpret_cast<const void *>(arg));
   }
   /**
    * @note constructor is deleted. use the struct initializer instead.
@@ -62,7 +63,7 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
 
   /**
    * @brief callback when a device is found
-   * @param advertisedDevice - the device found
+   * @param advertisedDevice the device found
    * @return void
    * @note This function will use nanopb to encode the payload and then send it to the characteristic
    */
