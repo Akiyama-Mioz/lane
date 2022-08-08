@@ -41,7 +41,7 @@ const char * CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 void app_main(void) {
   const int DEFAULT_NUM_LEDS = 45;
-  const int LED_PIN = 14;
+  const uint16_t LED_PIN = 14;
   initArduino();
 
   Preferences pref;
@@ -64,7 +64,7 @@ void app_main(void) {
   pServer->setCallbacks(new ServerCallbacks());
   pCharacteristic->setValue(std::string{0x00});
 
-  // Initialize NeoPixel.
+  /**** Initialize NeoPixel. ****/
   /** an aux function used to let FreeRTOS do it work.
    * since FreeRTOS is implemented in C where we can't have lambda capture, so pStrip must be
    * passed as parameter.

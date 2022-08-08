@@ -3,19 +3,19 @@
 //
 #include "StripCommon.h"
 
-void Strip::fillForward(int fill_count = 10) const {
-  for (int i = 0; i < max_leds; i++) {
+void Strip::fillForward() const {
+  for (int i = 0; i < max_LEDs; i++) {
     pixels->clear();
-    pixels->fill(color, i, fill_count);
+    pixels->fill(color, i, length);
     pixels->show();
     vTaskDelay(delay_ms / portTICK_PERIOD_MS);
   }
 }
 
-void Strip::fillReverse(int fill_count = 10) const {
-  for (int i = max_leds - 1; i >= 0; i--) {
+void Strip::fillReverse() const {
+  for (int i = max_LEDs - length; i >= 0; i--) {
     pixels->clear();
-    pixels->fill(color, i, fill_count);
+    pixels->fill(color, i, length);
     pixels->show();
     vTaskDelay(delay_ms / portTICK_PERIOD_MS);
   }
@@ -24,19 +24,18 @@ void Strip::fillReverse(int fill_count = 10) const {
 void Strip::stripTask() {
   pixels->clear();
   pixels->show();
-  auto fill_count = 10;
   // a delay that will be applied to the end of each loop.
   for (;;) {
     if (pixels != nullptr) {
       if (status == StripStatus::FORWARD) {
-        fillForward(fill_count);
+        fillForward();
       } else if (status == StripStatus::REVERSE) {
-        fillReverse(fill_count);
+        fillReverse();
       } else if (status == StripStatus::AUTO) {
         if (count % 2 == 0) {
-          fillForward(fill_count);
+          fillForward();
         } else {
-          fillReverse(fill_count);
+          fillReverse();
         }
       } else if (status == StripStatus::STOP) {
         pixels->clear();
@@ -68,14 +67,20 @@ void Strip::stripTask() {
  * @param new_max_LEDs
  */
 void Strip::setMaxLEDs(int new_max_LEDs) {
-  max_leds = new_max_LEDs;
+  max_LEDs = new_max_LEDs;
   // delete already checks if the pointer is still pointing to a valid memory location.
   // If it is already nullptr, then it does nothing
   // free up the allocated memory from new
   delete pixels;
   // prevent dangling pointer
   pixels = nullptr;
-  pixels = new Adafruit_NeoPixel(max_leds, pin, NEO_GRB + NEO_KHZ800);
+  /**
+   * @note Adafruit_NeoPixel::updateLength(uint16_t n) has been deprecated and only for old projects that
+   *       may still be calling it. New projects should instead use the
+   *       'new' keyword with the first constructor syntax (length, pin,
+   *       type).
+   */
+  pixels = new Adafruit_NeoPixel(max_LEDs, pin, NEO_GRB + NEO_KHZ800);
   pixels->setBrightness(brightness);
   pixels->begin();
 }
@@ -107,7 +112,7 @@ StripError Strip::initBLE(NimBLEServer *server) {
     max_leds_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDS_UUID,
                                                   NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
     auto max_LEDs_cb = new MaxLEDsCharCallback(*this);
-    max_leds_char->setValue(max_leds);
+    max_leds_char->setValue(max_LEDs);
     max_leds_char->setCallbacks(max_LEDs_cb);
 
     status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
@@ -146,20 +151,20 @@ Strip *Strip::get() {
 
 /**
  * @brief initialize the strip. this function should only be called once.
- * @param max_leds
+ * @param max_LEDs
  * @param PIN the pin of strip, default is 14.
  * @param color the default color of the strip. default is Cyan (0x00FF00).
  * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-StripError Strip::begin(int max_leds, int16_t PIN, uint32_t color, uint8_t brightness) {
+StripError Strip::begin(int max_LEDs, int16_t PIN, uint32_t color, uint8_t brightness) {
   if (!is_initialized){
     pref.begin("record", false);
     this->color = color;
-    this->max_leds = max_leds;
+    this->max_LEDs = max_LEDs;
     this->pin = PIN;
     this->brightness = brightness;
-    pixels = new Adafruit_NeoPixel(max_leds, PIN, NEO_GRB + NEO_KHZ800);
+    pixels = new Adafruit_NeoPixel(max_LEDs, PIN, NEO_GRB + NEO_KHZ800);
     pixels->begin();
     pixels->setBrightness(brightness);
     is_initialized = true;

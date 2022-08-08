@@ -66,7 +66,7 @@ void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     strip.pref.putInt("max_leds", max_leds);
   } else {
     ESP_LOGE("LengthCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.max_leds);
+    characteristic->setValue(strip.max_LEDs);
   }
 }
 

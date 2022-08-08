@@ -34,7 +34,9 @@ public:
   Preferences pref;
   int pin = 14;
   // 10 LEDs/m foo 24v
-  int max_leds = 50;
+  int max_LEDs = 50;
+  // length should be less than max_LEDs
+  uint16_t length = 10;
   uint32_t count = 0;
   uint8_t brightness = 32;
   Adafruit_NeoPixel *pixels = nullptr;
@@ -80,9 +82,9 @@ public:
 
   void setBrightness(uint8_t new_brightness);
 
-  void fillForward(int fill_count) const;
+  void fillForward() const;
 
-  void fillReverse(int fill_count) const;
+  void fillReverse() const;
 
   static Strip *get();
 
@@ -98,7 +100,7 @@ public:
   ~Strip() = delete;
 
   StripError
-  begin(int max_leds, int16_t PIN, uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255), uint8_t brightness = 32);
+  begin(int max_LEDs, int16_t PIN, uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255), uint8_t brightness = 32);
 
 protected:
   Strip() = default;
