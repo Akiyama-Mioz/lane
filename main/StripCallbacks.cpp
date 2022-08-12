@@ -6,7 +6,7 @@
 void ColorCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   if (data.length() >= 3) {
-    // BGR
+    // BRG
     auto color = Adafruit_NeoPixel::Color(data[0], data[1], data[2]);
     strip.color = color;
     [[maybe_unused]]

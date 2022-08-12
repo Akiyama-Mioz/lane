@@ -89,12 +89,22 @@ StripError Strip::initBLE(NimBLEServer *server) {
   if (server == nullptr) {
     return StripError::ERROR;
   }
-  if(!is_ble_initialized){
+  if (!is_ble_initialized) {
     service = server->createService(LIGHT_SERVICE_UUID);
     color_char = service->createCharacteristic(LIGHT_CHAR_COLOR_UUID,
                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
     auto color_cb = new ColorCharCallback(*this);
-    color_char->setValue(color);
+    // https://stackoverflow.com/questions/2182002/convert-big-endian-to-little-endian-in-c-without-using-provided-func
+    // well it's actually uint24;
+    uint32_t byte1 = ((color >> 16) & 0xff);
+    uint32_t byte2 = ((color >> 8) & 0xff) << 8;
+    uint32_t byte3 = ((color) & 0xff) << 16;
+    uint32_t actual_color =  byte1 | // move byte 2 to byte 0
+                             byte2 | // move byte 1 to byte 1
+                             byte3; // byte 0 to byte 2 ;
+
+    printf("actual_color: %x\n", actual_color);
+    color_char->setValue(actual_color);
     color_char->setCallbacks(color_cb);
 
     brightness_char = service->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
@@ -127,7 +137,7 @@ StripError Strip::initBLE(NimBLEServer *server) {
 
 
     halt_delay_char = service->createCharacteristic(LIGHT_CHAR_HALT_DELAY_UUID,
-                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
     auto halt_cb = new HaltDelayCharCallback(*this);
     halt_delay_char->setValue(status);
     halt_delay_char->setCallbacks(halt_cb);
@@ -158,7 +168,7 @@ Strip *Strip::get() {
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
 StripError Strip::begin(int max_LEDs, int16_t PIN, uint32_t color, uint8_t brightness) {
-  if (!is_initialized){
+  if (!is_initialized) {
     pref.begin("record", false);
     this->color = color;
     this->max_LEDs = max_LEDs;
