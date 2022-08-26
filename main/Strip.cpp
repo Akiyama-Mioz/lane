@@ -78,13 +78,13 @@ for(uint8_t i=0; i<3;i++){      //fill /  if skip
       stop=0;
       break;
     }
-      
+    shift_char->setValue(shift);
+  shift_char->notify();
     vTaskDelay((1000/fps-4000*0.03)/portTICK_PERIOD_MS);
   }
   status_char->setValue(StripStatus::STOP);
   status_char->notify();
-  shift_char->setValue(shift);
-  shift_char->notify();
+  
 }
 
 void Strip::RUN1000() const {
@@ -139,12 +139,14 @@ for(uint8_t i=0; i<3;i++){
       stop=0;
       break;
     }
+    shift_char->setValue(shift);
+    shift_char->notify();
     vTaskDelay((1000/fps-4000*0.03)/portTICK_PERIOD_MS);
   }
+
   status_char->setValue(StripStatus::STOP);
   status_char->notify();
-  shift_char->setValue(shift);
-  shift_char->notify();
+  
 }
 
 void Strip::stripTask() {
