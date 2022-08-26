@@ -12,16 +12,18 @@
 #include "NimBLEDevice.h"
 #include <map>
 
-#include "Strip.h"
+#include "StripCommon.h"
 #include "AdCallback.h"
 
 extern "C" { void app_main(); }
 
 static auto esp_name = "e-track 011";
-
+class Strip;
 //In seconds
 static const int scanTime = 1;
 static const int scanInterval = 50;
+
+
 
 [[noreturn]]
 void scanTask(BLEScan *pBLEScan) {
@@ -40,17 +42,17 @@ const char * SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const char * CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 void app_main(void) {
-  const int DEFAULT_NUM_LEDS = 45;
+  const int DEFAULT_NUM_LEDS = 4000;
   const uint16_t LED_PIN = 14;
   initArduino();
 
   Preferences pref;
   pref.begin("record", true);
   auto max_leds = pref.getInt("max_leds", DEFAULT_NUM_LEDS);
-  auto color = pref.getUInt("color", Adafruit_NeoPixel::Color(255, 0, 255));
+  
   auto brightness = pref.getUChar("brightness", 32);
   printf("max_leds stored in pref: %d\n", max_leds);
-  printf("color stored in pref: %x\n", color);
+  
   printf("brightness stored in pref: %d\n", brightness);
 
   NimBLEDevice::init(esp_name);
@@ -74,10 +76,10 @@ void app_main(void) {
   };
   // using singleton pattern to avoid memory leak
   auto pStrip = Strip::get();
-  pStrip->begin(max_leds, LED_PIN, color, brightness);
+  pStrip->begin(max_leds, LED_PIN, brightness);
   pStrip->initBLE(pServer);
   // Ad service must start after Strip service? why?
-  pService->start();
+
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);
@@ -95,10 +97,10 @@ void app_main(void) {
   // less or equal setInterval value
   pBLEScan->setWindow(99);
 
-  xTaskCreate(reinterpret_cast<TaskFunction_t>(scanTask),
-              "scanTask", 5000,
-              static_cast<void *>(pBLEScan), 1,
-              nullptr);
+  // xTaskCreate(reinterpret_cast<TaskFunction_t>(scanTask),
+  //             "scanTask", 5000,
+  //             static_cast<void *>(pBLEScan), 1,
+  //             nullptr);
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
               "stripTask", 5000,
               pStrip, 2,

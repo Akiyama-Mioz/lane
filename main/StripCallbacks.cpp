@@ -3,19 +3,26 @@
 //
 #include "StripCommon.h"
 
+
 void ColorCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   if (data.length() >= 3) {
     // BRG
-    auto color = Adafruit_NeoPixel::Color(data[0], data[1], data[2]);
-    strip.color = color;
+    for(uint8_t i=0;i<3;i++){
+      auto color = Adafruit_NeoPixel::Color(data[i], data[i+1], data[i+2]);
+      strip.color[i] = color;
+    }
+    
     [[maybe_unused]]
-    auto size = strip.pref.putUInt("color", strip.color);
+    auto size = strip.pref.putUInt("color0", strip.color[0]);
+    auto size = strip.pref.putUInt("color1", strip.color[1]);
+    auto size = strip.pref.putUInt("color2", strip.color[2]);
+    
 //    auto c = strip.pref.getUInt("color", Adafruit_NeoPixel::Color(255, 255, 255));
 //    printf("[ColorCharCallback] color stored in pref: %x, size: %d\n", c, size);
   } else {
     ESP_LOGE("ColorCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.color);
+    characteristic->setValue(strip.color[0]);
   }
 }
 
@@ -100,3 +107,36 @@ void HaltDelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 HaltDelayCharCallback::HaltDelayCharCallback(Strip &strip): strip(strip) {}
 
+void speedCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+  auto data = characteristic->getValue();
+  if (50 > data.length() >= 10 ) {
+    for(uint8_t i=0;i<8;i++){
+      speed_female[i*100] = data[2*i] | data[2*i+1] <<8;
+      speed_female[i*100+1] = data[2*i+16] | data[2*i+17] <<8;
+      speed_female[i*100+2] = data[2*i+32] | data[2*i+33] <<8;
+      auto size = strip.pref.putUInt("speed_female["+i*100, speed_female[i*100]);
+      auto size = strip.pref.putUInt("speed_female["+(i*100+1), speed_female[i*100+1]);
+      auto size = strip.pref.putUInt("speed_female["+(i*100+2), speed_female[i*100+2]);
+    }
+    characteristic->setValue(speed_female);
+    characteristic->notify();
+  } 
+  else if(data.length() < 70){
+    for(uint8_t i=0;i<10;i++){
+      speed_male[i*100] = data[2*i] | data[2*i+1] <<8;
+      speed_male[i*100+1] = data[2*i+20] | data[2*i+17] <<8;
+      speed_male[i*100+2] = data[2*i+40] | data[2*i+33] <<8;
+      auto size = strip.pref.putUInt("speed_male["+i*100, speed_male[i*100]);
+      auto size = strip.pref.putUInt("speed_male["+(i*100+1), speed_male[i*100+1]);
+      auto size = strip.pref.putUInt("speed_male["+(i*100+2), speed_male[i*100+2]);
+    }
+    characteristic->setValue(speed_female);
+    characteristic->notify();
+  }
+  else {
+    ESP_LOGE("speedCharCallback", "Invalid data length: %d", data.length());
+    // characteristic->setValue(strip.halt_delay);
+  }
+}
+
+speedCharCallback::speedCharCallback(Strip &strip): strip(strip) {}

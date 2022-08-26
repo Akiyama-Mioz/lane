@@ -1,24 +1,150 @@
 //
 // Created by Kurosu Chan on 2022/7/13.
 //
-#include "StripCommon.h"
 
-void Strip::fillForward() const {
-  for (int i = 0; i < max_LEDs; i++) {
-    pixels->clear();
-    pixels->fill(color, i, length);
-    pixels->show();
-    vTaskDelay(delay_ms / portTICK_PERIOD_MS);
+#include "StripCommon.h"
+float fps=6; //distance travelled ! max = 7 !
+uint8_t stop =0;
+void Strip::Get_color(void)  {
+  color[0] = pref.getUInt("color0", Adafruit_NeoPixel::Color(255, 0, 255));
+  color[1] = pref.getUInt("color1", Adafruit_NeoPixel::Color(255, 255, 0));
+  color[2] = pref.getUInt("color2", Adafruit_NeoPixel::Color(0, 255, 255));
+  
   }
+void Strip::Get_speed(void)  {
+  for(uint8_t i=0;i<8;i++){       ///speed_female 100:...[i00] 80:...[i01]  60:...[i02]
+    speed_female[i*100] = pref.getUInt("speed_female["+i*100,speed800[0][i]);  
+    speed_female[i*100+1] = pref.getUInt("speed_female["+(i*100+1),speed800[1][i]);
+    speed_female[i*100+2] = pref.getUInt("speed_female["+(i*100+2),speed800[2][i]);
+  }
+for(uint8_t i=0;i<10;i++){
+    speed_male[i*100] = pref.getUInt("speed_male["+i*100,speed1000[0][i]);
+    speed_male[i*100+1] = pref.getUInt("speed_male["+(i*100+1),speed1000[1][i]);
+    speed_male[i*100+2] = pref.getUInt("speed_male["+(i*100+2),speed1000[2][i]);
+  }
+ 
+  }
+
+void Strip::RUN800() const {
+  uint  position[3]={0};  //position of each 3 leds
+  float shift[3]={0};
+  uint8_t skip[3] ={0}; //if led is skipping to 0
+  for(;;){
+
+    pixels->clear();
+    //100 scores 
+    if (shift[0] < 800){
+      uint8_t c_hdd = shift[0] / 100;     //section locating
+      shift[0] += speed_female[c_hdd*100]/fps/10;    //distance  :m
+    }
+    else
+      shift[0] = 800;
+    position[0] = shift[0] * 10;
+    //80 scores 
+    if (shift[1] < 800){
+      uint8_t c_hdd = shift[1] / 100;     //section locating
+      shift[1] += speed_female[c_hdd*100+1]/fps/10;    //distance  :m
+    }
+    else
+      shift[1] = 800;
+    position[1] = shift[1] * 10;
+    //60 scores 
+    if (shift[2] < 800){
+      uint8_t c_hdd = shift[2] / 100;     //section locating
+      shift[2] += speed_female[c_hdd*100+2]/fps/10;    //distance  :m
+    }
+    else
+      shift[2] = 800;
+    position[2] = shift[2] * 10;
+//position message packet
+    for(uint8_t i = 0;i<3; i++){    //each position actually
+      if(position[i] > 4000){
+        position[i] -= 4000;
+        if(position[i] < 10) 
+          skip[i] = 1 ;
+        }
+    }
+    
+for(uint8_t i=0; i<3;i++){      //fill /  if skip
+    if(skip[i] == 1){
+      pixels->fill(color[i],4000-position[i]);
+      pixels->fill(color[i],0,position[i]);
+    }
+    else
+      pixels->fill(color[i], position[i]-length, length);
+    }
+    pixels->show();
+    if(shift[2] == 800 || stop ==1){
+      stop=0;
+      break;
+    }
+      
+    vTaskDelay((1000/fps-4000*0.03)/portTICK_PERIOD_MS);
+  }
+  status_char->setValue(StripStatus::STOP);
+  status_char->notify();
+  shift_char->setValue(shift);
+  shift_char->notify();
 }
 
-void Strip::fillReverse() const {
-  for (int i = max_LEDs - length; i >= 0; i--) {
+void Strip::RUN1000() const {
+  uint  position[3]={0};  //position of each 3 leds
+  float shift[3]={0};
+  uint8_t skip[3] ={0}; //if led is skipping to 0
+  for(;;){
     pixels->clear();
-    pixels->fill(color, i, length);
+    //100 scores 
+    if (shift[0] < 1000){
+      uint8_t c_hdd = shift[0] / 100;     //section locating
+      shift[0] += speed_male[c_hdd*100]/fps/10;    //distance  :m
+    }
+    else
+      shift[0] = 1000;
+    position[0] = shift[0] * 10;
+    //80 scores 
+    if (shift[1] < 1000){
+      uint8_t c_hdd = shift[1] / 100;     //section locating
+      shift[1] += speed_male[c_hdd*100+1]/fps/10;    //distance  :m
+    }
+    else
+      shift[1] = 1000;
+    position[1] = shift[1] * 10;
+    //60 scores 
+    if (shift[2] < 1000){
+      uint8_t c_hdd = shift[2] / 100;     //section locating
+      shift[2] += speed_male[c_hdd*100+2]/fps/10;    //distance  :m
+    }
+    else
+      shift[2] = 1000;
+    position[2] = shift[2] * 10;
+//position message packet
+    for(uint8_t i = 0;i<3; i++){    //each position actually
+      if(position[i] > 4000){
+        position[i] %= 4000;
+        if(position[i] < 10) 
+          skip[i] = 1 ;
+        }
+    }
+    
+for(uint8_t i=0; i<3;i++){
+    if(skip[i] == 1){
+      pixels->fill(color[i],4000-position[i]);
+      pixels->fill(color[i],0,position[i]);
+    }
+    else
+      pixels->fill(color[i], position[i]-length, length);
+    }
     pixels->show();
-    vTaskDelay(delay_ms / portTICK_PERIOD_MS);
+    if(shift[2] == 1000 || stop ==1){
+      stop=0;
+      break;
+    }
+    vTaskDelay((1000/fps-4000*0.03)/portTICK_PERIOD_MS);
   }
+  status_char->setValue(StripStatus::STOP);
+  status_char->notify();
+  shift_char->setValue(shift);
+  shift_char->notify();
 }
 
 void Strip::stripTask() {
@@ -27,19 +153,16 @@ void Strip::stripTask() {
   // a delay that will be applied to the end of each loop.
   for (;;) {
     if (pixels != nullptr) {
-      if (status == StripStatus::FORWARD) {
-        fillForward();
-      } else if (status == StripStatus::REVERSE) {
-        fillReverse();
-      } else if (status == StripStatus::AUTO) {
-        if (count % 2 == 0) {
-          fillForward();
-        } else {
-          fillReverse();
-        }
+      
+      if (status == StripStatus::RUN800) {
+        RUN800();
+      } else if (status == StripStatus::RUN1000) {
+        RUN1000();
       } else if (status == StripStatus::STOP) {
+        pixels->updateLength(4000);
         pixels->clear();
         pixels->show();
+        stop =1 ;
       }
     }
     const auto stop_halt_delay = 500;
@@ -49,14 +172,13 @@ void Strip::stripTask() {
       vTaskDelay(halt_delay / portTICK_PERIOD_MS);
     }
     // after a round record the count and notify the client.
-    if (pixels != nullptr && count_char != nullptr && status != StripStatus::STOP) {
+    if (pixels != nullptr && shift_char != nullptr && status != StripStatus::STOP) {
       if (count < UINT32_MAX) {
         count++;
       } else {
         count = 0;
       }
-      count_char->setValue(count);
-      count_char->notify();
+      
     }
   }
 }
@@ -96,9 +218,9 @@ StripError Strip::initBLE(NimBLEServer *server) {
     auto color_cb = new ColorCharCallback(*this);
     // https://stackoverflow.com/questions/2182002/convert-big-endian-to-little-endian-in-c-without-using-provided-func
     // well it's actually uint24;
-    uint32_t byte1 = ((color >> 16) & 0xff);
-    uint32_t byte2 = ((color >> 8) & 0xff) << 8;
-    uint32_t byte3 = ((color) & 0xff) << 16;
+    uint32_t byte1 = ((color[0] >> 16) & 0xff);
+    uint32_t byte2 = ((color[0] >> 8) & 0xff) << 8;
+    uint32_t byte3 = ((color[0]) & 0xff) << 16;
     uint32_t actual_color =  byte1 | // move byte 2 to byte 0
                              byte2 | // move byte 1 to byte 1
                              byte3; // byte 0 to byte 2 ;
@@ -131,9 +253,15 @@ StripError Strip::initBLE(NimBLEServer *server) {
     status_char->setValue(status);
     status_char->setCallbacks(status_cb);
 
-    this->count_char = service->createCharacteristic(LIGHT_CHAR_COUNT_UUID,
+    speed_char = service->createCharacteristic(LIGHT_CHAR_SPEED_UUID,
+                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto speed_cb = new speedCharCallback(*this);
+    //speed_char->setValue(speed);
+    speed_char->setCallbacks(speed_cb);
+
+    this->shift_char = service->createCharacteristic(LIGHT_CHAR_SHIFT_UUID,
                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-    count_char->setValue(count);
+    shift_char->setValue(count);
 
 
     halt_delay_char = service->createCharacteristic(LIGHT_CHAR_HALT_DELAY_UUID,
@@ -167,13 +295,14 @@ Strip *Strip::get() {
  * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-StripError Strip::begin(int max_LEDs, int16_t PIN, uint32_t color, uint8_t brightness) {
+StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
   if (!is_initialized) {
     pref.begin("record", false);
-    this->color = color;
     this->max_LEDs = max_LEDs;
     this->pin = PIN;
     this->brightness = brightness;
+    Get_color();
+    Get_speed();
     pixels = new Adafruit_NeoPixel(max_LEDs, PIN, NEO_GRB + NEO_KHZ800);
     pixels->begin();
     pixels->setBrightness(brightness);

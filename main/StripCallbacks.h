@@ -19,6 +19,15 @@ public:
   explicit ColorCharCallback(Strip &strip);
 };
 
+class speedCharCallback : public NimBLECharacteristicCallbacks {
+  Strip &strip;
+public:
+  void onWrite(NimBLECharacteristic *characteristic) override;
+
+  explicit speedCharCallback(Strip &strip);
+};
+
+
 class BrightnessCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
