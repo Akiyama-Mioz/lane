@@ -11,10 +11,20 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include <map>
-
+#include "pb_encode.h"
+#include "pb_decode.h"
+#include "msg.pb.h"
+//#include "pb.h"
+// #include "nanopb_cpp.h"
 #include "StripCommon.h"
 #include "AdCallback.h"
-
+#define TEST(x) \
+    if (!(x)) { \
+        fprintf(stderr, "\033[31;1mFAILED:\033[22;39m %s:%d %s\n", __FILE__, __LINE__, #x); \
+        status = 1; \
+    } else { \
+        printf("\033[32;1mOK:\033[22;39m %s\n", #x); \
+    }
 extern "C" { void app_main(); }
 
 static auto esp_name = "e-track 011";
@@ -37,6 +47,21 @@ void scanTask(BLEScan *pBLEScan) {
 
   vTaskDelete(nullptr);
 }
+
+uint8_t buf[50];
+uint8_t  message_length =40;
+
+  auto message_length = stream.bytes_written;
+  auto recevied_tuple = std::vector<TupleIntFloat>{};
+  pb_istream_t istream = pb_istream_from_buffer(buf, message_length);
+  TrackConfig config_decoded = TrackConfig_init_zero;
+
+pb_istream_t istream = pb_istream_from_buffer(buf, message_length);
+void nanopb_test(){
+  int status = 0;
+
+}
+
 
 const char * SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const char * CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
