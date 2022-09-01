@@ -12,13 +12,6 @@
 #include "NimBLEDevice.h"
 #include "StripCommon.h"
 #include "AdCallback.h"
-#define TEST(x) \
-    if (!(x)) { \
-        fprintf(stderr, "\033[31;1mFAILED:\033[22;39m %s:%d %s\n", __FILE__, __LINE__, #x); \
-        status = 1; \
-    } else { \
-        printf("\033[32;1mOK:\033[22;39m %s\n", #x); \
-    }
 extern "C" { void app_main(); }
 
 static auto esp_name = "e-track 011";
@@ -82,29 +75,12 @@ void app_main(void) {
   auto pStrip = Strip::get();
   pStrip->begin(max_leds, LED_PIN, brightness);
   pStrip->initBLE(pServer);
-  // Ad service must start after Strip service? why?
-
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);
   pAdvertising->setAppearance(0x0340);
   pAdvertising->setScanResponse(false);
 
-  // Initialize BLE Scanner.
-  auto pBLEScan = NimBLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new AdCallback(pCharacteristic));
-  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
-  pBLEScan->setDuplicateFilter(false); // maybe I should enable it
-  pBLEScan->setFilterPolicy(BLE_HCI_SCAN_FILT_NO_WL);
-  pBLEScan->setInterval(100);
-  // Active scan time
-  // less or equal setInterval value
-  pBLEScan->setWindow(99);
-
-  // xTaskCreate(reinterpret_cast<TaskFunction_t>(scanTask),
-  //             "scanTask", 5000,
-  //             static_cast<void *>(pBLEScan), 1,
-  //             nullptr);
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
               "stripTask", 5000,
               pStrip, 2,
