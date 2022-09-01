@@ -28,28 +28,12 @@ public:
   explicit BrightnessCharCallback(Strip &strip);
 };
 
-class DelayCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit DelayCharCallback(Strip &strip);
-};
-
 class StatusCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
   explicit StatusCharCallback(Strip &strip);
-};
-
-class HaltDelayCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit HaltDelayCharCallback(Strip &strip);
 };
 
 class SpeedCharCallback : public NimBLECharacteristicCallbacks {

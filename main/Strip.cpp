@@ -144,12 +144,6 @@ StripError Strip::initBLE(NimBLEServer *server) {
     brightness_char->setValue(brightness);
     brightness_char->setCallbacks(brightness_cb);
 
-    delay_char = service->createCharacteristic(LIGHT_CHAR_DELAY_UUID,
-                                               NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto delay_cb = new DelayCharCallback(*this);
-    delay_char->setValue(delay_ms);
-    delay_char->setCallbacks(delay_cb);
-
     status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
     auto status_cb = new StatusCharCallback(*this);
@@ -178,12 +172,6 @@ StripError Strip::initBLE(NimBLEServer *server) {
       track.speed_char->setValue(0);
       track.speed_char->setCallbacks(speed_cb);
     }
-
-    halt_delay_char = service->createCharacteristic(LIGHT_CHAR_HALT_DELAY_UUID,
-                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto halt_cb = new HaltDelayCharCallback(*this);
-    halt_delay_char->setValue(status);
-    halt_delay_char->setCallbacks(halt_cb);
 
     service->start();
     is_ble_initialized = true;

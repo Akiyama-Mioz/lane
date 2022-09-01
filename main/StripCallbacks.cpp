@@ -25,19 +25,6 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 BrightnessCharCallback::BrightnessCharCallback(Strip &strip) : strip(strip) {}
 
-void DelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  if (data.length() >= 2) {
-    uint16_t delay_ms = data[0] | data[1] << 8;
-    strip.delay_ms = delay_ms;
-  } else {
-    ESP_LOGE("DelayCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.delay_ms);
-  }
-}
-
-DelayCharCallback::DelayCharCallback(Strip &strip):strip(strip) {}
-
 void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   uint8_t status = data[0];
@@ -51,19 +38,6 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 }
 
 StatusCharCallback::StatusCharCallback(Strip &strip) : strip(strip) {}
-
-void HaltDelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  if (data.length() >= 2) {
-    uint16_t delay_ms = data[0] | data[1] << 8;
-    strip.halt_delay = delay_ms;
-  } else {
-    ESP_LOGE("HaltDelayCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.halt_delay);
-  }
-}
-
-HaltDelayCharCallback::HaltDelayCharCallback(Strip &strip) : strip(strip) {}
 
 ValueRetriever<float> getValueRetriever(NimBLEAttValue &data) {
   auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
