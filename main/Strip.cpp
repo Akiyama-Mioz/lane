@@ -150,9 +150,6 @@ StripError Strip::initBLE(NimBLEServer *server) {
     delay_char->setValue(delay_ms);
     delay_char->setCallbacks(delay_cb);
 
-    max_LEDs_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDs_UUID,
-                                                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-
     status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
     auto status_cb = new StatusCharCallback(*this);
