@@ -38,24 +38,6 @@ void DelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 DelayCharCallback::DelayCharCallback(Strip &strip):strip(strip) {}
 
-void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  if (data.length() >= 2) {
-    /** TODO: make a function to convert uint8 array to uint16_t
-     *   both big endian and little endian.
-    **/
-    uint16_t max_leds = data[0] | data[1] << 8;
-    strip.setMaxLEDs(max_leds);
-    strip.pref.putInt("max_leds", max_leds);
-  } else {
-    ESP_LOGE("LengthCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.max_LEDs);
-  }
-}
-
-MaxLEDsCharCallback::MaxLEDsCharCallback(Strip &strip) : strip(strip) {}
-
-
 void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   uint8_t status = data[0];

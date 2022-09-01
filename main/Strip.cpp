@@ -77,6 +77,7 @@ void Strip::run(Track *tracksBegin, Track *tracksEnd) {
 
 void Strip::run(std::vector<Track> &tracks) {
   // https://stackoverflow.com/questions/23316368/converting-iterator-to-pointer-really-it
+  // https://iris.artins.org/software/converting-an-stl-vector-iterator-to-a-raw-pointer/
   this->run(&*tracks.begin(), &*tracks.end());
 }
 
@@ -99,7 +100,6 @@ void Strip::stripTask() {
       } else if (status == StripStatus::CUSTOM) {
         runCustom();
       } else if (status == StripStatus::STOP) {
-        pixels->updateLength(4000);
         pixels->clear();
         pixels->show();
       }
@@ -152,9 +152,6 @@ StripError Strip::initBLE(NimBLEServer *server) {
 
     max_LEDs_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDs_UUID,
                                                   NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto max_LEDs_cb = new MaxLEDsCharCallback(*this);
-    max_LEDs_char->setValue(max_LEDs);
-    max_LEDs_char->setCallbacks(max_LEDs_cb);
 
     status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
