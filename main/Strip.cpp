@@ -87,7 +87,8 @@ void Strip::runCustom() {
   int totalLength = 100 * l;
 
   while (status != StripStatus::STOP) {
-    auto [position, shift, skip] = nextState(state, speedCustom, totalLength, fps);
+    auto newState = nextState(state, speedCustom, totalLength, fps);
+    auto [position, shift, skip] = newState;
     pixels->clear();
 
     if (state.isSkip) {
@@ -105,6 +106,7 @@ void Strip::runCustom() {
       this->status = StripStatus::STOP;
       break;
     }
+    state = newState;
     vTaskDelay((1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS);
   }
   status_char->setValue(StripStatus::STOP);
