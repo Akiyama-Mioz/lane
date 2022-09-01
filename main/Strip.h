@@ -14,11 +14,6 @@
 #include "map"
 #include "vector"
 
-static auto initDists = std::vector<int>{100, 200, 300, 400, 500, 600, 700, 800};
-static auto initSpeed0 = std::vector<int>{3968, 3968, 3663, 3968, 3401, 3663, 3401, 4762};
-static auto initSpeed1 = std::vector<int>{3805, 3805, 3513, 3805, 3262, 3513, 3262, 4566};
-static auto initSpeed2 = std::vector<int>{3546, 3546, 3273, 3546, 3040, 3273, 304, 4255,};
-static auto initSpeedCustom = std::vector<int>{3968, 3968, 3663, 3968, 3401, 3663, 3401, 4762};
 // change this to match the length of StripStatus
 constexpr uint8_t StripStatus_LENGTH = 4;
 enum class StripStatus {
