@@ -67,8 +67,8 @@ void Strip::runNormal() {
       idx = (idx + 1) % 3;
     }
     pixels->show();
-    // 0 should be the fastest one
-    if (states[0].shift == totalLength || this->status == StripStatus::STOP) {
+    // 0 should be the fastest one but we want to wait the slowest one to stop.
+    if (states[2].shift == totalLength || this->status == StripStatus::STOP) {
       this->status = StripStatus::STOP;
       break;
     }
