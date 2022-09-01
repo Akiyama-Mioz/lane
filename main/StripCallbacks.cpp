@@ -12,12 +12,9 @@ void ColorCharCallback::onWrite(NimBLECharacteristic *characteristic) {
       auto color = Adafruit_NeoPixel::Color(data[i], data[i + 1], data[i + 2]);
       strip.color[i] = color;
     }
-
-    [[maybe_unused]]
-    auto size = strip.pref.putUInt("color0", strip.color[0]);
-    auto size1 = strip.pref.putUInt("color1", strip.color[1]);
-    auto size2 = strip.pref.putUInt("color2", strip.color[2]);
-
+    strip.pref.putUInt("color0", strip.color[0]);
+    strip.pref.putUInt("color1", strip.color[1]);
+    strip.pref.putUInt("color2", strip.color[2]);
   } else {
     ESP_LOGE("ColorCharCallback", "Invalid data length: %d", data.length());
     characteristic->setValue(strip.color[0]);
@@ -105,13 +102,7 @@ void HaltDelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 HaltDelayCharCallback::HaltDelayCharCallback(Strip &strip) : strip(strip) {}
 
-
 auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
-  // Things will be weird if you dereference it
-  // I don't know why though
-  // auto tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // not ok
-  // https://stackoverflow.com/questions/1910712/dereference-vector-pointer-to-access-element
-  // auto *tuple_list = (reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as pointer
   auto &tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as reference
   TupleIntFloat t = TupleIntFloat_init_zero;
   bool status = pb_decode(stream, TupleIntFloat_fields, &t);
@@ -123,117 +114,29 @@ auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void 
   }
 };
 
-//*************************C
-void SpeedCustomCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  TrackConfig config_decoded = TrackConfig_init_zero;
-  pb_istream_t istream = pb_istream_from_buffer(data, data.length());   ///encode -> imsg
-  auto recevied_tuple = std::vector<TupleIntFloat>{};
-  config_decoded.lst.arg = reinterpret_cast<void *>(&recevied_tuple);
-  config_decoded.lst.funcs.decode = decode_tuple_list;
-  bool status_decode = pb_decode(&istream, TrackConfig_fields, &config_decoded);
-  std::cout << "Decode speedcustom success? " << (status_decode ? "true" : "false") << "\n";
-  if (status_decode) {
-    if (recevied_tuple.empty()) {
-      std::cout << "But I got nothing! \n";
-    }
-    for (auto &t: recevied_tuple) {
-      std::cout << "dist: " << t.dist << "\tspeedcustom: " << t.speed << "\n";
-    }
-  } else {
-    std::cout << "Error: Something goes wrong when decoding \n";
-  }
-  auto m = std::map<int, float>{};
-  delete cur_speedCustom;
-  cur_speedCustom = new ValueRetriever<float>(m);
-  for (auto &t: recevied_tuple) {
-    dists.emplace_back(t.dist);
-    m.insert_or_assign(t.dist, t.speed);
-  }
-}
-
-
-//*************************0
-void SpeedZeroCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  TrackConfig config_decoded = TrackConfig_init_zero;
-  pb_istream_t istream = pb_istream_from_buffer(data, data.length());   ///encode -> imsg
-  auto recevied_tuple = std::vector<TupleIntFloat>{};
-  config_decoded.lst.arg = reinterpret_cast<void *>(&recevied_tuple);
-  config_decoded.lst.funcs.decode = decode_tuple_list;
-  bool status_decode = pb_decode(&istream, TrackConfig_fields, &config_decoded);
-  std::cout << "Decode speed0 success? " << (status_decode ? "true" : "false") << "\n";
-  if (status_decode) {
-    if (recevied_tuple.empty()) {
-      std::cout << "But I got nothing! \n";
-    }
-    for (auto &t: recevied_tuple) {
-      std::cout << "dist: " << t.dist << "\tspeed0: " << t.speed << "\n";
-    }
-  } else {
-    std::cout << "Error: Something goes wrong when decoding \n";
-  }
-  auto m = std::map<int, float>{};
-  for (auto &t: recevied_tuple) {
-    dists.emplace_back(t.dist);
-    m.insert_or_assign(t.dist, t.speed);
-  }
-  strip.cur_speed0 = ValueRetriever<float>(m);
-}
-
-
-//*************************1
-void SpeedOneCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  TrackConfig config_decoded = TrackConfig_init_zero;
-  pb_istream_t istream = pb_istream_from_buffer(data, data.length());   ///encode -> imsg
-  auto recevied_tuple = std::vector<TupleIntFloat>{};
-  config_decoded.lst.arg = reinterpret_cast<void *>(&recevied_tuple);
-  config_decoded.lst.funcs.decode = decode_tuple_list;
-  bool status_decode = pb_decode(&istream, TrackConfig_fields, &config_decoded);
-  std::cout << "Decode speed1 success? " << (status_decode ? "true" : "false") << "\n";
-  if (status_decode) {
-    if (recevied_tuple.empty()) {
-      std::cout << "But I got nothing! \n";
-    }
-    for (auto &t: recevied_tuple) {
-      std::cout << "dist: " << t.dist << "\tspeed1: " << t.speed << "\n";
-    }
-  } else {
-    std::cout << "Error: Something goes wrong when decoding \n";
-  }
-  auto m = std::map<int, float>{};
-  for (auto &t: recevied_tuple) {
-    dists.emplace_back(t.dist);
-    m.insert_or_assign(t.dist, t.speed);
-  }
-  strip.cur_speed1 = ValueRetriever<float>(m);
-}
-
-//*************************2
-void SpeedTwoCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
+ValueRetriever<float> getValueRetriever(NimBLEAttValue &data) {
   TrackConfig config_decoded = TrackConfig_init_zero;
   pb_istream_t istream = pb_istream_from_buffer(data, data.length());   ///encode -> imsg
   auto received_tuple = std::vector<TupleIntFloat>{};
   config_decoded.lst.arg = reinterpret_cast<void *>(&received_tuple);
   config_decoded.lst.funcs.decode = decode_tuple_list;
   bool status_decode = pb_decode(&istream, TrackConfig_fields, &config_decoded);
-  std::cout << "Decode speed2 success? " << (status_decode ? "true" : "false") << "\n";
-  if (status_decode) {
-    if (received_tuple.empty()) {
-      std::cout << "But I got nothing! \n";
-    }
-    for (auto &t: received_tuple) {
-      std::cout << "dist: " << t.dist << "\tspeed2: " << t.speed << "\n";
-    }
-  } else {
-    std::cout << "Error: Something goes wrong when decoding \n";
+  if (!status_decode) {
+    ESP_LOGE("Decode speed0", "Error: Something goes wrong when decoding");
   }
   auto m = std::map<int, float>{};
   for (auto &t: received_tuple) {
-    dists.emplace_back(t.dist);
     m.insert_or_assign(t.dist, t.speed);
   }
-  strip.cur_speed2 = ValueRetriever<float>(m);
+  return ValueRetriever<float>(m);
+}
+
+void SpeedCustomCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+  auto data = characteristic->getValue();
+  strip.speedCustom = getValueRetriever(data);
+}
+
+void SpeedCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+  auto data = characteristic->getValue();
+  strip.speedVals[index] = getValueRetriever(data);
 }

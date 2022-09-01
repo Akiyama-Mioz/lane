@@ -49,6 +49,13 @@ private:
   std::map<int, T> m;
   std::vector<int> keys;
 public:
+  const std::map<int, T> &getMap() const {
+    return m;
+  }
+
+  const std::vector<int> &getKeys() const {
+    return keys;
+  }
   /**
    * @brief Construct a new Value Retriever object
    *

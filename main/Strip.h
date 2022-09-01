@@ -14,18 +14,17 @@
 #include "map"
 #include "vector"
 
-static auto dists = std::vector<int>{100, 200, 300, 400, 500, 600, 700, 800};
-static auto speed0 = std::vector<int>{3968, 3968, 3663, 3968, 3401, 3663, 3401, 4762};
-static auto speed1 = std::vector<int>{3805, 3805, 3513, 3805, 3262, 3513, 3262, 4566};
-static auto speed2 = std::vector<int>{3546, 3546, 3273, 3546, 3040, 3273, 304, 4255,};
-static auto speedCustom = std::vector<int>{3968, 3968, 3663, 3968, 3401, 3663, 3401, 4762};
+static auto initDists = std::vector<int>{100, 200, 300, 400, 500, 600, 700, 800};
+static auto initSpeed0 = std::vector<int>{3968, 3968, 3663, 3968, 3401, 3663, 3401, 4762};
+static auto initSpeed1 = std::vector<int>{3805, 3805, 3513, 3805, 3262, 3513, 3262, 4566};
+static auto initSpeed2 = std::vector<int>{3546, 3546, 3273, 3546, 3040, 3273, 304, 4255,};
+static auto initSpeedCustom = std::vector<int>{3968, 3968, 3663, 3968, 3401, 3663, 3401, 4762};
 // change this to match the length of StripStatus
 constexpr uint8_t StripStatus_LENGTH = 4;
 enum class StripStatus {
-  CUSTOM = 0,
-  RUN800,
-  RUN1000,
-  STOP,
+  STOP = 0,
+  NORMAL,
+  CUSTOM
 };
 
 enum class StripError {
@@ -39,6 +38,8 @@ protected:
   bool is_initialized = false;
   bool is_ble_initialized = false;
 public:
+  float fps = 6; //distance travelled ! max = 7 !
+  bool isStop = 0;
   Preferences pref;
   int pin = 14;
   // 10 LEDs/m for 24v
@@ -62,21 +63,20 @@ public:
   NimBLECharacteristic *color_char = nullptr;
   NimBLECharacteristic *status_char = nullptr;
   NimBLECharacteristic *brightness_char = nullptr;
-  NimBLECharacteristic *max_leds_char = nullptr;
+  NimBLECharacteristic *max_LEDs_char = nullptr;
   NimBLECharacteristic *delay_char = nullptr;
   NimBLECharacteristic *halt_delay_char = nullptr;
-  NimBLECharacteristic *speedcustom_char = nullptr;
+  NimBLECharacteristic *speed_custom_char = nullptr;
   NimBLECharacteristic *speed0_char = nullptr;
   NimBLECharacteristic *speed1_char = nullptr;
   NimBLECharacteristic *speed2_char = nullptr;
 
   NimBLEService *service = nullptr;
   const char *LIGHT_SERVICE_UUID = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
-  // should not use
   const char *LIGHT_CHAR_COLOR_UUID = "87a11e36-7c0e-44aa-a8ca-85307f52ce1e";
   const char *LIGHT_CHAR_BRIGHTNESS_UUID = "e3ce8b08-4bb9-4696-b862-3e62a1100adc";
   const char *LIGHT_CHAR_STATUS_UUID = "24207642-0d98-40cd-84bb-910008579114";
-  const char *LIGHT_CHAR_MAX_LEDS_UUID = "28734897-4356-4c4a-af3d-8359ea4657cd";
+  const char *LIGHT_CHAR_MAX_LEDs_UUID = "28734897-4356-4c4a-af3d-8359ea4657cd";
   const char *LIGHT_CHAR_DELAY_UUID = "adbbac7f-2c08-4a8d-b3f7-d38d7bd5bc41";
   const char *LIGHT_CHAR_SHIFT_UUID = "b972471a-139c-4211-a591-28c4ec1936f6";
   const char *LIGHT_CHAR_HALT_DELAY_UUID = "00923454-81de-4e74-b2e0-a873f2cbddcc";
@@ -84,10 +84,8 @@ public:
   const char *LIGHT_CHAR_SPEED1_UUID = "ed3eefa1-3c80-b43f-6b65-e652374650b5";
   const char *LIGHT_CHAR_SPEED2_UUID = "765961ad-e273-ddda-ce56-25a46e3017f9";
   const char *LIGHT_CHAR_SPEED_CUSTOM_UUID = "765961ad-e273-ddda-ce56-25a46e3017f9";
-  ValueRetriever<float> cur_speed0 = ValueRetriever<float>(std::map<int, float>());
-  ValueRetriever<float> cur_speed1 = ValueRetriever<float>(std::map<int, float>());
-  ValueRetriever<float> cur_speed2 = ValueRetriever<float>(std::map<int, float>());
-  ValueRetriever<float> cur_speedCustom = ValueRetriever<float>(std::map<int, float>());
+  std::vector<ValueRetriever<float>> speedVals = std::vector(3,ValueRetriever<float>(std::map<int, float>()));
+  ValueRetriever<float> speedCustom = ValueRetriever<float>(std::map<int, float>());
 
   /**
    * @brief Loop the strip.
@@ -105,14 +103,11 @@ public:
 
   void setBrightness(uint8_t new_brightness);
 
-  void run800() const;
-
-  void runCustom() const;
+  void runCustom();
 
   void getColor();
 
-
-  void run1000() const;
+  void runNormal();
 
   static Strip *get();
 

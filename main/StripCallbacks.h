@@ -17,6 +17,7 @@
 
 
 class Strip;
+
 // Maybe I should use factory pattern.
 class ColorCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
@@ -65,35 +66,22 @@ public:
 
   explicit HaltDelayCharCallback(Strip &strip);
 };
+
 class SpeedCustomCharCallback : public NimBLECharacteristicCallbacks {
-  ValueRetriever<float> *cur_speedCustom;
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedCustomCharCallback(Strip &strip):strip(strip){}
+  explicit SpeedCustomCharCallback(Strip &strip) : strip(strip) {}
 };
 
-class SpeedZeroCharCallback : public NimBLECharacteristicCallbacks {
+class SpeedCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
+  int index;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedZeroCharCallback(Strip &strip) : strip(strip){}
-};
-class SpeedOneCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit SpeedOneCharCallback(Strip &strip) : strip(strip){}
-};
-class SpeedTwoCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit SpeedTwoCharCallback(Strip &strip) : strip(strip){}
+  explicit SpeedCharCallback(Strip &strip, int index) : strip(strip), index(index) {}
 };
 
 #endif //HELLO_WORLD_STRIPCALLBACKS_H
