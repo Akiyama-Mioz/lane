@@ -1,6 +1,4 @@
-//
-// Created by Kurosu Chan on 2022/7/13.
-//
+
 
 #include "StripCommon.h"
 
@@ -57,6 +55,7 @@ void Strip::runNormal() {
                    });
     // reset index
     idx = 0;
+    std::vector<float> shift_buf;
     for (auto state: newStates){
       if (state.isSkip) {
         pixels->fill(color[idx], 4000 - state.position);
@@ -64,6 +63,7 @@ void Strip::runNormal() {
       } else {
         pixels->fill(color[idx], state.position - length, length);
       }
+      shift_buf[idx] = state.shift;
       idx = (idx + 1) % 3;
     }
     pixels->show();
@@ -73,8 +73,10 @@ void Strip::runNormal() {
       break;
     }
     states = newStates;
-    shift_char->setValue(states[0].shift);
+
+    shift_char->setValue(shift_buf);
     shift_char->notify();
+
     vTaskDelay((1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS);
   }
   status_char->setValue(StripStatus::STOP);
