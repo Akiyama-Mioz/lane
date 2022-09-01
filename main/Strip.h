@@ -25,10 +25,10 @@ auto speedcustom = std::vector<int>{3968,3968,3663,3968,3401,3663,3401,4762};
 // change this to match the length of StripStatus
 constexpr uint8_t StripStatus_LENGTH = 4;
 enum class StripStatus {
-  CUSTOM = 0,
-  RUN800,
-  RUN1000,
-  STOP,
+  STOP=0,
+ 
+  NORMAL,
+  CUSTOM 
 };
 
 enum class StripError {
@@ -107,13 +107,12 @@ public:
 
   void setBrightness(uint8_t new_brightness);
 
- void RUN800() const;
+ 
 void RUNCUSTOM() const;
 
  void Get_color();
 
-
-  void RUN1000() const;
+  void RUN_NORMAL() const;
 
   static Strip *get();
 

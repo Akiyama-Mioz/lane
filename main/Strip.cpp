@@ -13,33 +13,34 @@ void Strip::Get_color(void)  {
   }
 
 
-void Strip::RUN800() const {
+void Strip::RUN_NORMAL() const {
   uint  position[3]={0};  //position of each 3 leds
   float shift[3]={0};
   uint8_t skip[3] ={0}; //if led is skipping to 0
+  int total_lengh= 100*speed0.size();
   while(status != StripStatus::STOP)
   {
     pixels->clear();
     //100 scores 
-    if (shift[0] < 800){
+    if (shift[0] < total_lengh){
       shift[0] += cur_speed0->retrieve((int)shift[0])/fps/100;    //distance  :m
     }
     else
-      shift[0] = 800;
+      shift[0] = total_lengh;
     position[0] = shift[0] * 10;
     //80 scores 
-    if (shift[1] < 800){
+    if (shift[1] < total_lengh){
       shift[1] += cur_speed1->retrieve((int)shift[1])/fps/100;    //distance  :m
     }
     else
-      shift[1] = 800;
+      shift[1] = total_lengh;
     position[1] = shift[1] * 10;
     //60 scores 
-    if (shift[2] < 800){
+    if (shift[2] < total_lengh){
       shift[2] += cur_speed2->retrieve((int)shift[2])/fps/100;    //distance  :m
     }
     else
-      shift[2] = 800;
+      shift[2] = total_lengh;
     position[2] = shift[2] * 10;
 //position message packet
     for(uint8_t i = 0;i<3; i++){    //each position actually
@@ -59,7 +60,7 @@ for(uint8_t i=0; i<3;i++){      //fill /  if skip
       pixels->fill(color[i], position[i]-length, length);
     }
     pixels->show();
-    if(shift[2] == 800 || stop ==1){
+    if(shift[2] == total_lengh || stop ==1){
       stop=0;
       break;
     }
@@ -67,66 +68,6 @@ for(uint8_t i=0; i<3;i++){      //fill /  if skip
   shift_char->notify();
     vTaskDelay((1000/fps-4000*0.03)/portTICK_PERIOD_MS);
   }
-  status_char->setValue(StripStatus::STOP);
-  status_char->notify();
-  
-}
-
-void Strip::RUN1000() const {
-  uint  position[3]={0};  //position of each 3 leds
-  float shift[3]={0};
-  uint8_t skip[3] ={0}; //if led is skipping to 0
-  while(status != StripStatus::STOP)
-  {
-    pixels->clear();
-    //100 scores 
-    if (shift[0] < 1000){
-      shift[0] += cur_speed0->retrieve((int)shift[0])/fps/100;    //distance  :m
-    }
-    else
-      shift[0] = 1000;
-    position[0] = shift[0] * 10;
-    //80 scores 
-    if (shift[1] < 1000){
-      shift[1] += cur_speed1->retrieve((int)shift[1])/fps/100;    //distance  :m
-    }
-    else
-      shift[1] = 1000;
-    position[1] = shift[1] * 10;
-    //60 scores 
-    if (shift[2] < 1000){
-      shift[2] += cur_speed0->retrieve((int)shift[0])/fps/100;    //distance  :m
-    }
-    else
-      shift[2] = 1000;
-    position[2] = shift[2] * 10;
-//position message packet
-    for(uint8_t i = 0;i<3; i++){    //each position actually
-      if(position[i] > 4000){
-        position[i] %= 4000;
-        if(position[i] < 10) 
-          skip[i] = 1 ;
-        }
-    }
-    
-for(uint8_t i=0; i<3;i++){
-    if(skip[i] == 1){
-      pixels->fill(color[i],4000-position[i]);
-      pixels->fill(color[i],0,position[i]);
-    }
-    else
-      pixels->fill(color[i], position[i]-length, length);
-    }
-    pixels->show();
-    if(shift[2] == 1000 || stop ==1){
-      stop=0;
-      break;
-    }
-    shift_char->setValue(shift);
-    shift_char->notify();
-    vTaskDelay((1000/fps-4000*0.03)/portTICK_PERIOD_MS);
-  }
-
   status_char->setValue(StripStatus::STOP);
   status_char->notify();
   
@@ -189,10 +130,8 @@ void Strip::stripTask() {
   for (;;) {
     if (pixels != nullptr) {
       
-      if (status == StripStatus::RUN800) {
-        RUN800();
-      } else if (status == StripStatus::RUN1000) {
-        RUN1000();
+      if (status == StripStatus::NORMAL) {
+        RUN_NORMAL();
       } else if (status == StripStatus::CUSTOM){
         RUNCUSTOM();
       }
