@@ -3,18 +3,8 @@
 //
 
 #include "StripCommon.h"
+#include "Strip.h"
 
-void Strip::getColor(void) {
-  color[0] = pref.getUInt("color0", Adafruit_NeoPixel::Color(255, 0, 255));
-  color[1] = pref.getUInt("color1", Adafruit_NeoPixel::Color(255, 255, 0));
-  color[2] = pref.getUInt("color2", Adafruit_NeoPixel::Color(0, 255, 255));
-}
-
-struct TrackState {
-  uint32_t position;
-  float shift;
-  bool isSkip;
-};
 
 TrackState nextState(TrackState state, const ValueRetriever<float> &retriever, int totalLength, float fps) {
   uint32_t position; // late
@@ -39,83 +29,82 @@ TrackState nextState(TrackState state, const ValueRetriever<float> &retriever, i
   };
 }
 
-void Strip::runNormal() {
-  auto states = std::vector(3, TrackState{0, 0, false});
+/**
+ * @brief update the strip with the new state and write the pixel data to the strip.
+ * finally, write the new state to the characteristic and then notify.
+ * @param pixels
+ * @param totalLength
+ * @param trackLength
+ * @param fps
+ */
+void Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps) {
+  auto next = nextState(state, retriever, totalLength, fps);
+  this->state = next;
+  if (state.isSkip) {
+    pixels->fill(color, 4000 - state.position);
+    pixels->fill(color, 0, state.position);
+  } else {
+    pixels->fill(color, state.position - trackLength, trackLength);
+  }
+  shift_char->setValue(state.shift);
+  shift_char->notify();
+}
+
+void Strip::run(std::vector<Track> &tracks) {
   // use the max value of the 0 track to determine the length of the track.
-  auto keys = speedVals.begin()->getKeys();
+  auto keys = tracks.begin()->retriever.getKeys();
   auto l = *std::max_element(keys.begin(), keys.end());
   int totalLength = 100 * l;
+  std::for_each(tracks.begin(), tracks.end(), [](Track &track) {
+    track.resetState();
+  });
   while (status != StripStatus::STOP) {
-    std::vector<TrackState> newStates = {};
     pixels->clear();
-    // TODO: use zip instead of ugly indexing
-    int idx = 0;
-    std::transform(states.begin(), states.end(), std::back_inserter(newStates),
-                   [=, &idx](const TrackState &state) {
-                     auto next = nextState(state, speedVals[idx], totalLength, fps);
-                     idx = (idx + 1) % 3;
-                     return next;
-                   });
-    // reset index
-    idx = 0;
-    for (auto state: newStates) {
-      if (state.isSkip) {
-        pixels->fill(color[idx], 4000 - state.position);
-        pixels->fill(color[idx], 0, state.position);
-      } else {
-        pixels->fill(color[idx], state.position - length, length);
-      }
-      idx = (idx + 1) % 3;
+    for (auto &track: tracks) {
+      track.updateStrip(pixels, totalLength, l, fps);
     }
     pixels->show();
-    // 0 should be the fastest one but we want to wait the slowest one to stop.
-    if (states.end()->shift >= totalLength || this->status == StripStatus::STOP) {
+    // 0 should be the fastest one, but we want to wait the slowest one to stop.
+    if (tracks.end()->state.shift >= totalLength) {
       this->status = StripStatus::STOP;
-      break;
     }
-    states = newStates;
-    // TODO: make 3 char to send 3 values
-    shift_char->setValue(states[0].shift);
-    shift_char->notify();
     vTaskDelay((1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS);
   }
   status_char->setValue(StripStatus::STOP);
   status_char->notify();
+}
+
+void Strip::run(Track *tracksBegin, Track *tracksEnd) {
+  // use the max value of the 0 track to determine the length of the track.
+  auto keys = tracksBegin->retriever.getKeys();
+  auto l = *std::max_element(keys.begin(), keys.end());
+  int totalLength = 100 * l;
+  std::for_each(tracksBegin, tracksEnd, [](Track &track) {
+    track.resetState();
+  });
+  while (status != StripStatus::STOP) {
+    pixels->clear();
+    std::for_each(tracksBegin, tracksEnd, [=](Track &track) {
+      track.updateStrip(pixels, totalLength, l, fps);
+    });
+    pixels->show();
+    // 0 should be the fastest one, but we want to wait the slowest one to stop.
+    if (tracksEnd->state.shift >= totalLength) {
+      this->status = StripStatus::STOP;
+    }
+    vTaskDelay((1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS);
+  }
+  status_char->setValue(StripStatus::STOP);
+  status_char->notify();
+}
+
+void Strip::runNormal() {
+  run(normal_tracks.begin(), normal_tracks.end());
 }
 
 void Strip::runCustom() {
-  auto state = TrackState{0, 0, false};
-  auto keys = speedCustom.getKeys();
-  auto l = *std::max_element(keys.begin(), keys.end());
-  int totalLength = 100 * l;
-
-  while (status != StripStatus::STOP) {
-    auto newState = nextState(state, speedCustom, totalLength, fps);
-    auto [position, shift, skip] = newState;
-    pixels->clear();
-
-    if (state.isSkip) {
-      pixels->fill(color[1], 4000 - position);
-      pixels->fill(color[1], 0, position);
-    } else {
-      pixels->fill(color[1], position - length, length);
-    }
-
-    pixels->show();
-    shift_char->setValue(shift);
-    shift_char->notify();
-
-    if (shift == totalLength || this->status == StripStatus::STOP) {
-      this->status = StripStatus::STOP;
-      break;
-    }
-    state = newState;
-    vTaskDelay((1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS);
-  }
-  status_char->setValue(StripStatus::STOP);
-  status_char->notify();
+  run(custom_tracks.begin(), custom_tracks.end());
 }
-
 
 void Strip::stripTask() {
   pixels->clear();
@@ -166,21 +155,6 @@ StripError Strip::initBLE(NimBLEServer *server) {
   }
   if (!is_ble_initialized) {
     service = server->createService(LIGHT_SERVICE_UUID);
-    color_char = service->createCharacteristic(LIGHT_CHAR_COLOR_UUID,
-                                               NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto color_cb = new ColorCharCallback(*this);
-    // https://stackoverflow.com/questions/2182002/convert-big-endian-to-little-endian-in-c-without-using-provided-func
-    // well it's actually uint24;
-    uint32_t byte1 = ((color[0] >> 16) & 0xff);
-    uint32_t byte2 = ((color[0] >> 8) & 0xff) << 8;
-    uint32_t byte3 = ((color[0]) & 0xff) << 16;
-    uint32_t actual_color = byte1 | // move byte 2 to byte 0
-                            byte2 | // move byte 1 to byte 1
-                            byte3; // byte 0 to byte 2 ;
-
-    printf("actual_color: %x\n", actual_color);
-    color_char->setValue(actual_color);
-    color_char->setCallbacks(color_cb);
 
     brightness_char = service->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
@@ -206,34 +180,28 @@ StripError Strip::initBLE(NimBLEServer *server) {
     status_char->setValue(status);
     status_char->setCallbacks(status_cb);
 
-    speed_custom_char = service->createCharacteristic(LIGHT_CHAR_SPEED_CUSTOM_UUID,
-                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto speed_custom_cb = new SpeedCustomCharCallback(*this);
-    speed_custom_char->setValue(0);
-    speed_custom_char->setCallbacks(speed_custom_cb);
+    // TODO: find a way to make it less ugly
+    for (auto &track: normal_tracks) {
+      track.speed_char = service->createCharacteristic(track.speed_uuid,
+                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+      // shift has read only Characteristic. no callback (read only)
+      track.shift_char = service->createCharacteristic(track.shift_uuid,
+                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+      auto speed_cb = new SpeedCharCallback(*this, track);
+      track.speed_char->setValue(0);
+      track.speed_char->setCallbacks(speed_cb);
+    }
 
-    speed0_char = service->createCharacteristic(LIGHT_CHAR_SPEED0_UUID,
-                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto speed0_cb = new SpeedCharCallback(*this, 0);
-    speed0_char->setValue(0);
-    speed0_char->setCallbacks(speed0_cb);
-
-    speed1_char = service->createCharacteristic(LIGHT_CHAR_SPEED1_UUID,
-                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto speed1_cb = new SpeedCharCallback(*this, 1);
-    speed1_char->setValue(0);
-    speed1_char->setCallbacks(speed1_cb);
-
-    speed2_char = service->createCharacteristic(LIGHT_CHAR_SPEED2_UUID,
-                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto speed2_cb = new SpeedCharCallback(*this, 2);
-    speed2_char->setValue(0);
-    speed2_char->setCallbacks(speed2_cb);
-
-//*********shift has only Characteristic.no callback func(read only)
-    this->shift_char = service->createCharacteristic(LIGHT_CHAR_SHIFT_UUID,
-                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-
+    for (auto &track: custom_tracks) {
+      track.speed_char = service->createCharacteristic(track.speed_uuid,
+                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+      // shift has read only Characteristic. no callback (read only)
+      track.shift_char = service->createCharacteristic(track.shift_uuid,
+                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+      auto speed_cb = new SpeedCharCallback(*this, track);
+      track.speed_char->setValue(0);
+      track.speed_char->setCallbacks(speed_cb);
+    }
 
     halt_delay_char = service->createCharacteristic(LIGHT_CHAR_HALT_DELAY_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
@@ -267,12 +235,36 @@ Strip *Strip::get() {
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
 StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
+  // GNU old-style field designator extension
   if (!is_initialized) {
+    this->normal_tracks = std::array<Track, 3>{
+        Track{
+            .speed_uuid =  LIGHT_CHAR_SPEED0_UUID,
+            .shift_uuid =  LIGHT_CHAR_SHIFT0_UUID,
+            .color =  Adafruit_NeoPixel::Color(255, 0, 0),
+        },
+        Track{
+            .speed_uuid =  LIGHT_CHAR_SPEED1_UUID,
+            .shift_uuid =  LIGHT_CHAR_SHIFT1_UUID,
+            .color =  Adafruit_NeoPixel::Color(0, 255, 0),
+        },
+        Track{
+            .speed_uuid =  LIGHT_CHAR_SPEED2_UUID,
+            .shift_uuid =  LIGHT_CHAR_SHIFT2_UUID,
+            .color =  Adafruit_NeoPixel::Color(0, 0, 255),
+        },
+    };
+    this->custom_tracks = std::array<Track, 1>{
+        Track{
+            .speed_uuid =  LIGHT_CHAR_SPEED_CUSTOM_UUID,
+            .shift_uuid =  LIGHT_CHAR_SHIFT_CUSTOM_UUID,
+            .color =  Adafruit_NeoPixel::Color(255, 255, 0),
+        }
+    };
     pref.begin("record", false);
     this->max_LEDs = max_LEDs;
     this->pin = PIN;
     this->brightness = brightness;
-    getColor(); //get pref.color
     pixels = new Adafruit_NeoPixel(max_LEDs, PIN, NEO_GRB + NEO_KHZ800);
     pixels->begin();
     pixels->setBrightness(brightness);

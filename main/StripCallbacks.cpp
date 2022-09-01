@@ -2,26 +2,7 @@
 // Created by Kurosu Chan on 2022/8/5.
 //
 #include "StripCommon.h"
-
-
-void ColorCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  if (data.length() >= 3) {
-    // BRG
-    for (uint8_t i = 0; i < 3; i++) {
-      auto color = Adafruit_NeoPixel::Color(data[i], data[i + 1], data[i + 2]);
-      strip.color[i] = color;
-    }
-    strip.pref.putUInt("color0", strip.color[0]);
-    strip.pref.putUInt("color1", strip.color[1]);
-    strip.pref.putUInt("color2", strip.color[2]);
-  } else {
-    ESP_LOGE("ColorCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.color[0]);
-  }
-}
-
-ColorCharCallback::ColorCharCallback(Strip &strip) : strip(strip) {}
+#include "StripCallbacks.h"
 
 void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
@@ -55,7 +36,7 @@ void DelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   }
 }
 
-DelayCharCallback::DelayCharCallback(Strip &strip) : strip(strip) {}
+DelayCharCallback::DelayCharCallback(Strip &strip):strip(strip) {}
 
 void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
@@ -128,15 +109,11 @@ ValueRetriever<float> getValueRetriever(NimBLEAttValue &data) {
   for (auto &t: received_tuple) {
     m.insert_or_assign(t.dist, t.speed);
   }
-  return ValueRetriever<float>(m);
-}
-
-void SpeedCustomCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  strip.speedCustom = getValueRetriever(data);
+  // prevent additional copy
+  return ValueRetriever<float>(std::move(m));
 }
 
 void SpeedCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
-  strip.speedVals[index] = getValueRetriever(data);
+  track.retriever = getValueRetriever(data);
 }

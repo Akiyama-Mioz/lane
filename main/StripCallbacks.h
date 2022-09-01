@@ -16,17 +16,10 @@
 #include "msg.pb.h"
 
 
+class Track;
 class Strip;
 
 // Maybe I should use factory pattern.
-class ColorCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit ColorCharCallback(Strip &strip);
-};
-
 class BrightnessCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
@@ -67,21 +60,13 @@ public:
   explicit HaltDelayCharCallback(Strip &strip);
 };
 
-class SpeedCustomCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit SpeedCustomCharCallback(Strip &strip) : strip(strip) {}
-};
-
 class SpeedCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
-  int index;
+  Track &track;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedCharCallback(Strip &strip, int index) : strip(strip), index(index) {}
+  explicit SpeedCharCallback(Strip &strip, Track &track) : strip(strip), track(track) {}
 };
 
 #endif //HELLO_WORLD_STRIPCALLBACKS_H
