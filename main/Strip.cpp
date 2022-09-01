@@ -11,47 +11,32 @@ void Strip::Get_color(void)  {
   color[2] = pref.getUInt("color2", Adafruit_NeoPixel::Color(0, 255, 255));
   
   }
-void Strip::Get_speed(void)  {
-  for(uint8_t i=0;i<8;i++){       ///speed_female 100:...[i00] 80:...[i01]  60:...[i02]
-    speed_female[i*100] = pref.getUInt("speed_female["+i*100,speed800[0][i]);  
-    speed_female[i*100+1] = pref.getUInt("speed_female["+(i*100+1),speed800[1][i]);
-    speed_female[i*100+2] = pref.getUInt("speed_female["+(i*100+2),speed800[2][i]);
-  }
-for(uint8_t i=0;i<10;i++){
-    speed_male[i*100] = pref.getUInt("speed_male["+i*100,speed1000[0][i]);
-    speed_male[i*100+1] = pref.getUInt("speed_male["+(i*100+1),speed1000[1][i]);
-    speed_male[i*100+2] = pref.getUInt("speed_male["+(i*100+2),speed1000[2][i]);
-  }
- 
-  }
+
 
 void Strip::RUN800() const {
   uint  position[3]={0};  //position of each 3 leds
   float shift[3]={0};
   uint8_t skip[3] ={0}; //if led is skipping to 0
-  for(;;){
-
+  while(status != StripStatus::STOP)
+  {
     pixels->clear();
     //100 scores 
     if (shift[0] < 800){
-      uint8_t c_hdd = shift[0] / 100;     //section locating
-      shift[0] += speed_female[c_hdd*100]/fps/10;    //distance  :m
+      shift[0] += cur_speed0->retrieve((int)shift[0])/fps/100;    //distance  :m
     }
     else
       shift[0] = 800;
     position[0] = shift[0] * 10;
     //80 scores 
     if (shift[1] < 800){
-      uint8_t c_hdd = shift[1] / 100;     //section locating
-      shift[1] += speed_female[c_hdd*100+1]/fps/10;    //distance  :m
+      shift[1] += cur_speed1->retrieve((int)shift[1])/fps/100;    //distance  :m
     }
     else
       shift[1] = 800;
     position[1] = shift[1] * 10;
     //60 scores 
     if (shift[2] < 800){
-      uint8_t c_hdd = shift[2] / 100;     //section locating
-      shift[2] += speed_female[c_hdd*100+2]/fps/10;    //distance  :m
+      shift[2] += cur_speed2->retrieve((int)shift[2])/fps/100;    //distance  :m
     }
     else
       shift[2] = 800;
@@ -91,28 +76,26 @@ void Strip::RUN1000() const {
   uint  position[3]={0};  //position of each 3 leds
   float shift[3]={0};
   uint8_t skip[3] ={0}; //if led is skipping to 0
-  for(;;){
+  while(status != StripStatus::STOP)
+  {
     pixels->clear();
     //100 scores 
     if (shift[0] < 1000){
-      uint8_t c_hdd = shift[0] / 100;     //section locating
-      shift[0] += speed_male[c_hdd*100]/fps/10;    //distance  :m
+      shift[0] += cur_speed0->retrieve((int)shift[0])/fps/100;    //distance  :m
     }
     else
       shift[0] = 1000;
     position[0] = shift[0] * 10;
     //80 scores 
     if (shift[1] < 1000){
-      uint8_t c_hdd = shift[1] / 100;     //section locating
-      shift[1] += speed_male[c_hdd*100+1]/fps/10;    //distance  :m
+      shift[1] += cur_speed1->retrieve((int)shift[1])/fps/100;    //distance  :m
     }
     else
       shift[1] = 1000;
     position[1] = shift[1] * 10;
     //60 scores 
     if (shift[2] < 1000){
-      uint8_t c_hdd = shift[2] / 100;     //section locating
-      shift[2] += speed_male[c_hdd*100+2]/fps/10;    //distance  :m
+      shift[2] += cur_speed0->retrieve((int)shift[0])/fps/100;    //distance  :m
     }
     else
       shift[2] = 1000;
@@ -149,6 +132,56 @@ for(uint8_t i=0; i<3;i++){
   
 }
 
+
+//*************************
+void Strip::RUNCUSTOM() const
+{
+  uint  position=0;  //position of each 3 leds
+  float shift=0;
+  uint8_t skip =0; //if led is skipping to 0
+  int total_lengh= 100*speedcustom.size();
+
+  while(status != StripStatus::STOP)
+  {
+      pixels->clear();
+      if (shift<total_lengh)
+      shift += cur_speedCustom->retrieve((int)shift)/fps/100;    //distance  :m
+      else 
+      shift = total_lengh;
+
+      position = shift *10;
+      if(position > 4000){
+        position %= 4000;
+        if(position < 10) 
+          skip = 1 ;
+      }
+
+      if(skip == 1){
+        pixels->fill(color[1],4000-position);
+        pixels->fill(color[1],0,position);
+      }
+      else
+        pixels->fill(color[1], position-length, length);
+      
+      pixels->show();
+      
+      shift_char->setValue(shift);
+      shift_char->notify();
+      
+      if(shift == total_lengh ){
+        break;
+      }
+      vTaskDelay((1000/fps-4000*0.03)/portTICK_PERIOD_MS);
+    
+  }
+  status_char->setValue(StripStatus::STOP);
+  status_char->notify();
+}
+
+
+
+
+
 void Strip::stripTask() {
   pixels->clear();
   pixels->show();
@@ -160,7 +193,10 @@ void Strip::stripTask() {
         RUN800();
       } else if (status == StripStatus::RUN1000) {
         RUN1000();
-      } else if (status == StripStatus::STOP) {
+      } else if (status == StripStatus::CUSTOM){
+        RUNCUSTOM();
+      }
+      else if (status == StripStatus::STOP) {
         pixels->updateLength(4000);
         pixels->clear();
         pixels->show();
@@ -168,20 +204,7 @@ void Strip::stripTask() {
       }
     }
     const auto stop_halt_delay = 500;
-    if (status == StripStatus::STOP) {
-      vTaskDelay(stop_halt_delay / portTICK_PERIOD_MS);
-    } else {
-      vTaskDelay(halt_delay / portTICK_PERIOD_MS);
-    }
-    // after a round record the count and notify the client.
-    if (pixels != nullptr && shift_char != nullptr && status != StripStatus::STOP) {
-      if (count < UINT32_MAX) {
-        count++;
-      } else {
-        count = 0;
-      }
-      
-    }
+  
   }
 }
 
@@ -254,17 +277,35 @@ StripError Strip::initBLE(NimBLEServer *server) {
     auto status_cb = new StatusCharCallback(*this);
     status_char->setValue(status);
     status_char->setCallbacks(status_cb);
-
-    speed_char = service->createCharacteristic(LIGHT_CHAR_SPEED_UUID,
+//***********create speedC callback
+    speedcustom_char = service->createCharacteristic(LIGHT_CHAR_SPEEDCUSTOM_UUID,
                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto speed_cb = new speedCharCallback(*this);
-    //speed_char->setValue(speed);
-    speed_char->setCallbacks(speed_cb);
+    auto speedcustom_cb = new SpeedCustomCharCallback(*this,cur_speedCustom);
+    speedcustom_char->setValue(speedcustom);
+    speedcustom_char->setCallbacks(speedcustom_cb);
+//***********create speed0 callback
+    speed0_char = service->createCharacteristic(LIGHT_CHAR_SPEED0_UUID,
+                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto speed0_cb = new SpeedZeroCharCallback(*this,cur_speed0);
+    speed0_char->setValue(speed0);
+    speed0_char->setCallbacks(speed0_cb);
+//***********create speed callback
+    speed1_char = service->createCharacteristic(LIGHT_CHAR_SPEED1_UUID,
+                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto speed1_cb = new SpeedOneCharCallback(*this,cur_speed1);
+    speed1_char->setValue(speed1);
+    speed1_char->setCallbacks(speed1_cb);
+//***********create speed callback
+    speed2_char = service->createCharacteristic(LIGHT_CHAR_SPEED2_UUID,
+                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto speed2_cb = new SpeedTwoCharCallback(*this,cur_speed2);
+    speed2_char->setValue(speed2);
+    speed2_char->setCallbacks(speed2_cb);
 
+//*********shift has only Characteristic.no callback func(read only)
     this->shift_char = service->createCharacteristic(LIGHT_CHAR_SHIFT_UUID,
                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-    shift_char->setValue(count);
-
+    
 
     halt_delay_char = service->createCharacteristic(LIGHT_CHAR_HALT_DELAY_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
@@ -303,8 +344,7 @@ StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
     this->max_LEDs = max_LEDs;
     this->pin = PIN;
     this->brightness = brightness;
-    Get_color();
-    Get_speed();
+    Get_color(); //get pref.color
     pixels = new Adafruit_NeoPixel(max_LEDs, PIN, NEO_GRB + NEO_KHZ800);
     pixels->begin();
     pixels->setBrightness(brightness);

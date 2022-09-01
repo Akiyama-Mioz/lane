@@ -10,14 +10,6 @@
 #include "freertos/task.h"
 #include "Arduino.h"
 #include "NimBLEDevice.h"
-#include <map>
-#include <utils.h>
-#include <iostream>
-#include "pb_encode.h"
-#include "pb_decode.h"
-#include "msg.pb.h"
-//#include "pb.h"
-// #include "nanopb_cpp.h"
 #include "StripCommon.h"
 #include "AdCallback.h"
 #define TEST(x) \
@@ -49,58 +41,6 @@ void scanTask(BLEScan *pBLEScan) {
 
   vTaskDelete(nullptr);
 }
-
-uint8_t buf[50];
-uint8_t  message_length =40;
-auto dists = std::vector<int>{100, 200, 300, 400, 500, 600, 700, 800};
-auto speedes = std::vector<float>{2, 2.5, 3, 4, 3.5, 3, 2, 4};
-int nanopb_test(){
-  int status = 0;
- TrackConfig config_decoded = TrackConfig_init_zero;
-  auto recevied_tuple = std::vector<TupleIntFloat>{};
-  pb_istream_t istream = pb_istream_from_buffer(buf, message_length);
-  TrackConfig config_decoded = TrackConfig_init_zero;
-auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
-    // Things will be weird if you dereference it
-    // I don't know why though
-    // auto tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // not ok
-    // https://stackoverflow.com/questions/1910712/dereference-vector-pointer-to-access-element
-    // auto *tuple_list = (reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as pointer
-    auto &tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as reference
-    TupleIntFloat t = TupleIntFloat_init_zero;
-    bool status = pb_decode(stream, TupleIntFloat_fields, &t);
-    if (status) {
-      tuple_list.emplace_back(t);
-      return true;
-    } else {
-      return false;
-    }
-  };
-  config_decoded.lst.arg = reinterpret_cast<void *>(&recevied_tuple);
-  config_decoded.lst.funcs.decode = decode_tuple_list;
-  bool status_decode = pb_decode(&istream, TrackConfig_fields, &config_decoded);
-  std::cout << "Decode success? " << (status_decode ? "true" : "false") << "\n";
-  if (status_decode){
-    if (recevied_tuple.empty()){
-      std::cout << "But I got nothing! \n";
-      return 1;
-    }
-    for (auto &t : recevied_tuple){
-      std::cout << "dist: " << t.dist << "\tspeed: " << t.speed << "\n";
-    }
-  } else {
-    std::cout << "Error: Something goes wrong when decoding \n";
-    return 1;
-  }
-
-auto m = std::map<int, float>{};
-for (auto &t : recevied_tuple){
-      dists.emplace_back(t.dist);
-      m.insert_or_assign(t.dist, t.speed);
-    }
-    auto res = retriever.retrieve(val);
-}
-
 
 const char * SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const char * CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
