@@ -5,6 +5,7 @@
 #ifndef HELLO_WORLD_STRIPCALLBACKS_H
 #define HELLO_WORLD_STRIPCALLBACKS_H
 
+#include "utils.h"
 #include <Adafruit_NeoPixel.h>
 #include "NimBLEDevice.h"
 #include <map>
@@ -13,7 +14,6 @@
 #include "pb_encode.h"
 #include "pb_decode.h"
 #include "msg.pb.h"
-#include "utils.h"
 
 
 class Strip;
@@ -71,32 +71,29 @@ class SpeedCustomCharCallback : public NimBLECharacteristicCallbacks {
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedCustomCharCallback(Strip &strip, ValueRetriever<float> *speedCustom):cur_speedCustom(speedCustom), strip(strip){}
+  explicit SpeedCustomCharCallback(Strip &strip):strip(strip){}
 };
 
 class SpeedZeroCharCallback : public NimBLECharacteristicCallbacks {
-  ValueRetriever<float> *cur_speed0;
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedZeroCharCallback(Strip &strip, ValueRetriever<float> *speed0):cur_speed0(speed0), strip(strip){}
+  explicit SpeedZeroCharCallback(Strip &strip) : strip(strip){}
 };
 class SpeedOneCharCallback : public NimBLECharacteristicCallbacks {
-  ValueRetriever<float> *cur_speed1;
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedOneCharCallback(Strip &strip, ValueRetriever<float> *speed1):cur_speed1(speed1), strip(strip){}
+  explicit SpeedOneCharCallback(Strip &strip) : strip(strip){}
 };
 class SpeedTwoCharCallback : public NimBLECharacteristicCallbacks {
-  ValueRetriever<float> *cur_speed2;
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedTwoCharCallback(Strip &strip, ValueRetriever<float> *speed2):cur_speed2(speed2), strip(strip){}
+  explicit SpeedTwoCharCallback(Strip &strip) : strip(strip){}
 };
 
 #endif //HELLO_WORLD_STRIPCALLBACKS_H
