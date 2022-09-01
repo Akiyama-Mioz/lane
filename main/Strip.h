@@ -141,8 +141,8 @@ public:
 protected:
   Strip() = default;
 
-  void run(std::vector<Track> &tracks);
   void run(Track *tracksBegin, Track *tracksEnd);
+  void run(std::vector<Track> &tracks);
 };
 
 

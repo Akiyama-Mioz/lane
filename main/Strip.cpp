@@ -50,30 +50,6 @@ void Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLen
   shift_char->notify();
 }
 
-void Strip::run(std::vector<Track> &tracks) {
-  // use the max value of the 0 track to determine the length of the track.
-  auto keys = tracks.begin()->retriever.getKeys();
-  auto l = *std::max_element(keys.begin(), keys.end());
-  int totalLength = 100 * l;
-  std::for_each(tracks.begin(), tracks.end(), [](Track &track) {
-    track.resetState();
-  });
-  while (status != StripStatus::STOP) {
-    pixels->clear();
-    for (auto &track: tracks) {
-      track.updateStrip(pixels, totalLength, l, fps);
-    }
-    pixels->show();
-    // 0 should be the fastest one, but we want to wait the slowest one to stop.
-    if (tracks.end()->state.shift >= totalLength) {
-      this->status = StripStatus::STOP;
-    }
-    vTaskDelay((1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS);
-  }
-  status_char->setValue(StripStatus::STOP);
-  status_char->notify();
-}
-
 void Strip::run(Track *tracksBegin, Track *tracksEnd) {
   // use the max value of the 0 track to determine the length of the track.
   auto keys = tracksBegin->retriever.getKeys();
@@ -84,6 +60,7 @@ void Strip::run(Track *tracksBegin, Track *tracksEnd) {
   });
   while (status != StripStatus::STOP) {
     pixels->clear();
+    // pointer can be captured by value
     std::for_each(tracksBegin, tracksEnd, [=](Track &track) {
       track.updateStrip(pixels, totalLength, l, fps);
     });
@@ -96,6 +73,11 @@ void Strip::run(Track *tracksBegin, Track *tracksEnd) {
   }
   status_char->setValue(StripStatus::STOP);
   status_char->notify();
+}
+
+void Strip::run(std::vector<Track> &tracks) {
+  // https://stackoverflow.com/questions/23316368/converting-iterator-to-pointer-really-it
+  this->run(&*tracks.begin(), &*tracks.end());
 }
 
 void Strip::runNormal() {
