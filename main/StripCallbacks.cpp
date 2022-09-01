@@ -65,19 +65,18 @@ void HaltDelayCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 HaltDelayCharCallback::HaltDelayCharCallback(Strip &strip) : strip(strip) {}
 
-auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
-  auto &tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as reference
-  TupleIntFloat t = TupleIntFloat_init_zero;
-  bool status = pb_decode(stream, TupleIntFloat_fields, &t);
-  if (status) {
-    tuple_list.emplace_back(t);
-    return true;
-  } else {
-    return false;
-  }
-};
-
 ValueRetriever<float> getValueRetriever(NimBLEAttValue &data) {
+  auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
+    auto &tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as reference
+    TupleIntFloat t = TupleIntFloat_init_zero;
+    bool status = pb_decode(stream, TupleIntFloat_fields, &t);
+    if (status) {
+      tuple_list.emplace_back(t);
+      return true;
+    } else {
+      return false;
+    }
+  };
   TrackConfig config_decoded = TrackConfig_init_zero;
   pb_istream_t istream = pb_istream_from_buffer(data, data.length());   ///encode -> imsg
   auto received_tuple = std::vector<TupleIntFloat>{};
