@@ -6,7 +6,7 @@
 #include "Strip.h"
 
 
-RunState nextState(RunState state, const ValueRetriever<float> &retriever, int totalLength, float fps) {
+inline RunState nextState(RunState state, const ValueRetriever<float> &retriever, int totalLength, float fps) {
   uint32_t position; // late
   float shift; // late
   float speed = retriever.retrieve(static_cast<int>(state.shift));
@@ -39,7 +39,7 @@ RunState nextState(RunState state, const ValueRetriever<float> &retriever, int t
  * @param trackLength
  * @param fps
  */
-RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps) {
+inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps) {
   auto next = nextState(state, retriever, totalLength, fps);
   auto [position, speed, shift, skip] = next;
   this->state = next;
@@ -73,7 +73,7 @@ void Strip::run(std::vector<Track> &tracks) {
   };
   auto param = TimerParam{&tracks, state_char};
   auto timer_cb = [](TimerHandle_t xTimer) {
-    auto param = *(TimerParam *) pvTimerGetTimerID(xTimer);
+    auto param = *static_cast<TimerParam *>(pvTimerGetTimerID(xTimer));
     auto &tracks = *param.tracks;
     auto ble_char = param.state_char;
     TrackStates states = TrackStates_init_zero;
@@ -104,9 +104,9 @@ void Strip::run(std::vector<Track> &tracks) {
     pb_ostream_t stream = pb_ostream_from_buffer(buf, sizeof(buf));
     states.states.arg = callbacks.arg_to_void();
     states.states.funcs.encode = callbacks.func_to_void();
-    bool res = pb_encode(&stream, TrackStates_fields, &states);
-    if (!res) {
-      // do nothing. You can't use printf/log in the timer callback.
+    bool success = pb_encode(&stream, TrackStates_fields, &states);
+    if (!success) {
+      // do nothing.
     } else {
       ble_char->setValue(buf, stream.bytes_written);
       ble_char->notify();
@@ -151,7 +151,6 @@ void Strip::run(std::vector<Track> &tracks) {
 void Strip::stripTask() {
   pixels->clear();
   pixels->show();
-  // a delay that will be applied to the end of each loop.
   for (;;) {
     if (pixels != nullptr) {
       if (status == StripStatus::RUN) {
