@@ -31,8 +31,10 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   if (status < StripStatus_LENGTH) {
     auto s = StripStatus(status);
     strip.status = s;
+    fmt::print("[StatusCharCallback] status changed to {}\n", status);
   } else {
-    ESP_LOGE("StatusCharCallback", "Invalid data length: %d", data.length());
+//    ESP_LOGE("StatusCharCallback", "Invalid data: %d", data.length());
+    fmt::print("[StatusCharCallback] Invalid data: {}\n", status);
     characteristic->setValue(strip.status);
   }
 }
@@ -57,12 +59,13 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   // 20 should be more than enough.
   // https://stackoverflow.com/questions/7774938/in-c-will-the-vector-function-push-back-increase-the-size-of-an-empty-array
   auto received_tuple = std::vector<TupleIntFloat>{};
-  received_tuple.reserve(20);
+  received_tuple.reserve(11);
   config.lst.arg = reinterpret_cast<void *>(&received_tuple);
   config.lst.funcs.decode = decode_tuple_list;
-  bool status_decode = pb_decode(&istream, TrackConfig_fields, &config);
-  if (!status_decode) {
+  bool success = pb_decode(&istream, TrackConfig_fields, &config);
+  if (!success) {
     ESP_LOGE("Decode Config", "Error: Something goes wrong when decoding");
+    return;
   }
   auto m = std::map<int, float>{};
   for (auto &t: received_tuple) {
@@ -77,8 +80,10 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     .color = Adafruit_NeoPixel::Color(config.color.red, config.color.green, config.color.blue),
   };
   if (config.command == Command_ADD){
+    fmt::print("Add track id {}\n", track.id);
     strip.tracks.emplace_back(track);
   } else if (config.command == Command_RESET){
+    fmt::print("Reset and add track id {}\n", track.id);
     strip.tracks.clear();
     strip.tracks.emplace_back(track);
   } else {

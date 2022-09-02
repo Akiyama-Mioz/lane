@@ -15,14 +15,11 @@
 
 extern "C" { void app_main(); }
 
-static auto esp_name = "e-track 011";
-
-class Strip;
+static auto esp_name = "long-track 011";
 
 //In seconds
 static const int scanTime = 1;
 static const int scanInterval = 50;
-
 
 [[noreturn]]
 void scanTask(BLEScan *pBLEScan) {
@@ -70,7 +67,7 @@ void app_main(void) {
   pAdvertising->setScanResponse(false);
 
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
-              "stripTask", 5000,
+              "stripTask", 5120,
               pStrip, 2,
               nullptr);
 

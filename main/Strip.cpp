@@ -39,7 +39,7 @@ RunState nextState(RunState state, const ValueRetriever<float> &retriever, int t
  * @param trackLength
  * @param fps
  */
-void Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps) {
+RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps) {
   auto next = nextState(state, retriever, totalLength, fps);
   auto [position, speed, shift, skip] = next;
   this->state = next;
@@ -49,16 +49,23 @@ void Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLen
   } else {
     pixels->fill(color, position - trackLength, trackLength);
   }
+  return next;
 }
 
-void Strip::run(Track *begin, Track *end) {
+void Strip::run(std::vector<Track> &tracks) {
+  if (tracks.empty()){
+    fmt::print("no track to run\n");
+    status = StripStatus::STOP;
+    return;
+  }
   // use the max value of the 0 track to determine the length of the track.
-  auto keys = begin->retriever.getKeys();
-  auto l = begin->retriever.getMaxKey();
+  auto keys = tracks.begin()->retriever.getKeys();
+  auto l = tracks.begin()->retriever.getMaxKey();
   int totalLength = 100 * l;
-  std::for_each(begin, end, [](Track &track) {
+  fmt::print("total length is {} cm\n", totalLength);
+  for (auto &track: tracks){
     track.resetState();
-  });
+  }
 
   struct TimerParam {
     std::vector<Track> *tracks;
@@ -74,8 +81,8 @@ void Strip::run(Track *begin, Track *end) {
         &tracks,
         [](pb_ostream_t *stream, const pb_field_t *field,
            std::vector<Track> *const *arg) -> bool {
-          auto tracks = *arg;
-          for (auto &track: *tracks) {
+          auto &tracks = **arg;
+          for (auto &track: tracks) {
             auto state = track.state;
             auto [position, speed, shift, skip] = state;
             auto state_encode = TrackState{
@@ -93,7 +100,7 @@ void Strip::run(Track *begin, Track *end) {
           return true;
         }
     };
-    uint8_t buf[256];
+    uint8_t buf[128];
     pb_ostream_t stream = pb_ostream_from_buffer(buf, sizeof(buf));
     states.states.arg = callbacks.arg_to_void();
     states.states.funcs.encode = callbacks.func_to_void();
@@ -107,37 +114,38 @@ void Strip::run(Track *begin, Track *end) {
   };
   // encode and send the states to the characteristic
   // 1 second send one message.
-  auto timer = xTimerCreate("timer", 1000 / portTICK_PERIOD_MS, pdTRUE, reinterpret_cast<void *>(&param), timer_cb);
+  auto timer = xTimerCreate("timer", pdMS_TO_TICKS(1000), pdTRUE, reinterpret_cast<void *>(&param), timer_cb);
   xTimerStart(timer, 0);
 
+  fmt::print("enter loop\n");
   while (status != StripStatus::STOP) {
     pixels->clear();
-    // pointer can be captured by value
-    std::for_each(begin, end, [=](Track &track) {
-      track.updateStrip(pixels, totalLength, l, fps);
-    });
+    for (auto &track:tracks){
+      auto next = track.updateStrip(pixels, totalLength, length, fps);
+      auto [position, speed, shift, skip] = next;
+      fmt::print("track {}: position {}, speed {}, shift {}, skip {}\n", track.id, position, speed, shift, skip);
+    }
     pixels->show();
     // TODO: add priority to the tracks and then sort the states.
     // We can use ID
     // first should be the fastest one, but we want to wait the slowest one to stop.
-    if (end->state.shift >= totalLength) {
+    // TODO: fix the bug. state.shift should be a small float but it get very big
+    // I guess it's because of the precision of the float. Fuck IEEE 754.
+    // TODO: use meter and meter per second to calculate the speed.
+    // instead of cm per second which is wired.
+    if (tracks.end()->state.shift >= totalLength) {
+      fmt::print("last shift {}\n", tracks.end()->state.shift);
       this->status = StripStatus::STOP;
     }
     // compile time calculation
-    // 46 ms per frame? You must be kidding me. THAT'S TOO FAST.
+    // 46 ms per frame? You must be kidding me. THAT'S TOO FAST and IMPOSSIBLE TO REACH
     constexpr auto delay = (1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS;
     vTaskDelay(delay);
   }
-
+  fmt::print("exit loop\n");
   xTimerStop(timer, portMAX_DELAY);
   status_char->setValue(StripStatus::STOP);
   status_char->notify();
-}
-
-void Strip::run(std::vector<Track> &tracks) {
-  // https://stackoverflow.com/questions/23316368/converting-iterator-to-pointer-really-it
-  // https://iris.artins.org/software/converting-an-stl-vector-iterator-to-a-raw-pointer/
-  this->run(&*tracks.begin(), &*tracks.end());
 }
 
 void Strip::stripTask() {
@@ -151,8 +159,8 @@ void Strip::stripTask() {
       } else if (status == StripStatus::STOP) {
         pixels->clear();
         pixels->show();
-        // 500 ms halt delay
-        constexpr auto delay = 500 / portTICK_PERIOD_MS;
+        // 100 ms halt delay
+        constexpr auto delay = 100 / portTICK_PERIOD_MS;
         vTaskDelay(delay);
       }
     }
@@ -176,7 +184,7 @@ void Strip::setMaxLEDs(int new_max_LEDs) {
    * @note Adafruit_NeoPixel::updateLength(uint16_t n) has been deprecated and only for old projects that
    *       may still be calling it. New projects should instead use the
    *       'new' keyword with the first constructor syntax (length, pin,
-   *       type).
+   *       type)
    */
   pixels = new Adafruit_NeoPixel(max_LEDs, pin, NEO_GRB + NEO_KHZ800);
   pixels->setBrightness(brightness);
@@ -241,7 +249,7 @@ StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
   if (!is_initialized) {
     pref.begin("record", false);
     tracks.clear();
-    tracks.reserve(10);
+    tracks.reserve(5);
     this->max_LEDs = max_LEDs;
     this->pin = PIN;
     this->brightness = brightness;

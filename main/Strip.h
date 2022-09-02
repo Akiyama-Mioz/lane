@@ -50,7 +50,7 @@ public:
     this->state = RunState{0, 0, 0, false};
   }
 
-  void updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps);
+  RunState  updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps);
 };
 
 class Strip {
@@ -123,8 +123,6 @@ public:
 
 protected:
   Strip() = default;
-
-  void run(Track *begin, Track *end);
 
   void run(std::vector<Track> &tracks);
 };
