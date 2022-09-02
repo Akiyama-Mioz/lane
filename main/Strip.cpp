@@ -54,7 +54,7 @@ void Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLen
 void Strip::run(Track *begin, Track *end) {
   // use the max value of the 0 track to determine the length of the track.
   auto keys = begin->retriever.getKeys();
-  auto l = *std::max_element(keys.begin(), keys.end());
+  auto l = begin->retriever.getMaxKey();
   int totalLength = 100 * l;
   std::for_each(begin, end, [](Track &track) {
     track.resetState();

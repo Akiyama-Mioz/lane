@@ -48,7 +48,11 @@ class ValueRetriever {
 private:
   std::map<int, T> m;
   std::vector<int> keys;
+  int max_key;
 public:
+  int getMaxKey() const {
+    return max_key;
+  }
   const std::map<int, T> &getMap() const {
     return m;
   }
@@ -76,11 +80,7 @@ public:
       keys.push_back(kv.first);
     }
     std::sort(keys.begin(), keys.end());
-    std::cout << "Here are the updated sorted keys: ";
-    for (auto &v : keys){
-      std::cout << v << " ";
-    }
-    std::cout << "\n";
+    max_key = *std::max_element(keys.begin(), keys.end());
   }
 
   T retrieve(int val) const {
