@@ -139,7 +139,7 @@ void Strip::run(std::vector<Track> &tracks) {
     }
     // compile time calculation
     // 46 ms per frame? You must be kidding me. THAT'S TOO FAST and IMPOSSIBLE TO REACH
-    constexpr auto delay = (1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS;
+    constexpr uint delay = pdMS_TO_TICKS(1000 / fps - 4000 * 0.03);
     vTaskDelay(delay);
   }
   fmt::print("exit loop\n");
@@ -160,7 +160,7 @@ void Strip::stripTask() {
         pixels->clear();
         pixels->show();
         // 100 ms halt delay
-        constexpr auto delay = 100 / portTICK_PERIOD_MS;
+        constexpr uint delay = pdMS_TO_TICKS(100);
         vTaskDelay(delay);
       }
     }
