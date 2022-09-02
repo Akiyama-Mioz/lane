@@ -37,9 +37,6 @@ void scanTask(BLEScan *pBLEScan) {
   vTaskDelete(nullptr);
 }
 
-const char *SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-const char *CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-
 void app_main(void) {
   const int DEFAULT_NUM_LEDs = 4000;
   const uint16_t LED_PIN = 14;
@@ -52,14 +49,7 @@ void app_main(void) {
 
   NimBLEDevice::init(esp_name);
   auto pServer = NimBLEDevice::createServer();
-  auto pService = pServer->createService(SERVICE_UUID);
-  auto pCharacteristic = pService->createCharacteristic(
-      CHARACTERISTIC_UUID,
-      NIMBLE_PROPERTY::READ |
-      NIMBLE_PROPERTY::NOTIFY
-  );
   pServer->setCallbacks(new ServerCallbacks());
-  pCharacteristic->setValue(std::string{0x00});
 
   /**** Initialize NeoPixel. ****/
   /** an aux function used to let FreeRTOS do it work.
@@ -84,6 +74,7 @@ void app_main(void) {
               pStrip, 2,
               nullptr);
 
+  pServer->start();
   NimBLEDevice::startAdvertising();
   printf("Characteristic defined! Now you can read it in your phone!\n");
   pref.end();
