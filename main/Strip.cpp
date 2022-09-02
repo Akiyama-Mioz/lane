@@ -39,34 +39,35 @@ TrackState nextState(TrackState state, const ValueRetriever<float> &retriever, i
  */
 void Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps) {
   auto next = nextState(state, retriever, totalLength, fps);
+  auto [position, shift, skip] = next;
   this->state = next;
-  if (state.isSkip) {
-    pixels->fill(color, 4000 - state.position);
-    pixels->fill(color, 0, state.position);
+  if (skip) {
+    pixels->fill(color, 4000 - position);
+    pixels->fill(color, 0, position);
   } else {
-    pixels->fill(color, state.position - trackLength, trackLength);
+    pixels->fill(color, position - trackLength, trackLength);
   }
-  shift_char->setValue(state.shift);
+  shift_char->setValue(shift);
   shift_char->notify();
 }
 
-void Strip::run(Track *tracksBegin, Track *tracksEnd) {
+void Strip::run(Track *begin, Track *end) {
   // use the max value of the 0 track to determine the length of the track.
-  auto keys = tracksBegin->retriever.getKeys();
+  auto keys = begin->retriever.getKeys();
   auto l = *std::max_element(keys.begin(), keys.end());
   int totalLength = 100 * l;
-  std::for_each(tracksBegin, tracksEnd, [](Track &track) {
+  std::for_each(begin, end, [](Track &track) {
     track.resetState();
   });
   while (status != StripStatus::STOP) {
     pixels->clear();
     // pointer can be captured by value
-    std::for_each(tracksBegin, tracksEnd, [=](Track &track) {
+    std::for_each(begin, end, [=](Track &track) {
       track.updateStrip(pixels, totalLength, l, fps);
     });
     pixels->show();
     // 0 should be the fastest one, but we want to wait the slowest one to stop.
-    if (tracksEnd->state.shift >= totalLength) {
+    if (end->state.shift >= totalLength) {
       this->status = StripStatus::STOP;
     }
     vTaskDelay((1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS);

@@ -130,7 +130,7 @@ public:
 protected:
   Strip() = default;
 
-  void run(Track *tracksBegin, Track *tracksEnd);
+  void run(Track *begin, Track *end);
   void run(std::vector<Track> &tracks);
 };
 
