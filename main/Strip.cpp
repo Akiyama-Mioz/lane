@@ -65,7 +65,6 @@ void Strip::run(Track *begin, Track *end) {
     NimBLECharacteristic *state_char;
   };
   auto param = TimerParam{&tracks, state_char};
-
   auto timer_cb = [](TimerHandle_t xTimer) {
     auto param = *(TimerParam *) pvTimerGetTimerID(xTimer);
     auto &tracks = *param.tracks;
@@ -129,6 +128,7 @@ void Strip::run(Track *begin, Track *end) {
     constexpr auto delay = (1000 / fps - 4000 * 0.03) / portTICK_PERIOD_MS;
     vTaskDelay(delay);
   }
+
   xTimerStop(timer, portMAX_DELAY);
   status_char->setValue(StripStatus::STOP);
   status_char->notify();
@@ -241,6 +241,7 @@ StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
   if (!is_initialized) {
     pref.begin("record", false);
     tracks.clear();
+    tracks.reserve(10);
     this->max_LEDs = max_LEDs;
     this->pin = PIN;
     this->brightness = brightness;

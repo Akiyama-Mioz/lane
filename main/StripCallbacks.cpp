@@ -54,7 +54,10 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   };
   TrackConfig config = TrackConfig_init_zero;
   pb_istream_t istream = pb_istream_from_buffer(data, data.length());
+  // 20 should be more than enough.
+  // https://stackoverflow.com/questions/7774938/in-c-will-the-vector-function-push-back-increase-the-size-of-an-empty-array
   auto received_tuple = std::vector<TupleIntFloat>{};
+  received_tuple.reserve(20);
   config.lst.arg = reinterpret_cast<void *>(&received_tuple);
   config.lst.funcs.decode = decode_tuple_list;
   bool status_decode = pb_decode(&istream, TrackConfig_fields, &config);

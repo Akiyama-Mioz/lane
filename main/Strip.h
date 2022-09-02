@@ -87,7 +87,7 @@ public:
   const char *LIGHT_CHAR_CONFIG_UUID = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
   const char *LIGHT_CHAR_STATE_UUID = "ed3eefa1-3c80-b43f-6b65-e652374650b5";
 
-  std::vector<Track> tracks = std::vector<Track>(10);
+  std::vector<Track> tracks = std::vector<Track>{};
 
   /**
    * @brief Loop the strip.
