@@ -13,8 +13,7 @@
 #include <vector>
 #include "pb_encode.h"
 #include "pb_decode.h"
-#include "msg.pb.h"
-
+#include "track_config.pb.h"
 
 class Track;
 class Strip;
@@ -36,13 +35,12 @@ public:
   explicit StatusCharCallback(Strip &strip);
 };
 
-class SpeedCharCallback : public NimBLECharacteristicCallbacks {
+class ConfigCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
-  Track &track;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit SpeedCharCallback(Strip &strip, Track &track) : strip(strip), track(track) {}
+  explicit ConfigCharCallback(Strip &strip) : strip(strip) {}
 };
 
 #endif //HELLO_WORLD_STRIPCALLBACKS_H

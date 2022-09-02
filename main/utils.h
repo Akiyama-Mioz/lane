@@ -13,6 +13,7 @@
 #include <iostream>
 #include <iomanip>
 #include <vector>
+#include <pb_encode.h>
 #include <map>
 
 std::string to_hex(const std::basic_string<char> &s);
@@ -86,6 +87,44 @@ public:
   T retrieve(int val) const {
     return retrieve_by_val(keys, m, val);
   }
+};
+
+/**
+ * @brief A auxiliary class to handle the callback of nanopb encoding.
+ *        This exists because the need for
+ * @warning: T must be a pointer type (with a little star behind it)
+ */
+template<class T>
+struct PbCallback {
+  using PbEncodeCallback = bool (*)(pb_ostream_t *stream, const pb_field_t *field, T const *arg);
+  using PbEncodeCallbackVoid = bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg);
+  /**
+   * @brief The parameter should be passed to the func with pointer type T.
+   */
+  T arg;
+  /**
+   * @brief The function to be called when encoding.
+   */
+  PbEncodeCallback func;
+  /**
+   * @brief cast the function to the type of PbEncodeCallbackVoid.
+   * @return a function pointer of bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
+   */
+  inline PbEncodeCallbackVoid func_to_void() {
+    return reinterpret_cast<PbEncodeCallbackVoid>(func);
+  }
+  /**
+   * @brief cast the arg (which should already be a pointer) to void *.
+   * @return void *
+   */
+  inline void * arg_to_void() {
+    return const_cast<void *>(reinterpret_cast<const void *>(arg));
+  }
+  /**
+   * @note constructor is deleted. use the struct initializer instead.
+   * @see <a href="https://en.cppreference.com/w/c/language/struct_initialization">Struct Initialization</a>
+   */
+  PbCallback() = delete;
 };
 
 #endif //HELLO_WORLD_UTILS_H

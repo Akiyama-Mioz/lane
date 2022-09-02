@@ -39,7 +39,8 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 StatusCharCallback::StatusCharCallback(Strip &strip) : strip(strip) {}
 
-ValueRetriever<float> getValueRetriever(NimBLEAttValue &data) {
+void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+  auto data = characteristic->getValue();
   auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
     auto &tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as reference
     TupleIntFloat t = TupleIntFloat_init_zero;
@@ -51,24 +52,33 @@ ValueRetriever<float> getValueRetriever(NimBLEAttValue &data) {
       return false;
     }
   };
-  TrackConfig config_decoded = TrackConfig_init_zero;
-  pb_istream_t istream = pb_istream_from_buffer(data, data.length());   ///encode -> imsg
+  TrackConfig config = TrackConfig_init_zero;
+  pb_istream_t istream = pb_istream_from_buffer(data, data.length());
   auto received_tuple = std::vector<TupleIntFloat>{};
-  config_decoded.lst.arg = reinterpret_cast<void *>(&received_tuple);
-  config_decoded.lst.funcs.decode = decode_tuple_list;
-  bool status_decode = pb_decode(&istream, TrackConfig_fields, &config_decoded);
+  config.lst.arg = reinterpret_cast<void *>(&received_tuple);
+  config.lst.funcs.decode = decode_tuple_list;
+  bool status_decode = pb_decode(&istream, TrackConfig_fields, &config);
   if (!status_decode) {
-    ESP_LOGE("Decode speed0", "Error: Something goes wrong when decoding");
+    ESP_LOGE("Decode Config", "Error: Something goes wrong when decoding");
   }
   auto m = std::map<int, float>{};
   for (auto &t: received_tuple) {
     m.insert_or_assign(t.dist, t.speed);
   }
   // prevent additional copy
-  return ValueRetriever<float>(std::move(m));
-}
-
-void SpeedCharCallback::onWrite(NimBLECharacteristic *characteristic) {
-  auto data = characteristic->getValue();
-  track.retriever = getValueRetriever(data);
+  auto retriever = ValueRetriever<float>(std::move(m));
+  auto track = Track{
+    .id = config.id,
+    .state = RunState{0, 0, 0, false},
+    .retriever = std::move(retriever),
+    .color = Adafruit_NeoPixel::Color(config.color.red, config.color.green, config.color.blue),
+  };
+  if (config.command == Command_ADD){
+    strip.tracks.emplace_back(track);
+  } else if (config.command == Command_RESET){
+    strip.tracks.clear();
+    strip.tracks.emplace_back(track);
+  } else {
+    ESP_LOGE("ConfigCharCallback", "Invalid command: %d", config.command);
+  }
 }
