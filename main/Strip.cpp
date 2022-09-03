@@ -54,7 +54,7 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, i
 void Strip::run(std::vector<Track> &tracks) {
   if (tracks.empty()){
     fmt::print("no track to run\n");
-    status = StripStatus::STOP;
+    setStatus(StripStatus::STOP);
     return;
   }
   // use the max value of the 0 track to determine the length of the track.
@@ -134,7 +134,7 @@ void Strip::run(std::vector<Track> &tracks) {
     // instead of cm per second which is wired.
     if (tracks.end()->state.shift >= totalLength) {
       fmt::print("last shift {}\n", tracks.end()->state.shift);
-      this->status = StripStatus::STOP;
+      setStatus(StripStatus::STOP);
     }
     // compile time calculation
     // 46 ms per frame? You must be kidding me. THAT'S TOO FAST and IMPOSSIBLE TO REACH
@@ -143,8 +143,6 @@ void Strip::run(std::vector<Track> &tracks) {
   }
   fmt::print("exit loop\n");
   xTimerStop(timer, portMAX_DELAY);
-  status_char->setValue(StripStatus::STOP);
-  status_char->notify();
 }
 
 void Strip::stripTask() {
@@ -270,5 +268,13 @@ void Strip::setBrightness(const uint8_t new_brightness) {
   if (pixels != nullptr) {
     brightness = new_brightness;
     pixels->setBrightness(brightness);
+  }
+}
+
+void Strip::setStatus(StripStatus status) {
+  this->status = status;
+  if (status_char != nullptr) {
+    status_char->setValue(status);
+    status_char->notify();
   }
 }

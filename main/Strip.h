@@ -105,6 +105,8 @@ public:
 
   void setBrightness(uint8_t new_brightness);
 
+  void setStatus(StripStatus status);
+
   static Strip *get();
 
   Strip(Strip const &) = delete;
