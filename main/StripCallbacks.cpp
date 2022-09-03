@@ -2,7 +2,6 @@
 // Created by Kurosu Chan on 2022/8/5.
 //
 #include "StripCommon.h"
-#include "StripCallbacks.h"
 
 void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();

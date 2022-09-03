@@ -3,7 +3,6 @@
 //
 
 #include "StripCommon.h"
-#include "Strip.h"
 
 
 inline RunState nextState(RunState state, const ValueRetriever<float> &retriever, int totalLength, float fps) {
