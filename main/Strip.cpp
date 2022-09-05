@@ -31,7 +31,7 @@ inline RunState nextState(RunState state, const ValueRetriever<float> &retriever
   position = shift;
   if (position > CIRCLE_LENGTH) {
     position = fmod(position, CIRCLE_LENGTH);
-    if (position < LEDsCountToMeter(ledCounts)){
+    if (position < LEDsCountToMeter(ledCounts)) {
       skip = true;
     } else {
       skip = false;
@@ -57,7 +57,7 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, flo
   auto maxLength = getMaxLength();
   // if the shift is larger than the max length, we should stop updating the state.
   // do an early return.
-  if (floor(state.shift) >= maxLength){
+  if (floor(state.shift) >= maxLength) {
     return state;
   } else {
     this->state = next;
@@ -128,14 +128,15 @@ void Strip::run(std::vector<Track> &tracks) {
       // do nothing.
     } else {
       // end() is not the same as back()
-      ESP_LOGD("Strip::run::callback", "Last track shift: %f",tracks.back().state.shift);
+      ESP_LOGD("Strip::run::callback", "Last track shift: %f", tracks.back().state.shift);
       ble_char->setValue(buf, stream.bytes_written);
       ble_char->notify();
     }
   };
   // encode and send the states to the characteristic
   // 1 second send one message.
-  auto timer = xTimerCreate("timer", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, reinterpret_cast<void *>(&param), timer_cb);
+  auto timer = xTimerCreate("timer", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, static_cast<void *>(&param),
+                            timer_cb);
   xTimerStart(timer, 0);
 
   ESP_LOGD("Strip::run", "enter loop");
@@ -144,7 +145,8 @@ void Strip::run(std::vector<Track> &tracks) {
     for (auto &track: tracks) {
       auto next = track.updateStrip(pixels, countLEDs, fps);
       auto [position, speed, shift, skip] = next;
-      ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed, shift);
+      ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
+               shift);
     }
     pixels->show();
     // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
@@ -258,7 +260,6 @@ Strip *Strip::get() {
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
 StripError Strip::begin(int16_t PIN, uint8_t brightness) {
-  // GNU old-style field designator extension
   if (!is_initialized) {
     pref.begin("record", false);
     tracks.clear();

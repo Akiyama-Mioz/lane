@@ -14,6 +14,5 @@ std::string to_hex(const uint8_t *v, const size_t s) {
   for (int i = 0; i < s; i++) {
     ss << std::hex << std::setw(2) << static_cast<int>(v[i]);
   }
-
   return ss.str();
 }

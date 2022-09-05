@@ -118,5 +118,5 @@ void ServerCallbacks::onDisconnect(NimBLEServer *pServer) {
 }
 
 void ServerCallbacks::onMTUChange(uint16_t MTU, ble_gap_conn_desc *desc) {
-  ESP_LOGI("onMTUChacnge", "MTU updated: %u for connection ID: %u", MTU, desc->conn_handle);
+  ESP_LOGI("onMTUChange", "MTU updated: %u for connection ID: %u", MTU, desc->conn_handle);
 }
