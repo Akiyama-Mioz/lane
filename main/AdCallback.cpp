@@ -33,7 +33,7 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
       }
     };
 
-    auto encode_string_callback = PbCallback<const char *>{
+    auto encode_string_callback = PbEncodeCallback<const char *>{
       .arg = name.c_str(),
       .func = encode_string
     };
@@ -65,7 +65,7 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
         advertisedDevice->getPayload(),
         31 // payload size, here it's fixed since bluetooth advertisement payload is 31 bytes.
     };
-    auto encode_str_with_len_callback = PbCallback<Payload *>{
+    auto encode_str_with_len_callback = PbEncodeCallback<Payload *>{
         .arg = &payload_data,
         .func = encode_str_with_len,
     };

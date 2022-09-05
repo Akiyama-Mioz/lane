@@ -96,7 +96,7 @@ void Strip::run(std::vector<Track> &tracks) {
     auto &tracks = *param.tracks;
     auto ble_char = param.state_char;
     TrackStates states = TrackStates_init_zero;
-    auto callbacks = PbCallback<std::vector<Track> *>{
+    auto callbacks = PbEncodeCallback<std::vector<Track> *>{
         &tracks,
         [](pb_ostream_t *stream, const pb_field_t *field,
            std::vector<Track> *const *arg) -> bool {
@@ -134,8 +134,7 @@ void Strip::run(std::vector<Track> &tracks) {
     }
   };
   // encode and send the states to the characteristic
-  // 1 second send one message.
-  auto timer = xTimerCreate("timer", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, static_cast<void *>(&param),
+  auto timer = xTimerCreate("sendStatus", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, static_cast<void *>(&param),
                             timer_cb);
   xTimerStart(timer, 0);
 

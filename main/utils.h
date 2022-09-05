@@ -93,9 +93,9 @@ public:
  * @warning: T must be a pointer type (with a little star behind it)
  */
 template<class T>
-struct PbCallback {
-  using PbEncodeCallback = bool (*)(pb_ostream_t *stream, const pb_field_t *field, T const *arg);
-  using PbEncodeCallbackVoid = bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg);
+struct PbEncodeCallback {
+  using PbEncodeFunc = bool (*)(pb_ostream_t *stream, const pb_field_t *field, T const *arg);
+  using PbEncodeVoid = bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg);
   /**
    * @brief The parameter should be passed to the func with pointer type T.
    */
@@ -103,13 +103,13 @@ struct PbCallback {
   /**
    * @brief The function to be called when encoding.
    */
-  PbEncodeCallback func;
+  PbEncodeFunc func;
   /**
    * @brief cast the function to the type of PbEncodeCallbackVoid.
    * @return a function pointer of bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
    */
-  inline PbEncodeCallbackVoid func_to_void() {
-    return reinterpret_cast<PbEncodeCallbackVoid>(func);
+  inline PbEncodeVoid func_to_void() {
+    return reinterpret_cast<PbEncodeVoid>(func);
   }
   /**
    * @brief cast the arg (which should already be a pointer) to void *.
@@ -120,9 +120,10 @@ struct PbCallback {
   }
   /**
    * @note constructor is deleted. use the struct initializer instead.
+   * @warning T must be a pointer type (with a little star behind it)
    * @see <a href="https://en.cppreference.com/w/c/language/struct_initialization">Struct Initialization</a>
    */
-  PbCallback() = delete;
+  PbEncodeCallback() = delete;
 };
 
 #endif //HELLO_WORLD_UTILS_H
