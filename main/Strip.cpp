@@ -201,7 +201,7 @@ void Strip::setMaxLEDs(int new_max_LEDs) {
    *       'new' keyword with the first constructor syntax (length, pin,
    *       type)
    */
-  pixels = new Adafruit_NeoPixel(max_LEDs, pin, NEO_GRB + NEO_KHZ800);
+  pixels = new Adafruit_NeoPixel(max_LEDs, pin, pixelType);
   pixels->setBrightness(brightness);
   pixels->begin();
 }
@@ -269,7 +269,7 @@ StripError Strip::begin(int16_t PIN, uint8_t brightness) {
     this->max_LEDs = meterToLEDsCount(CIRCLE_LENGTH);
     this->pin = PIN;
     this->brightness = brightness;
-    pixels = new Adafruit_NeoPixel(max_LEDs, PIN, NEO_GRB + NEO_KHZ800);
+    pixels = new Adafruit_NeoPixel(max_LEDs, PIN, pixelType);
     pixels->begin();
     pixels->setBrightness(brightness);
     is_initialized = true;

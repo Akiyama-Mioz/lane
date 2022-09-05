@@ -73,6 +73,7 @@ protected:
 public:
   //distance travelled. MAX = 7
   constexpr static const float fps = 6;
+  static const neoPixelType pixelType = NEO_RGB + NEO_KHZ800;
   Preferences pref;
   int pin = 14;
   // 10 LEDs/m for 24V version
