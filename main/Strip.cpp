@@ -6,7 +6,7 @@
 
 // a LED count is 0.1m
 inline int meterToLEDsCount(float meter) {
-  return ceil(meter * LEDs_PER_METER);
+  return round(meter * LEDs_PER_METER);
 }
 
 inline float LEDsCountToMeter(int count) {
@@ -54,7 +54,14 @@ inline RunState nextState(RunState state, const ValueRetriever<float> &retriever
 inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, float fps) {
   auto next = nextState(state, retriever, ledCounts, fps);
   auto [position, speed, shift, skip] = next;
-  this->state = next;
+  auto maxLength = getMaxLength();
+  // if the shift is larger than the max length, we should stop updating the state.
+  // do an early return.
+  if (floor(state.shift) >= maxLength){
+    return state;
+  } else {
+    this->state = next;
+  }
   if (skip) {
     // fill to the end
     pixels->fill(color, meterToLEDsCount(CIRCLE_LENGTH - position));
@@ -141,7 +148,7 @@ void Strip::run(std::vector<Track> &tracks) {
     }
     pixels->show();
     // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
-    if (tracks.back().state.shift >= totalLength) {
+    if (ceil(tracks.back().state.shift) >= totalLength) {
       ESP_LOGI("Strip::run", "Run finished last shift %f", tracks.back().state.shift);
       setStatus(StripStatus::STOP);
     }

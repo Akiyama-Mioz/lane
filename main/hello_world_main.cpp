@@ -15,13 +15,11 @@ extern "C" { void app_main(); }
 static auto esp_name = "long-track 011";
 
 void app_main() {
-  const int DEFAULT_NUM_LEDs = 4000;
   const uint16_t LED_PIN = 14;
   initArduino();
 
   Preferences pref;
   pref.begin("record", true);
-  auto max_LEDs = DEFAULT_NUM_LEDs;
   auto brightness = pref.getUChar("brightness", 32);
 
   NimBLEDevice::init(esp_name);
@@ -43,7 +41,6 @@ void app_main() {
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(esp_name);
-  pAdvertising->setAppearance(0x0340);
   pAdvertising->setScanResponse(false);
 
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),

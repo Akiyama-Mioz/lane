@@ -54,6 +54,11 @@ public:
   ValueRetriever<float> retriever = ValueRetriever<float>(std::map<int, float>());
   uint32_t color = Adafruit_NeoPixel::Color(255, 255, 255);
 
+  [[nodiscard]]
+  int getMaxLength() const {
+    return retriever.getMaxKey();
+  }
+
   void resetState() {
     this->state = RunState{0, 0, 0, false};
   }
