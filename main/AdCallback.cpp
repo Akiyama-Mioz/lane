@@ -12,8 +12,8 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     return;
   }
   if (advertisedDevice->getName().find("T03") != std::string::npos) {
-    fmt::print("Name: {}, Data: {}, RSSI: {}\n", name,
-               to_hex(payload.c_str(), 31),
+    ESP_LOGI("AdCallback", "Name: %s, Data: %s, RSSI: %d", name.c_str(),
+               to_hex(payload.c_str(), 31).c_str(),
                advertisedDevice->getRSSI());
 
     uint8_t buffer[128];
@@ -82,9 +82,9 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
       this->characteristic->setValue(buffer, length);
       this->characteristic->notify();
       std::string buf = std::string(reinterpret_cast<char *>(buffer), length);
-      fmt::print("Protobuf: {}, Length: {}\n", to_hex(buf), length);
+      ESP_LOGD("AdCallback", "Protobuf: %s, Length: %d", to_hex(buf).c_str(), length);
     } else {
-      fmt::print("Error: {}\n", status);
+      ESP_LOGE("AdCallback", "Error: %d", status);
     }
     lastDevices.insert_or_assign(name, payload);
   }
@@ -92,9 +92,7 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
 
 
 void ServerCallbacks::onConnect(NimBLEServer *pServer, ble_gap_conn_desc *desc) {
-  printf("Client address: ");
-  fmt::print(NimBLEAddress(desc->peer_ota_addr).toString());
-  printf("\n");
+  ESP_LOGI("onConnect", "Client address: %s", NimBLEAddress(desc->peer_ota_addr).toString().c_str());
   /** We can use the connection handle here to ask for different connection parameters.
    *  Args: connection handle, min connection interval, max connection interval
    *  latency, supervision timeout.
@@ -109,16 +107,16 @@ void ServerCallbacks::onConnect(NimBLEServer *pServer, ble_gap_conn_desc *desc) 
  *  See: src/ble_gap.h for the details of the ble_gap_conn_desc struct.
  */
 void ServerCallbacks::onConnect(NimBLEServer *pServer) {
-  fmt::print("Client connected. ");
-  fmt::print("Multi-connect support: start advertising\n");
+  ESP_LOGI("onConnect", "Client connected.");
+  ESP_LOGI("onConnect", "Multi-connect support: start advertising");
   NimBLEDevice::startAdvertising();
 }
 
 void ServerCallbacks::onDisconnect(NimBLEServer *pServer) {
-  printf("Client disconnected - start advertising\n");
+  ESP_LOGI("onDisconnect", "Client disconnected - start advertising");
   NimBLEDevice::startAdvertising();
 }
 
 void ServerCallbacks::onMTUChange(uint16_t MTU, ble_gap_conn_desc *desc) {
-  printf("MTU updated: %u for connection ID: %u\n", MTU, desc->conn_handle);
+  ESP_LOGI("onMTUChacnge", "MTU updated: %u for connection ID: %u", MTU, desc->conn_handle);
 }

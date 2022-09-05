@@ -7,9 +7,6 @@
 [submodule "nanopb_cpp"]
 	path = components/nanopb/nanopb_cpp
 	url = https://github.com/nanopb/nanopb_cpp
-[submodule "components/fmtlib/fmt"]
-	path = components/fmtlib/fmt
-	url = https://github.com/fmtlib/fmt
 [submodule "components/arduino-libs/NimBLE-Arduino"]
 	path = components/arduino-libs/NimBLE-Arduino
 	url = https://github.com/h2zero/NimBLE-Arduino

@@ -1,10 +1,7 @@
-// necessary for using fmt library
-#define FMT_HEADER_ONLY
-
 // fmt library should be included first
 #include "utils.h"
-#include <cstdio>
 #include <vector>
+#include <cstdio>
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -17,24 +14,7 @@ extern "C" { void app_main(); }
 
 static auto esp_name = "long-track 011";
 
-//In seconds
-static const int scanTime = 1;
-static const int scanInterval = 50;
-
-[[noreturn]]
-void scanTask(BLEScan *pBLEScan) {
-  for (;;) {
-    BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
-    printf("Devices found: %d\n", foundDevices.getCount());
-    printf("Scan done!\n");
-    pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-    vTaskDelay(scanInterval / portTICK_PERIOD_MS); // Delay a second between loops.
-  }
-
-  vTaskDelete(nullptr);
-}
-
-void app_main(void) {
+void app_main() {
   const int DEFAULT_NUM_LEDs = 4000;
   const uint16_t LED_PIN = 14;
   initArduino();
@@ -58,7 +38,7 @@ void app_main(void) {
   };
   // using singleton pattern to avoid memory leak
   auto pStrip = Strip::get();
-  pStrip->begin(max_LEDs, LED_PIN, brightness);
+  pStrip->begin(LED_PIN, brightness);
   pStrip->initBLE(pServer);
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
@@ -73,7 +53,7 @@ void app_main(void) {
 
   pServer->start();
   NimBLEDevice::startAdvertising();
-  printf("Characteristic defined! Now you can read it in your phone!\n");
+  ESP_LOGI("MAIN", "Characteristic defined! Now you can read it in your phone!");
   pref.end();
 }
 

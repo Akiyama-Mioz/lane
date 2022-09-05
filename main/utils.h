@@ -1,13 +1,9 @@
 //
 // Created by Kurosu Chan on 2022/8/4.
 //
-// necessary for using fmt library
-#define FMT_HEADER_ONLY
-
 #ifndef HELLO_WORLD_UTILS_H
 #define HELLO_WORLD_UTILS_H
 
-#include "fmt/core.h"
 #include <algorithm>
 #include <sstream>
 #include <iostream>
@@ -49,8 +45,9 @@ class ValueRetriever {
 private:
   std::map<int, T> m;
   std::vector<int> keys;
-  int max_key;
+  int max_key = 0;
 public:
+  [[nodiscard]]
   int getMaxKey() const {
     return max_key;
   }
@@ -58,6 +55,7 @@ public:
     return m;
   }
 
+  [[nodiscard]]
   const std::vector<int> &getKeys() const {
     return keys;
   }

@@ -1,16 +1,12 @@
 //
 // Created by Kurosu Chan on 2022/8/4.
 //
-// necessary for using fmt library
-#define FMT_HEADER_ONLY
-
 #ifndef HELLO_WORLD_ADCALLBACK_H
 #define HELLO_WORLD_ADCALLBACK_H
 
-#include "fmt/core.h"
+#include "utils.h"
 #include "Arduino.h"
 #include "NimBLEDevice.h"
-#include "utils.h"
 #include <map>
 #include "ble.pb.h"
 

@@ -5,17 +5,22 @@
 
 
 std::string to_hex(const std::basic_string<char> &s) {
-  std::string res;
+  std::stringstream ss;
+  ss << std::hex << std::setfill('0');
   for (auto c: s) {
-    res += fmt::format("{:02x}", c);
+    ss << std::hex << std::setw(2) << static_cast<int>(c);
   }
-  return res;
+  return ss.str();
 }
 
-std::string to_hex(const char *s, size_t len) {
-  std::string res;
-  for (size_t i = 0; i < len; i++) {
-    res += fmt::format("{:02x}", s[i]);
+std::string to_hex(const uint8_t *v, const size_t s) {
+  std::stringstream ss;
+
+  ss << std::hex << std::setfill('0');
+
+  for (int i = 0; i < s; i++) {
+    ss << std::hex << std::setw(2) << static_cast<int>(v[i]);
   }
-  return res;
+
+  return ss.str();
 }

@@ -4,14 +4,6 @@
 
 #include "StripCommon.h"
 
-// in meters
-static const int CIRCLE_LENGTH = 400;
-static const int LEDs_PER_METER = 10;
-// in ms
-static const int TRANSMIT_INTERVAL = 1000;
-// in ms
-static const int HALT_INTERVAL = 100;
-
 // a LED count is 0.1m
 inline int meterToLEDsCount(float meter) {
   return ceil(meter * LEDs_PER_METER);
@@ -75,7 +67,7 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, flo
 
 void Strip::run(std::vector<Track> &tracks) {
   if (tracks.empty()) {
-    fmt::print("no track to run\n");
+    ESP_LOGE("Strip::run", "no track to run");
     setStatus(StripStatus::STOP);
     return;
   }
@@ -258,7 +250,7 @@ Strip *Strip::get() {
  * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
+StripError Strip::begin(int16_t PIN, uint8_t brightness) {
   // GNU old-style field designator extension
   if (!is_initialized) {
     pref.begin("record", false);
@@ -266,7 +258,7 @@ StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
     // reserve some space for the tracks
     // avoid the reallocation of the vector
     tracks.reserve(5);
-    this->max_LEDs = max_LEDs;
+    this->max_LEDs = meterToLEDsCount(CIRCLE_LENGTH);
     this->pin = PIN;
     this->brightness = brightness;
     pixels = new Adafruit_NeoPixel(max_LEDs, PIN, NEO_GRB + NEO_KHZ800);

@@ -77,7 +77,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     .color = Adafruit_NeoPixel::Color(config.color.red, config.color.green, config.color.blue),
   };
   if (config.command == Command_ADD){
-    fmt::print("Add track id {}\n", track.id);
+    ESP_LOGI("ConfigChar", "Add track id %d", track.id);
     strip.tracks.emplace_back(track);
     // sort the tracks by id from small to large.
     std::sort(strip.tracks.begin(), strip.tracks.end(), [](const Track &a, const Track &b) {
@@ -86,7 +86,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     // set the value of the characteristic to zero after finishing the operation.
     strip.config_char->setValue(0);
   } else if (config.command == Command_RESET){
-    fmt::print("Reset and add track id {}\n", track.id);
+    ESP_LOGI("ConfigChar", "Reset and add track id %d", track.id);
     strip.tracks.clear();
     strip.tracks.emplace_back(track);
     strip.config_char->setValue(0);
