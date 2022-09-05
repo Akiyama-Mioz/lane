@@ -5,19 +5,12 @@
 
 
 std::string to_hex(const std::basic_string<char> &s) {
-  std::stringstream ss;
-  ss << std::hex << std::setfill('0');
-  for (auto c: s) {
-    ss << std::hex << std::setw(2) << static_cast<int>(c);
-  }
-  return ss.str();
+  return to_hex(s.c_str(), s.size());
 }
 
 std::string to_hex(const uint8_t *v, const size_t s) {
   std::stringstream ss;
-
   ss << std::hex << std::setfill('0');
-
   for (int i = 0; i < s; i++) {
     ss << std::hex << std::setw(2) << static_cast<int>(v[i]);
   }

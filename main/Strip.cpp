@@ -142,7 +142,7 @@ void Strip::run(std::vector<Track> &tracks) {
     pixels->show();
     // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
     if (tracks.back().state.shift >= totalLength) {
-      ESP_LOGD("Strip::run", "last shift %f", tracks.back().state.shift);
+      ESP_LOGI("Strip::run", "Run finished last shift %f", tracks.back().state.shift);
       setStatus(StripStatus::STOP);
     }
     // TODO: no magic number
