@@ -15,7 +15,6 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     }
     [[maybe_unused]]
     auto size = strip.pref.putUChar("brightness", strip.brightness);
-//    printf("[BrightnessCharCallback] brightness stored in pref: %d, size: %d\n", brightness, size);
   } else {
     ESP_LOGE("BrightnessCharCallback", "Invalid data length: %d", data.length());
     characteristic->setValue(strip.pixels->getBrightness());
@@ -30,10 +29,9 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   if (status < StripStatus_LENGTH) {
     auto s = StripStatus(status);
     strip.status = s;
-    fmt::print("[StatusCharCallback] status changed to {}\n", status);
+    ESP_LOGI("StatusCharCallback", "status changed to %d", status);
   } else {
-//    ESP_LOGE("StatusCharCallback", "Invalid data: %d", data.length());
-    fmt::print("[StatusCharCallback] Invalid data: {}\n", status);
+    ESP_LOGE("StatusCharCallback", "Invalid status: %d", status);
     characteristic->setValue(strip.status);
   }
 }
@@ -81,10 +79,17 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   if (config.command == Command_ADD){
     fmt::print("Add track id {}\n", track.id);
     strip.tracks.emplace_back(track);
+    // sort the tracks by id from small to large.
+    std::sort(strip.tracks.begin(), strip.tracks.end(), [](const Track &a, const Track &b) {
+      return a.id < b.id;
+    });
+    // set the value of the characteristic to zero after finishing the operation.
+    strip.config_char->setValue(0);
   } else if (config.command == Command_RESET){
     fmt::print("Reset and add track id {}\n", track.id);
     strip.tracks.clear();
     strip.tracks.emplace_back(track);
+    strip.config_char->setValue(0);
   } else {
     ESP_LOGE("ConfigCharCallback", "Invalid command: %d", config.command);
   }

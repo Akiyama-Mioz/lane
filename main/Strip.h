@@ -31,13 +31,13 @@ enum class StripError {
 };
 
 struct RunState {
-  uint32_t position;
+  float position;
   float speed;
   float shift;
   bool isSkip;
 };
 
-RunState nextState(RunState state, const ValueRetriever<float> &retriever, int totalLength, float fps);
+RunState nextState(RunState state, const ValueRetriever<float> &retriever, int ledCounts, float fps);
 
 class Track {
 public:
@@ -50,7 +50,7 @@ public:
     this->state = RunState{0, 0, 0, false};
   }
 
-  RunState  updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps);
+  RunState updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, float fps);
 };
 
 class Strip {
@@ -65,8 +65,8 @@ public:
   // 10 LEDs/m for 24v
   int max_LEDs = 4000;
   // length should be less than max_LEDs
-  uint16_t length = 10;
-  uint32_t count = 0;
+  // the LED count that is filled once
+  uint16_t countLEDs = 10;
   uint8_t brightness = 32;
   Adafruit_NeoPixel *pixels = nullptr;
   StripStatus status = StripStatus::STOP;

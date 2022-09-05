@@ -4,23 +4,46 @@
 
 #include "StripCommon.h"
 
+// in meters
+static const int CIRCLE_LENGTH = 400;
+static const int LEDs_PER_METER = 10;
+// in ms
+static const int TRANSMIT_INTERVAL = 1000;
+// in ms
+static const int HALT_INTERVAL = 100;
 
-inline RunState nextState(RunState state, const ValueRetriever<float> &retriever, int totalLength, float fps) {
-  uint32_t position; // late
-  float shift; // late
+// a LED count is 0.1m
+inline int meterToLEDsCount(float meter) {
+  return ceil(meter * LEDs_PER_METER);
+}
+
+inline float LEDsCountToMeter(int count) {
+  return count / LEDs_PER_METER;
+}
+
+/**
+ * @brief get the next state. should be a pure function.
+ * @param state the current state.
+ * @param retriever
+ * @param fps frames per second
+ * @return the next state.
+ */
+inline RunState nextState(RunState state, const ValueRetriever<float> &retriever, int ledCounts, float fps) {
+  float position; // late
+  float shift = state.shift;
   float speed = retriever.retrieve(static_cast<int>(state.shift));
   bool skip = state.isSkip;
   //distance unit is `meter`
-  if (state.shift < totalLength)
-    shift = speed / fps / 100;
-  else {
-    shift = totalLength;
-  }
-  position = shift * 10;
-  if (position > 4000) {
-    position %= 4000;
-    if (position < 10)
+  // total length will not be considered here.
+  shift = shift + speed / fps; // speed per frame in m/s
+  position = shift;
+  if (position > CIRCLE_LENGTH) {
+    position = fmod(position, CIRCLE_LENGTH);
+    if (position < LEDsCountToMeter(ledCounts)){
       skip = true;
+    } else {
+      skip = false;
+    }
   }
   return RunState{
       position,
@@ -32,37 +55,35 @@ inline RunState nextState(RunState state, const ValueRetriever<float> &retriever
 
 /**
  * @brief update the strip with the new state and write the pixel data to the strip.
- * finally, write the new state to the characteristic and then notify.
  * @param pixels
- * @param totalLength
- * @param trackLength
+ * @param ledCounts - counts of the number of LEDs in one track.
  * @param fps
  */
-inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int totalLength, int trackLength, float fps) {
-  auto next = nextState(state, retriever, totalLength, fps);
+inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, float fps) {
+  auto next = nextState(state, retriever, ledCounts, fps);
   auto [position, speed, shift, skip] = next;
   this->state = next;
   if (skip) {
-    pixels->fill(color, 4000 - position);
-    pixels->fill(color, 0, position);
+    // fill to the end
+    pixels->fill(color, meterToLEDsCount(CIRCLE_LENGTH - position));
+    pixels->fill(color, 0, meterToLEDsCount(position));
   } else {
-    pixels->fill(color, position - trackLength, trackLength);
+    pixels->fill(color, meterToLEDsCount(position - LEDsCountToMeter(ledCounts)), ledCounts);
   }
   return next;
 }
 
 void Strip::run(std::vector<Track> &tracks) {
-  if (tracks.empty()){
+  if (tracks.empty()) {
     fmt::print("no track to run\n");
     setStatus(StripStatus::STOP);
     return;
   }
   // use the max value of the 0 track to determine the length of the track.
-  auto keys = tracks.begin()->retriever.getKeys();
-  auto l = tracks.begin()->retriever.getMaxKey();
-  int totalLength = 100 * l;
-  fmt::print("total length is {} cm\n", totalLength);
-  for (auto &track: tracks){
+  auto keys = tracks.front().retriever.getKeys();
+  int totalLength = tracks.front().retriever.getMaxKey();
+  ESP_LOGI("Strip::run", "total length is %d m", totalLength);
+  for (auto &track: tracks) {
     track.resetState();
   }
 
@@ -107,41 +128,39 @@ void Strip::run(std::vector<Track> &tracks) {
     if (!success) {
       // do nothing.
     } else {
+      // end() is not the same as back()
+      ESP_LOGD("Strip::run::callback", "Last track shift: %f",tracks.back().state.shift);
       ble_char->setValue(buf, stream.bytes_written);
       ble_char->notify();
     }
   };
   // encode and send the states to the characteristic
   // 1 second send one message.
-  auto timer = xTimerCreate("timer", pdMS_TO_TICKS(1000), pdTRUE, reinterpret_cast<void *>(&param), timer_cb);
+  auto timer = xTimerCreate("timer", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, reinterpret_cast<void *>(&param), timer_cb);
   xTimerStart(timer, 0);
 
-  fmt::print("enter loop\n");
+  ESP_LOGD("Strip::run", "enter loop");
   while (status != StripStatus::STOP) {
     pixels->clear();
-    for (auto &track:tracks){
-      auto next = track.updateStrip(pixels, totalLength, length, fps);
+    for (auto &track: tracks) {
+      auto next = track.updateStrip(pixels, countLEDs, fps);
       auto [position, speed, shift, skip] = next;
-      fmt::print("track {}: position {}, speed {}, shift {}, skip {}\n", track.id, position, speed, shift, skip);
+      ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed, shift);
     }
     pixels->show();
-    // TODO: add priority to the tracks and then sort the states.
-    // We can use ID
-    // first should be the fastest one, but we want to wait the slowest one to stop.
-    // TODO: fix the bug. state.shift should be a small float but it get very big
-    // I guess it's because of the precision of the float. Fuck IEEE 754.
-    // TODO: use meter and meter per second to calculate the speed.
-    // instead of cm per second which is wired.
-    if (tracks.end()->state.shift >= totalLength) {
-      fmt::print("last shift {}\n", tracks.end()->state.shift);
+    // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
+    if (tracks.back().state.shift >= totalLength) {
+      ESP_LOGD("Strip::run", "last shift %f", tracks.back().state.shift);
       setStatus(StripStatus::STOP);
     }
-    // compile time calculation
-    // 46 ms per frame? You must be kidding me. THAT'S TOO FAST and IMPOSSIBLE TO REACH
+    // TODO: no magic number
+    // 46 ms per frame?
     constexpr uint delay = pdMS_TO_TICKS(1000 / fps - 4000 * 0.03);
     vTaskDelay(delay);
   }
-  fmt::print("exit loop\n");
+  ESP_LOGD("Strip::run", "exit loop");
+  // promise the last state is sent.
+  vTaskDelay(pdMS_TO_TICKS(TRANSMIT_INTERVAL));
   xTimerStop(timer, portMAX_DELAY);
 }
 
@@ -155,8 +174,7 @@ void Strip::stripTask() {
       } else if (status == StripStatus::STOP) {
         pixels->clear();
         pixels->show();
-        // 100 ms halt delay
-        constexpr uint delay = pdMS_TO_TICKS(100);
+        constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL);
         vTaskDelay(delay);
       }
     }
@@ -245,6 +263,8 @@ StripError Strip::begin(int max_LEDs, int16_t PIN, uint8_t brightness) {
   if (!is_initialized) {
     pref.begin("record", false);
     tracks.clear();
+    // reserve some space for the tracks
+    // avoid the reallocation of the vector
     tracks.reserve(5);
     this->max_LEDs = max_LEDs;
     this->pin = PIN;
