@@ -51,24 +51,25 @@ inline RunState nextState(RunState state, const ValueRetriever<float> &retriever
  * @param fps
  */
 inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, float fps) {
-  auto next = nextState(state, retriever, ledCounts, fps);
-  auto [position, speed, shift, skip] = next;
   auto maxLength = getMaxLength();
   // if the shift is larger than the max length, we should stop updating the state.
   // do an early return.
   if (floor(state.shift) >= maxLength) {
+    state.speed = 0;
     return state;
   } else {
+    auto next = nextState(state, retriever, ledCounts, fps);
+    auto [position, speed, shift, skip] = next;
     this->state = next;
+    if (skip) {
+      // fill to the end
+      pixels->fill(color, meterToLEDsCount(CIRCLE_LENGTH - position));
+      pixels->fill(color, 0, meterToLEDsCount(position));
+    } else {
+      pixels->fill(color, meterToLEDsCount(position - LEDsCountToMeter(ledCounts)), ledCounts);
+    }
+    return next;
   }
-  if (skip) {
-    // fill to the end
-    pixels->fill(color, meterToLEDsCount(CIRCLE_LENGTH - position));
-    pixels->fill(color, 0, meterToLEDsCount(position));
-  } else {
-    pixels->fill(color, meterToLEDsCount(position - LEDsCountToMeter(ledCounts)), ledCounts);
-  }
-  return next;
 }
 
 void Strip::run(std::vector<Track> &tracks) {
@@ -127,7 +128,6 @@ void Strip::run(std::vector<Track> &tracks) {
       // do nothing.
     } else {
       // end() is not the same as back()
-      ESP_LOGD("Strip::run::callback", "Last track shift: %f", tracks.back().state.shift);
       ble_char->setValue(buf, stream.bytes_written);
       ble_char->notify();
     }

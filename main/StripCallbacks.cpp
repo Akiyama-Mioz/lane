@@ -15,6 +15,7 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     }
     [[maybe_unused]]
     auto size = strip.pref.putUChar("brightness", strip.brightness);
+    ESP_LOGI("BrightnessCharCallback", "Brightness changed to %d", brightness);
   } else {
     ESP_LOGE("BrightnessCharCallback", "Invalid data length: %d", data.length());
     characteristic->setValue(strip.pixels->getBrightness());
