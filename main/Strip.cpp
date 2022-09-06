@@ -4,12 +4,11 @@
 
 #include "StripCommon.h"
 
-// a LED count is 0.1m
-inline int meterToLEDsCount(float meter) {
+static inline int meterToLEDsCount(float meter) {
   return round(meter * LEDs_PER_METER);
 }
 
-inline float LEDsCountToMeter(int count) {
+static inline float LEDsCountToMeter(int count) {
   return count / LEDs_PER_METER;
 }
 
@@ -75,7 +74,7 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, flo
 void Strip::run(std::vector<Track> &tracks) {
   if (tracks.empty()) {
     ESP_LOGE("Strip::run", "no track to run");
-    setStatus(StripStatus::STOP);
+    setStatusNotify(StripStatus::STOP);
     return;
   }
   // use the max value of the 0 track to determine the length of the track.
@@ -151,7 +150,7 @@ void Strip::run(std::vector<Track> &tracks) {
     // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
     if (ceil(tracks.back().state.shift) >= totalLength) {
       ESP_LOGI("Strip::run", "Run finished last shift %f", tracks.back().state.shift);
-      setStatus(StripStatus::STOP);
+      setStatusNotify(StripStatus::STOP);
     }
     // TODO: no magic number
     // 46 ms per frame?
@@ -181,11 +180,6 @@ void Strip::stripTask() {
   }
 }
 
-/**
- * @brief sets the maximum number of LEDs that can be used.
- * @warning This function will not set the corresponding bluetooth characteristic value.
- * @param new_max_LEDs
- */
 void Strip::setMaxLEDs(int new_max_LEDs) {
   max_LEDs = new_max_LEDs;
   // delete already checks if the pointer is still pointing to a valid memory location.
@@ -278,11 +272,6 @@ StripError Strip::begin(int16_t PIN, uint8_t brightness) {
   }
 }
 
-/**
- * @brief set the color of the strip.
- * @warning This function will not set the corresponding bluetooth characteristic value.
- * @param color the color of the strip.
- */
 void Strip::setBrightness(const uint8_t new_brightness) {
   if (pixels != nullptr) {
     brightness = new_brightness;
@@ -290,7 +279,7 @@ void Strip::setBrightness(const uint8_t new_brightness) {
   }
 }
 
-void Strip::setStatus(StripStatus status) {
+void Strip::setStatusNotify(StripStatus status) {
   this->status = status;
   if (status_char != nullptr) {
     status_char->setValue(status);

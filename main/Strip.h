@@ -115,11 +115,26 @@ public:
 
   StripError initBLE(NimBLEServer *server);
 
+  /**
+   * @brief sets the maximum number of LEDs that can be used.
+   * @warning This function will NOT set the corresponding bluetooth characteristic value.
+   * @param new_max_LEDs
+   */
   void setMaxLEDs(int new_max_LEDs);
 
+/**
+ * @brief set the color of the strip.
+ * @warning This function will NOT set the corresponding bluetooth characteristic value.
+ * @param color the color of the strip.
+ */
   void setBrightness(uint8_t new_brightness);
 
-  void setStatus(StripStatus status);
+  /**
+   * @brief set the status of the strip.
+   * @warning This function WILL set the corresponding bluetooth characteristic value and notify.
+   * @param status
+   */
+  void setStatusNotify(StripStatus status);
 
   static Strip *get();
 
