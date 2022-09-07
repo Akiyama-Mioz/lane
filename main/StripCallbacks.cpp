@@ -79,11 +79,11 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   };
   if (config.command == Command_ADD) {
     ESP_LOGI("ConfigChar", "Add track id %d", track.id);
-    auto isDuplicated = std::find_if(strip.tracks.begin(), strip.tracks.end(), [&track](const Track &t) {
+    bool isDuplicated = std::find_if(strip.tracks.begin(), strip.tracks.end(), [&track](const Track &t) {
       return t.id == track.id;
-    });
+    }) != strip.tracks.end();
     // If not present, it returns an iterator to one-past-the-end.
-    if (isDuplicated != strip.tracks.end()) {
+    if (isDuplicated) {
       ESP_LOGE("ConfigChar", "Duplicated track id %d", track.id);
       return;
     }
