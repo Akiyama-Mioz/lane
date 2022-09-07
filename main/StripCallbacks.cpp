@@ -72,13 +72,21 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   // prevent additional copy
   auto retriever = ValueRetriever<float>(std::move(m));
   auto track = Track{
-    .id = config.id,
-    .state = RunState{0, 0, 0, false},
-    .retriever = std::move(retriever),
-    .color = Adafruit_NeoPixel::Color(config.color.red, config.color.green, config.color.blue),
+      .id = config.id,
+      .state = RunState{0, 0, 0, false},
+      .retriever = std::move(retriever),
+      .color = Adafruit_NeoPixel::Color(config.color.red, config.color.green, config.color.blue),
   };
-  if (config.command == Command_ADD){
+  if (config.command == Command_ADD) {
     ESP_LOGI("ConfigChar", "Add track id %d", track.id);
+    auto isDuplicated = std::find_if(strip.tracks.begin(), strip.tracks.end(), [&track](const auto &t) {
+      return t.id == track.id;
+    });
+    // If not present, it returns an iterator to one-past-the-end.
+    if (isDuplicated != strip.tracks.end()) {
+      ESP_LOGE("ConfigChar", "Duplicated track id %d", track.id);
+      return;
+    }
     strip.tracks.emplace_back(track);
     // sort the tracks by id from small to large.
     std::sort(strip.tracks.begin(), strip.tracks.end(), [](const Track &a, const Track &b) {
@@ -86,7 +94,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     });
     // set the value of the characteristic to zero after finishing the operation.
     strip.config_char->setValue(0);
-  } else if (config.command == Command_RESET){
+  } else if (config.command == Command_RESET) {
     ESP_LOGI("ConfigChar", "Reset and add track id %d", track.id);
     strip.tracks.clear();
     strip.tracks.emplace_back(track);
