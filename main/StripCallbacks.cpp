@@ -34,6 +34,11 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
+  if (strip.status != StripStatus::STOP){
+    ESP_LOGE("ConfigCharCallback", "Strip is not stopped, cannot change config");
+    characteristic->setValue(1);
+    return;
+  }
   auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
     auto &tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as reference
     TupleIntFloat t = TupleIntFloat_init_zero;
