@@ -152,9 +152,17 @@ void Strip::run(std::vector<Track> &tracks) {
       ESP_LOGI("Strip::run", "Run finished last shift %f", tracks.back().state.shift);
       setStatusNotify(StripStatus::STOP);
     }
-    // TODO: no magic number
-    // 46 ms per frame?
-    constexpr uint delay = pdMS_TO_TICKS(1000 / fps - 4000 * 0.03);
+    // I expect the delay to be 1/fps seconds.
+    // Remember that the Adafruit_NeoPixel::show()
+    // will be blocking for LED_DELAY_TIME_MS milliseconds for ONE LED which could be huge for a large amount LEDs.
+    // so the actual delay we have to wait is (expectedDelay - LED_DELAY_TIME_MS * countLEDs).
+    // Actually the delay will be a little longer than expectedDelay because of the time spent in executing the code,
+    // but we won't care about that for now.
+    //
+    //    "There's no easy fix for this, but a few specialized alternative or companion libraries exist that use
+    //     very device-specific peripherals to work around it."
+    constexpr auto expectedDelay = 1000 / fps;
+    auto delay = pdMS_TO_TICKS(expectedDelay - meterToLEDsCount(CIRCLE_LENGTH) * LED_DELAY_TIME_MS);
     vTaskDelay(delay);
   }
   ESP_LOGD("Strip::run", "exit loop");

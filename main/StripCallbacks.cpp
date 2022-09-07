@@ -9,7 +9,7 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     uint8_t brightness = data[0];
     strip.brightness = brightness;
     // update the brightness of the strip.
-    // it may be nullptr during update max length.
+    // it may be nullptr during update of max length.
     if (strip.pixels != nullptr) {
       strip.pixels->setBrightness(brightness);
     }
@@ -54,10 +54,9 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   };
   TrackConfig config = TrackConfig_init_zero;
   pb_istream_t istream = pb_istream_from_buffer(data, data.length());
-  // 20 should be more than enough.
   // https://stackoverflow.com/questions/7774938/in-c-will-the-vector-function-push-back-increase-the-size-of-an-empty-array
   auto received_tuple = std::vector<TupleIntFloat>{};
-  received_tuple.reserve(11);
+  received_tuple.reserve(15);
   config.lst.arg = reinterpret_cast<void *>(&received_tuple);
   config.lst.funcs.decode = decode_tuple_list;
   bool success = pb_decode(&istream, TrackConfig_fields, &config);

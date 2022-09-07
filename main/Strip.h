@@ -24,6 +24,8 @@ static const int LEDs_PER_METER = 10;
 static const int TRANSMIT_INTERVAL = 1000;
 // in ms
 static const int HALT_INTERVAL = 100;
+// 0.03ms i.e. 30us (microseconds) per LED
+static const float LED_DELAY_TIME_MS = 0.03;
 
 // change this to match the length of StripStatus
 constexpr uint8_t StripStatus_LENGTH = 2;
