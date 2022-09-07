@@ -24,7 +24,7 @@ class BrightnessCharCallback : public NimBLECharacteristicCallbacks {
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit BrightnessCharCallback(Strip &strip);
+  explicit BrightnessCharCallback(Strip &strip): strip(strip) {};
 };
 
 class StatusCharCallback : public NimBLECharacteristicCallbacks {
@@ -32,7 +32,7 @@ class StatusCharCallback : public NimBLECharacteristicCallbacks {
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit StatusCharCallback(Strip &strip);
+  explicit StatusCharCallback(Strip &strip): strip(strip) {};
 };
 
 class ConfigCharCallback : public NimBLECharacteristicCallbacks {
@@ -41,6 +41,14 @@ public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
   explicit ConfigCharCallback(Strip &strip) : strip(strip) {}
+};
+
+class MaxLEDsCharCallback : public NimBLECharacteristicCallbacks {
+  Strip &strip;
+public:
+  void onWrite(NimBLECharacteristic *characteristic) override;
+
+  explicit MaxLEDsCharCallback(Strip &strip) : strip(strip) {}
 };
 
 #endif //HELLO_WORLD_STRIPCALLBACKS_H

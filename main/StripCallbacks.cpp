@@ -2,6 +2,8 @@
 // Created by Kurosu Chan on 2022/8/5.
 //
 #include "StripCommon.h"
+#include "StripCallbacks.h"
+
 
 void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
@@ -22,8 +24,6 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   }
 }
 
-BrightnessCharCallback::BrightnessCharCallback(Strip &strip) : strip(strip) {}
-
 void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
   uint8_t status = data[0];
@@ -36,8 +36,6 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     characteristic->setValue(strip.status);
   }
 }
-
-StatusCharCallback::StatusCharCallback(Strip &strip) : strip(strip) {}
 
 void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
@@ -100,5 +98,31 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     strip.config_char->setValue(0);
   } else {
     ESP_LOGE("ConfigCharCallback", "Invalid command: %d", config.command);
+  }
+}
+
+void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+  auto data = characteristic->getValue();
+  if (data.length() >= 2) {
+    /** TODO: make a function to convert uint8 array to uint16_t
+     *   both big endian and little endian.
+    **/
+    // ESP32 is little endian.
+    // NOTE: the sender should send the data in little endian.
+    // i.e. the first byte is the least significant byte.
+    constexpr uint16_t MAX_MAX_LEDs = 5000;
+    uint16_t max_LEDs = data[0] | data[1] << 8;
+    if (max_LEDs < MAX_MAX_LEDs) {
+      if (strip.status != StripStatus::STOP){
+        ESP_LOGE("MaxLEDsCharCallback", "Strip is running. You SHOULD NOT change the max LEDs.");
+        return;
+      }
+      strip.setMaxLEDs(max_LEDs);
+    } else {
+      ESP_LOGE("MaxLEDsCharCallback", "Invalid max LEDs: %d. Should less than %d", max_LEDs, MAX_MAX_LEDs);
+    }
+  } else {
+    ESP_LOGE("MaxLEDsCharCallback", "Invalid data length: %d", data.length());
+    characteristic->setValue(strip.max_LEDs);
   }
 }

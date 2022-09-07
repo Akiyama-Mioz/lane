@@ -19,7 +19,8 @@ static inline float LEDsCountToMeter(int count) {
  * @param fps frames per second
  * @return the next state.
  */
-inline RunState nextState(RunState state, const ValueRetriever<float> &retriever, int ledCounts, float fps) {
+inline RunState
+nextState(RunState state, const ValueRetriever<float> &retriever, float circleLength, float trackLength, float fps) {
   float position; // late
   float shift = state.shift;
   float speed = retriever.retrieve(static_cast<int>(state.shift));
@@ -28,9 +29,9 @@ inline RunState nextState(RunState state, const ValueRetriever<float> &retriever
   // total length will not be considered here.
   shift = shift + speed / fps; // speed per frame in m/s
   position = shift;
-  if (position > CIRCLE_LENGTH) {
-    position = fmod(position, CIRCLE_LENGTH);
-    if (position < LEDsCountToMeter(ledCounts)) {
+  if (position > circleLength) {
+    position = fmod(position, circleLength);
+    if (position < trackLength) {
       skip = true;
     } else {
       skip = false;
@@ -47,10 +48,10 @@ inline RunState nextState(RunState state, const ValueRetriever<float> &retriever
 /**
  * @brief update the strip with the new state and write the pixel data to the strip.
  * @param pixels
- * @param ledCounts - counts of the number of LEDs in one track.
+ * @param trackLength - counts of the number of LEDs in one track.
  * @param fps
  */
-inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, float fps) {
+inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps) {
   auto maxLength = getMaxLength();
   // if the shift is larger than the max length, we should stop updating the state.
   // do an early return.
@@ -58,15 +59,15 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, int ledCounts, flo
     state.speed = 0;
     return state;
   } else {
-    auto next = nextState(state, retriever, ledCounts, fps);
+    auto next = nextState(state, retriever, circleLength, trackLength, fps);
     auto [position, speed, shift, skip] = next;
     this->state = next;
     if (skip) {
       // fill to the end
-      pixels->fill(color, meterToLEDsCount(CIRCLE_LENGTH - position));
+      pixels->fill(color, meterToLEDsCount(circleLength - position));
       pixels->fill(color, 0, meterToLEDsCount(position));
     } else {
-      pixels->fill(color, meterToLEDsCount(position - LEDsCountToMeter(ledCounts)), ledCounts);
+      pixels->fill(color, meterToLEDsCount(position - trackLength), meterToLEDsCount(trackLength));
     }
     return next;
   }
@@ -136,19 +137,21 @@ void Strip::run(std::vector<Track> &tracks) {
   auto timer = xTimerCreate("sendStatus", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, static_cast<void *>(&param),
                             timer_cb);
   xTimerStart(timer, 0);
-
+  // should not change max_LEDs while running
+  auto circleLength = LEDsCountToMeter(max_LEDs);
+  auto trackLength = LEDsCountToMeter(countLEDs);
   ESP_LOGD("Strip::run", "enter loop");
   while (status != StripStatus::STOP) {
     pixels->clear();
     for (auto &track: tracks) {
-      auto next = track.updateStrip(pixels, countLEDs, fps);
+      auto next = track.updateStrip(pixels, circleLength, trackLength, fps);
       auto [position, speed, shift, skip] = next;
       ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
                shift);
     }
     pixels->show();
     // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
-    if (ceil(tracks.back().state.shift) >= totalLength) {
+    if (ceil(tracks.back().state.shift) >= circleLength) {
       ESP_LOGI("Strip::run", "Run finished last shift %f", tracks.back().state.shift);
       setStatusNotify(StripStatus::STOP);
     }
@@ -162,12 +165,12 @@ void Strip::run(std::vector<Track> &tracks) {
     //    "There's no easy fix for this, but a few specialized alternative or companion libraries exist that use
     //     very device-specific peripherals to work around it."
     constexpr auto expectedDelay = 1000 / fps;
-    auto delay = pdMS_TO_TICKS(expectedDelay - meterToLEDsCount(CIRCLE_LENGTH) * LED_DELAY_TIME_MS);
+    auto delay = pdMS_TO_TICKS(expectedDelay - max_LEDs * LED_DELAY_TIME_MS);
     vTaskDelay(delay);
   }
   ESP_LOGD("Strip::run", "exit loop");
   // promise the last state is sent.
-  vTaskDelay(pdMS_TO_TICKS(TRANSMIT_INTERVAL));
+  vTaskDelay(2 * pdMS_TO_TICKS(TRANSMIT_INTERVAL));
   xTimerStop(timer, portMAX_DELAY);
 }
 
@@ -214,11 +217,18 @@ StripError Strip::initBLE(NimBLEServer *server) {
   if (!is_ble_initialized) {
     service = server->createService(LIGHT_SERVICE_UUID);
 
+    // TODO: use macro or template to generate the code
+    // Or maybe use function
     brightness_char = service->createCharacteristic(LIGHT_CHAR_BRIGHTNESS_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
     auto brightness_cb = new BrightnessCharCallback(*this);
     brightness_char->setValue(brightness);
     brightness_char->setCallbacks(brightness_cb);
+
+    max_LEDs_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDs_CHAR,
+                                                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    auto max_LEDs_cb = new MaxLEDsCharCallback(*this);
+    max_LEDs_char->setCallbacks(max_LEDs_cb);
 
     status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE |
@@ -267,7 +277,7 @@ StripError Strip::begin(int16_t PIN, uint8_t brightness) {
     // reserve some space for the tracks
     // avoid the reallocation of the vector
     tracks.reserve(5);
-    this->max_LEDs = meterToLEDsCount(CIRCLE_LENGTH);
+    this->max_LEDs = meterToLEDsCount(DEFAULT_CIRCLE_LENGTH);
     this->pin = PIN;
     this->brightness = brightness;
     pixels = new Adafruit_NeoPixel(max_LEDs, PIN, pixelType);
