@@ -87,7 +87,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
       ESP_LOGE("ConfigChar", "Duplicated track id %d", track.id);
       return;
     }
-    strip.tracks.emplace_back(track);
+    strip.tracks.emplace_back(std::move(track));
     // sort the tracks by id from small to large.
     std::sort(strip.tracks.begin(), strip.tracks.end(), [](const Track &a, const Track &b) {
       return a.id < b.id;
@@ -97,7 +97,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   } else if (config.command == Command_RESET) {
     ESP_LOGI("ConfigChar", "Reset and add track id %d", track.id);
     strip.tracks.clear();
-    strip.tracks.emplace_back(track);
+    strip.tracks.emplace_back(std::move(track));
     strip.config_char->setValue(0);
   } else {
     ESP_LOGE("ConfigCharCallback", "Invalid command: %d", config.command);
