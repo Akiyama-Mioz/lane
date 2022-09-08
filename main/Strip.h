@@ -76,7 +76,7 @@ protected:
 public:
   //distance travelled. MAX = 7
   constexpr static const float fps = 6;
-  static const neoPixelType pixelType = NEO_RGB + NEO_KHZ800;
+  static const neoPixelType pixelType = NEO_RBG + NEO_KHZ800;
   Preferences pref;
   int pin = 14;
   // See also DEFAULT_CIRCLE_LENGTH
