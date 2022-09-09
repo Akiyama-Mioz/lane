@@ -82,7 +82,6 @@ void Strip::run(std::vector<Track> &tracks) {
     return;
   }
   // use the max value of the 0 track to determine the length of the track.
-  auto keys = tracks.front().retriever.getKeys();
   int totalLength = tracks.front().retriever.getMaxKey();
   ESP_LOGI("Strip::run", "total length is %d m", totalLength);
   for (auto &track: tracks) {
