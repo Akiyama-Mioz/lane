@@ -12,7 +12,7 @@
 
 extern "C" { void app_main(); }
 
-static auto esp_name = "long-track 011";
+static auto BLE_NAME = "long-track 011";
 static const uint16_t LED_PIN = 23;
 
 void app_main() {
@@ -22,7 +22,7 @@ void app_main() {
   pref.begin("record", true);
   auto brightness = pref.getUChar("brightness", 32);
 
-  NimBLEDevice::init(esp_name);
+  NimBLEDevice::init(BLE_NAME);
   auto pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
 
@@ -40,7 +40,7 @@ void app_main() {
   pStrip->initBLE(pServer);
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
-  pAdvertising->setName(esp_name);
+  pAdvertising->setName(BLE_NAME);
   pAdvertising->setScanResponse(false);
 
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),

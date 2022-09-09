@@ -5,7 +5,7 @@
 #include "StripCommon.h"
 
 static inline int meterToLEDsCount(float meter) {
-  return abs(ceil(meter * LEDs_PER_METER));
+  return abs(round(meter * LEDs_PER_METER));
 }
 
 static inline float LEDsCountToMeter(int count) {

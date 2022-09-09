@@ -13,6 +13,7 @@
 #include <map>
 
 std::string to_hex(const std::basic_string<char> &s);
+
 std::string to_hex(const char *s, size_t len);
 
 /**
@@ -25,16 +26,16 @@ std::string to_hex(const char *s, size_t len);
  * @return T
  */
 template<typename T>
-T retrieve_by_val(std::vector<int> const &keys, std::map<int, T> const &m, int val){
+T retrieve_by_val(std::vector<int> const &keys, std::map<int, T> const &m, int val) {
   size_t idx = 0;
   // since keys is sorted we can get result easily
-  for (auto key:keys){
-    if (val < key){
+  for (auto key: keys) {
+    if (val < key) {
       break;
     }
     idx += 1;
   }
-  if (idx >= keys.size()){
+  if (idx >= keys.size()) {
     idx = keys.size() - 1;
   }
   return m.at(keys[idx]);
@@ -51,6 +52,7 @@ public:
   int getMaxKey() const {
     return max_key;
   }
+
   const std::map<int, T> &getMap() const {
     return m;
   }
@@ -59,6 +61,7 @@ public:
   const std::vector<int> &getKeys() const {
     return keys;
   }
+
   /**
    * @brief Construct a new Value Retriever object
    *
@@ -73,10 +76,11 @@ public:
    * @brief rebuild the keys and sort them, which is time consuming I guess.
    *        This function will be called in constructor.
    */
-  void update_keys(){
+  void update_keys() {
     keys.clear();
-    for (auto &kv : m) {
-      keys.push_back(kv.first);
+    // https://stackoverflow.com/questions/26281979/c-loop-through-map
+    for (auto &[k, v]: m) {
+      keys.push_back(k);
     }
     std::sort(keys.begin(), keys.end());
     max_key = *std::max_element(keys.begin(), keys.end());
@@ -95,7 +99,7 @@ public:
 template<class T>
 struct PbEncodeCallback {
   using PbEncodeFunc = bool (*)(pb_ostream_t *stream, const pb_field_t *field, T const *arg);
-  using PbEncodeVoid = bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg);
+  using PbEncodeVoid = bool (*)(pb_ostream_t *stream, const pb_field_t *field, void *const *arg);
   /**
    * @brief The parameter should be passed to the func with pointer type T.
    */
@@ -104,6 +108,7 @@ struct PbEncodeCallback {
    * @brief The function to be called when encoding.
    */
   PbEncodeFunc func;
+
   /**
    * @brief cast the function to the type of PbEncodeCallbackVoid.
    * @return a function pointer of bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
@@ -111,13 +116,15 @@ struct PbEncodeCallback {
   inline PbEncodeVoid func_to_void() {
     return reinterpret_cast<PbEncodeVoid>(func);
   }
+
   /**
    * @brief cast the arg (which should already be a pointer) to void *.
    * @return void *
    */
-  inline void * arg_to_void() {
+  inline void *arg_to_void() {
     return const_cast<void *>(reinterpret_cast<const void *>(arg));
   }
+
   /**
    * @note constructor is deleted. use the struct initializer instead.
    * @warning T must be a pointer type (with a little star behind it)
