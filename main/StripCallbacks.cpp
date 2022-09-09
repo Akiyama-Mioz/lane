@@ -117,6 +117,7 @@ void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
         ESP_LOGE("MaxLEDsCharCallback", "Strip is running. You SHOULD NOT change the max LEDs.");
         return;
       }
+      ESP_LOGI("MaxLEDsCharCallback", "Max LEDs changed to %d", max_LEDs);
       strip.setMaxLEDs(max_LEDs);
     } else {
       ESP_LOGE("MaxLEDsCharCallback", "Invalid max LEDs: %d. Should less than %d", max_LEDs, MAX_MAX_LEDs);

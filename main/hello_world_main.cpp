@@ -13,9 +13,9 @@
 extern "C" { void app_main(); }
 
 static auto esp_name = "long-track 011";
+static const uint16_t LED_PIN = 23;
 
 void app_main() {
-  const uint16_t LED_PIN = 14;
   initArduino();
 
   Preferences pref;

@@ -5,7 +5,7 @@
 #include "StripCommon.h"
 
 static inline int meterToLEDsCount(float meter) {
-  return round(meter * LEDs_PER_METER);
+  return abs(ceil(meter * LEDs_PER_METER));
 }
 
 static inline float LEDsCountToMeter(int count) {
@@ -24,24 +24,23 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
   float position; // late
   float shift = state.shift;
   float speed = retriever.retrieve(static_cast<int>(state.shift));
-  bool skip = state.isSkip;
+  float extra = 0; // late
   //distance unit is `meter`
   // total length will not be considered here.
   shift = shift + speed / fps; // speed per frame in m/s
   position = shift;
   if (position > circleLength) {
     position = fmod(position, circleLength);
-    if (position < trackLength) {
-      skip = true;
-    } else {
-      skip = false;
+    if (position <= trackLength) {
+      // trackLength = position + extra
+      extra = trackLength - position;
     }
   }
   return RunState{
       position,
       speed,
       shift,
-      skip
+      extra
   };
 }
 
@@ -60,11 +59,14 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength
     return state;
   } else {
     auto next = nextState(state, retriever, circleLength, trackLength, fps);
-    auto [position, speed, shift, skip] = next;
+    auto [position, speed, shift, extra] = next;
     this->state = next;
-    if (skip) {
-      // fill to the end
-      pixels->fill(color, meterToLEDsCount(circleLength - position));
+    if (extra != 0) {
+      // position may be larger than trackLength if float is not precise enough.
+      if (circleLength < position){
+        // fill to the end
+        pixels->fill(color, meterToLEDsCount(circleLength - extra), 0);
+      }
       pixels->fill(color, 0, meterToLEDsCount(position));
     } else {
       pixels->fill(color, meterToLEDsCount(position - trackLength), meterToLEDsCount(trackLength));
@@ -104,7 +106,7 @@ void Strip::run(std::vector<Track> &tracks) {
           auto &tracks = **arg;
           for (auto &track: tracks) {
             auto state = track.state;
-            auto [position, speed, shift, skip] = state;
+            auto [position, speed, shift, extra] = state;
             auto state_encode = TrackState{
                 .id = track.id,
                 .shift = shift,
@@ -145,7 +147,7 @@ void Strip::run(std::vector<Track> &tracks) {
     pixels->clear();
     for (auto &track: tracks) {
       auto next = track.updateStrip(pixels, circleLength, trackLength, fps);
-      auto [position, speed, shift, skip] = next;
+      auto [position, speed, shift, extra] = next;
       ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
                shift);
     }

@@ -44,7 +44,7 @@ struct RunState {
   float position;
   float speed;
   float shift;
-  bool isSkip;
+  float extra;
 };
 
 RunState
