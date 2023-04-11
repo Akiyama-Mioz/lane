@@ -19,7 +19,9 @@
 
 // in meters
 static const int DEFAULT_CIRCLE_LENGTH = 400;
-static const int LEDs_PER_METER = 10;
+// 12.8 cm per LEDs in the new environment
+// i.e. 1 meter = 7.8125 LEDs (space)
+static const float LEDs_PER_METER = 7.8125;
 // in ms
 static const int TRANSMIT_INTERVAL = 1000;
 // in ms
@@ -76,7 +78,7 @@ protected:
 public:
   //distance travelled. MAX = 7
   constexpr static const float fps = 6;
-  static const neoPixelType pixelType = NEO_RBG + NEO_KHZ800;
+  static const neoPixelType pixelType = NEO_RGB + NEO_KHZ800;
   Preferences pref;
   int pin = 14;
   // See also DEFAULT_CIRCLE_LENGTH

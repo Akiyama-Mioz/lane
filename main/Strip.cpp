@@ -4,12 +4,17 @@
 
 #include "StripCommon.h"
 
+// You need one more LED to make the strip.
 static inline int meterToLEDsCount(float meter) {
-  return abs(round(meter * LEDs_PER_METER));
+  return abs(round(meter * LEDs_PER_METER)) + 1;
 }
 
 static inline float LEDsCountToMeter(int count) {
-  return count / LEDs_PER_METER;
+  if (count <= 1) {
+    return 0;
+  } else {
+    return (count - 1) / LEDs_PER_METER;
+  }
 }
 
 /**
@@ -63,7 +68,7 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength
     this->state = next;
     if (extra != 0) {
       // position may be larger than trackLength if float is not precise enough.
-      if (circleLength < position){
+      if (circleLength < position) {
         // fill to the end
         pixels->fill(color, meterToLEDsCount(circleLength - extra), 0);
       }
