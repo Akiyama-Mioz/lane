@@ -130,8 +130,8 @@ void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     }
     case TrackOptions_led_per_meter_tag: {
       auto l = options.options.led_per_meter.led_per_meter;
-      strip.LEDsPerMeter = l;
-      ESP_LOGI("OptionsCharCallback", "led_per_meter changed to %d", strip.LEDsPerMeter);
+      strip.LEDs_per_meter = l;
+      ESP_LOGI("OptionsCharCallback", "led_per_meter changed to %f", strip.LEDs_per_meter);
       break;
     }
   }

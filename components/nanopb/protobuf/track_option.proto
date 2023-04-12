@@ -9,7 +9,7 @@ message CountLed {
 }
 
 message LedPerMeter {
-  uint32 led_per_meter = 1;
+  float led_per_meter = 1;
 }
 
 message TrackOptions {

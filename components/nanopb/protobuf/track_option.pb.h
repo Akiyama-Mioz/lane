@@ -15,7 +15,7 @@ typedef struct _CountLed {
 } CountLed;
 
 typedef struct _LedPerMeter {
-    uint32_t led_per_meter;
+    float led_per_meter;
 } LedPerMeter;
 
 typedef struct _MaxLedLength {
@@ -66,7 +66,7 @@ X(a, STATIC,   SINGULAR, UINT32,   count_led,         1)
 #define CountLed_DEFAULT NULL
 
 #define LedPerMeter_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UINT32,   led_per_meter,     1)
+X(a, STATIC,   SINGULAR, FLOAT,    led_per_meter,     1)
 #define LedPerMeter_CALLBACK NULL
 #define LedPerMeter_DEFAULT NULL
 
@@ -93,7 +93,7 @@ extern const pb_msgdesc_t TrackOptions_msg;
 
 /* Maximum encoded size of messages (where known) */
 #define CountLed_size                            6
-#define LedPerMeter_size                         6
+#define LedPerMeter_size                         5
 #define MaxLedLength_size                        6
 #define TrackOptions_size                        8
 
