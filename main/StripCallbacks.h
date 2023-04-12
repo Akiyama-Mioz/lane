@@ -14,6 +14,7 @@
 #include "pb_encode.h"
 #include "pb_decode.h"
 #include "track_config.pb.h"
+#include "track_option.pb.h"
 
 class Track;
 class Strip;
@@ -43,12 +44,12 @@ public:
   explicit ConfigCharCallback(Strip &strip) : strip(strip) {}
 };
 
-class MaxLEDsCharCallback : public NimBLECharacteristicCallbacks {
+class OptionsCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit MaxLEDsCharCallback(Strip &strip) : strip(strip) {}
+  explicit OptionsCharCallback(Strip &strip) : strip(strip) {}
 };
 
 #endif //HELLO_WORLD_STRIPCALLBACKS_H

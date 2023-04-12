@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+message MaxLedLength {
+  uint32 max_led_length = 1;
+}
+
+message CountLed {
+  uint32 count_led = 1;
+}
+
+message LedPerMeter {
+  uint32 led_per_meter = 1;
+}
+
+message TrackOptions {
+  oneof options {
+    MaxLedLength max_led_length = 1;
+    CountLed count_led = 2;
+    LedPerMeter led_per_meter = 3;
+  }
+}

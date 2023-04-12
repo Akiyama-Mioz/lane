@@ -5,15 +5,15 @@
 #include "StripCommon.h"
 
 // You need one more LED to make the strip.
-static inline int meterToLEDsCount(float meter) {
-  return abs(round(meter * LEDs_PER_METER)) + 1;
+static inline int meterToLEDsCount(float meter, float LEDs_per_meter) {
+  return abs(round(meter * LEDs_per_meter)) + 1;
 }
 
-static inline float LEDsCountToMeter(int count) {
+static inline float LEDsCountToMeter(uint32_t count, float LEDs_per_meter) {
   if (count <= 1) {
     return 0;
   } else {
-    return (count - 1) / LEDs_PER_METER;
+    return (count - 1) / LEDs_per_meter;
   }
 }
 
@@ -55,7 +55,7 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
  * @param trackLength - counts of the number of LEDs in one track.
  * @param fps
  */
-inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps) {
+inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps, float LEDs_per_meter) {
   auto maxLength = getMaxLength();
   // if the shift is larger than the max length, we should stop updating the state.
   // do an early return.
@@ -70,11 +70,11 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength
       // position may be larger than trackLength if float is not precise enough.
       if (circleLength < position) {
         // fill to the end
-        pixels->fill(color, meterToLEDsCount(circleLength - extra), 0);
+        pixels->fill(color, meterToLEDsCount(circleLength - extra, LEDs_per_meter), 0);
       }
-      pixels->fill(color, 0, meterToLEDsCount(position));
+      pixels->fill(color, 0, meterToLEDsCount(position, LEDs_per_meter));
     } else {
-      pixels->fill(color, meterToLEDsCount(position - trackLength), meterToLEDsCount(trackLength));
+      pixels->fill(color, meterToLEDsCount(position - trackLength, LEDs_per_meter), meterToLEDsCount(trackLength, LEDs_per_meter));
     }
     return next;
   }
@@ -144,13 +144,13 @@ void Strip::run(std::vector<Track> &tracks) {
                             timer_cb);
   xTimerStart(timer, 0);
   // should not change max_LEDs while running
-  auto circleLength = LEDsCountToMeter(max_LEDs);
-  auto trackLength = LEDsCountToMeter(countLEDs);
+  auto circleLength = LEDsCountToMeter(max_LEDs, this->LEDs_per_meter);
+  auto trackLength = LEDsCountToMeter(countLEDs, this->LEDs_per_meter);
   ESP_LOGD("Strip::run", "enter loop");
   while (status != StripStatus::STOP) {
     pixels->clear();
     for (auto &track: tracks) {
-      auto next = track.updateStrip(pixels, circleLength, trackLength, fps);
+      auto next = track.updateStrip(pixels, circleLength, trackLength, fps, LEDs_per_meter);
       auto [position, speed, shift, extra] = next;
       ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
                shift);
@@ -197,7 +197,7 @@ void Strip::stripTask() {
   }
 }
 
-void Strip::setMaxLEDs(int new_max_LEDs) {
+void Strip::setMaxLEDs(uint32_t new_max_LEDs) {
   max_LEDs = new_max_LEDs;
   // delete already checks if the pointer is still pointing to a valid memory location.
   // If it is already nullptr, then it does nothing
@@ -231,10 +231,10 @@ StripError Strip::initBLE(NimBLEServer *server) {
     brightness_char->setValue(brightness);
     brightness_char->setCallbacks(brightness_cb);
 
-    max_LEDs_char = service->createCharacteristic(LIGHT_CHAR_MAX_LEDs_CHAR,
+    options_char = service->createCharacteristic(LIGHT_CHAR_OPTIONS_CHAR,
                                                   NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    auto max_LEDs_cb = new MaxLEDsCharCallback(*this);
-    max_LEDs_char->setCallbacks(max_LEDs_cb);
+    auto options_cb = new OptionsCharCallback(*this);
+    options_char->setCallbacks(options_cb);
 
     status_char = service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE |
@@ -283,7 +283,7 @@ StripError Strip::begin(int16_t PIN, uint8_t brightness) {
     // reserve some space for the tracks
     // avoid the reallocation of the vector
     tracks.reserve(5);
-    this->max_LEDs = meterToLEDsCount(DEFAULT_CIRCLE_LENGTH);
+    this->max_LEDs = meterToLEDsCount(DEFAULT_CIRCLE_LENGTH, this->LEDs_per_meter);
     this->pin = PIN;
     this->brightness = brightness;
     pixels = new Adafruit_NeoPixel(max_LEDs, PIN, pixelType);

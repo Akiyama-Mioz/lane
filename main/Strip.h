@@ -21,7 +21,7 @@
 static const int DEFAULT_CIRCLE_LENGTH = 400;
 // 12.8 cm per LEDs in the new environment
 // i.e. 1 meter = 7.8125 LEDs (space)
-static const float LEDs_PER_METER = 7.8125;
+static const float DEFAULT_LEDs_PER_METER = 7.8125;
 // in ms
 static const int TRANSMIT_INTERVAL = 1000;
 // in ms
@@ -68,7 +68,7 @@ public:
     this->state = RunState{0, 0, 0, false};
   }
 
-  RunState updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps);
+  RunState updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps, float LEDs_per_meter);
 };
 
 class Strip {
@@ -83,11 +83,12 @@ public:
   int pin = 14;
   // See also DEFAULT_CIRCLE_LENGTH
   // LEDs_PER_METER
-  int max_LEDs = 0;
+  uint32_t max_LEDs = 0;
   // length should be less than max_LEDs
-  // the LED count that is filled once
-  uint16_t countLEDs = 10;
+  // the LED count that is filled at once
+  uint32_t countLEDs = 10;
   uint8_t brightness = 32;
+  float LEDs_per_meter = DEFAULT_LEDs_PER_METER;
   Adafruit_NeoPixel *pixels = nullptr;
   StripStatus status = StripStatus::STOP;
 
@@ -96,7 +97,7 @@ public:
   // should be always alive with BLE anyway.)
   NimBLECharacteristic *status_char = nullptr;
   NimBLECharacteristic *brightness_char = nullptr;
-  NimBLECharacteristic *max_LEDs_char = nullptr;
+  NimBLECharacteristic *options_char = nullptr;
   NimBLECharacteristic *config_char = nullptr;
   NimBLECharacteristic *state_char = nullptr;
 
@@ -105,7 +106,7 @@ public:
 
   const char *LIGHT_CHAR_BRIGHTNESS_UUID = "e3ce8b08-4bb9-4696-b862-3e62a1100adc";
   const char *LIGHT_CHAR_STATUS_UUID = "24207642-0d98-40cd-84bb-910008579114";
-  const char *LIGHT_CHAR_MAX_LEDs_CHAR = "9f5806ba-a71b-4194-9854-5d76698200de";
+  const char *LIGHT_CHAR_OPTIONS_CHAR = "9f5806ba-a71b-4194-9854-5d76698200de";
   const char *LIGHT_CHAR_CONFIG_UUID = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
   const char *LIGHT_CHAR_STATE_UUID = "ed3eefa1-3c80-b43f-6b65-e652374650b5";
 
@@ -128,7 +129,7 @@ public:
    * @warning This function will NOT set the corresponding bluetooth characteristic value.
    * @param new_max_LEDs
    */
-  void setMaxLEDs(int new_max_LEDs);
+  void setMaxLEDs(uint32_t new_max_LEDs);
 
 /**
  * @brief set the color of the strip.

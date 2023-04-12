@@ -34,7 +34,7 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
-  if (strip.status != StripStatus::STOP){
+  if (strip.status != StripStatus::STOP) {
     ESP_LOGE("ConfigCharCallback", "Strip is not stopped, cannot change config");
     characteristic->setValue(1);
     return;
@@ -101,29 +101,38 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   }
 }
 
-void MaxLEDsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
-  if (data.length() >= 2) {
-    /** TODO: make a function to convert uint8 array to uint16_t
-     *   both big endian and little endian.
-    **/
-    // ESP32 is little endian.
-    // NOTE: the sender should send the data in little endian.
-    // i.e. the first byte is the least significant byte.
-    constexpr uint16_t MAX_MAX_LEDs = 5000;
-    uint16_t max_LEDs = data[0] | data[1] << 8;
-    if (max_LEDs < MAX_MAX_LEDs) {
-      if (strip.status != StripStatus::STOP){
-        ESP_LOGE("MaxLEDsCharCallback", "Strip is running. You SHOULD NOT change the max LEDs.");
-        return;
-      }
-      ESP_LOGI("MaxLEDsCharCallback", "Max LEDs changed to %d", max_LEDs);
-      strip.setMaxLEDs(max_LEDs);
-    } else {
-      ESP_LOGE("MaxLEDsCharCallback", "Invalid max LEDs: %d. Should less than %d", max_LEDs, MAX_MAX_LEDs);
+  if (strip.status != StripStatus::STOP) {
+    ESP_LOGE("OptionsCharCallback", "Strip is not stopped, cannot change options");
+    characteristic->setValue(0);
+    return;
+  }
+  TrackOptions options = TrackOptions_init_zero;
+  pb_istream_t istream = pb_istream_from_buffer(data, data.length());
+  auto res = pb_decode(&istream, TrackOptions_fields, &options);
+  if (!res) {
+    ESP_LOGE("Decode Options", "Error: Something goes wrong when decoding");
+    return;
+  }
+  switch (options.which_options) {
+    case TrackOptions_max_led_length_tag: {
+      auto l = options.options.max_led_length.max_led_length;
+      strip.setMaxLEDs(l);
+      ESP_LOGI("OptionsCharCallback", "max_led_length changed to %d", strip.max_LEDs);
+      break;
     }
-  } else {
-    ESP_LOGE("MaxLEDsCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.max_LEDs);
+    case TrackOptions_count_led_tag: {
+      auto c = options.options.count_led.count_led;
+      strip.countLEDs = c;
+      ESP_LOGI("OptionsCharCallback", "count_led changed to %d", strip.countLEDs);
+      break;
+    }
+    case TrackOptions_led_per_meter_tag: {
+      auto l = options.options.led_per_meter.led_per_meter;
+      strip.LEDsPerMeter = l;
+      ESP_LOGI("OptionsCharCallback", "led_per_meter changed to %d", strip.LEDsPerMeter);
+      break;
+    }
   }
 }
