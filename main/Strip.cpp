@@ -3,6 +3,8 @@
 //
 
 #include "StripCommon.h"
+#include "Strip.h"
+
 
 // You need one more LED to make the strip.
 static inline int meterToLEDsCount(float meter, float LEDs_per_meter) {
@@ -30,7 +32,7 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
   float shift = state.shift;
   float speed = retriever.retrieve(static_cast<int>(state.shift));
   float extra = 0; // late
-  //distance unit is `meter`
+  // distance unit is `meter`
   // total length will not be considered here.
   shift = shift + speed / fps; // speed per frame in m/s
   position = shift;
@@ -56,10 +58,10 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
  * @param fps
  */
 inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps, float LEDs_per_meter) {
-  auto maxLength = getMaxLength();
+  auto max_shift = getMaxShiftLength();
   // if the shift is larger than the max length, we should stop updating the state.
   // do an early return.
-  if (floor(state.shift) >= maxLength) {
+  if (floor(state.shift) >= max_shift) {
     state.speed = 0;
     return state;
   } else {
@@ -143,14 +145,15 @@ void Strip::run(std::vector<Track> &tracks) {
   auto timer = xTimerCreate("sendStatus", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, static_cast<void *>(&param),
                             timer_cb);
   xTimerStart(timer, 0);
-  // should not change max_LEDs while running
-  auto circleLength = LEDsCountToMeter(max_LEDs, this->LEDs_per_meter);
-  auto trackLength = LEDsCountToMeter(countLEDs, this->LEDs_per_meter);
+  // should not change any parameter when running
+  auto circleLength = static_cast<float>(this->circle_length_meter);
+  auto trackLength = LEDsCountToMeter(countLEDs, this->getLEDsPerMeter());
   ESP_LOGD("Strip::run", "enter loop");
-  while (status != StripStatus::STOP) {
+  while (status == StripStatus::RUN) {
+    auto startTime = Instant();
     pixels->clear();
     for (auto &track: tracks) {
-      auto next = track.updateStrip(pixels, circleLength, trackLength, fps, LEDs_per_meter);
+      auto next = track.updateStrip(pixels, circleLength, trackLength, fps, this->getLEDsPerMeter());
       auto [position, speed, shift, extra] = next;
       ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
                shift);
@@ -165,14 +168,28 @@ void Strip::run(std::vector<Track> &tracks) {
     // Remember that the Adafruit_NeoPixel::show()
     // will be blocking for LED_DELAY_TIME_MS milliseconds for ONE LED which could be huge for a large amount LEDs.
     // so the actual delay we have to wait is (expectedDelay - LED_DELAY_TIME_MS * countLEDs).
-    // Actually the delay will be a little longer than expectedDelay because of the time spent in executing the code,
-    // but we won't care about that for now.
     //
     //    "There's no easy fix for this, but a few specialized alternative or companion libraries exist that use
     //     very device-specific peripherals to work around it."
-    constexpr auto expectedDelay = 1000 / fps;
-    auto delay = pdMS_TO_TICKS(expectedDelay - max_LEDs * LED_DELAY_TIME_MS);
-    vTaskDelay(delay);
+    //
+    constexpr long long MILLI = 1000;
+    auto secondsToMillis = [](uint seconds){
+      return seconds * MILLI;
+    };
+    auto millisToSeconds = [](long long millis) {
+      return millis / static_cast<float>(MILLI);
+    };
+
+    // microseconds
+    constexpr long long expectedDelay = secondsToMillis(1) / fps;
+    auto elapsed = startTime.elapsed();
+    auto elapsedMillis = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+    auto diff = expectedDelay - elapsedMillis;
+    if (diff > 0) {
+      vTaskDelay(pdMS_TO_TICKS(diff));
+    } else {
+      ESP_LOGE("Strip::run", "Loop timeout %.2f", millisToSeconds(elapsedMillis));
+    }
   }
   ESP_LOGD("Strip::run", "exit loop");
   // promise the last state is sent.
@@ -197,6 +214,7 @@ void Strip::stripTask() {
   }
 }
 
+/// i.e. Circle LEDs
 void Strip::setMaxLEDs(uint32_t new_max_LEDs) {
   max_LEDs = new_max_LEDs;
   // delete already checks if the pointer is still pointing to a valid memory location.
@@ -270,20 +288,17 @@ Strip *Strip::get() {
 
 /**
  * @brief initialize the strip. this function should only be called once.
- * @param max_LEDs
  * @param PIN the pin of strip, default is 14.
- * @param color the default color of the strip. default is Cyan (0x00FF00).
  * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
 StripError Strip::begin(int16_t PIN, uint8_t brightness) {
   if (!is_initialized) {
-    pref.begin("record", false);
+    pref.begin(STRIP_PREF_RECORD_NAME, false);
     tracks.clear();
     // reserve some space for the tracks
     // avoid the reallocation of the vector
     tracks.reserve(5);
-    this->max_LEDs = meterToLEDsCount(DEFAULT_CIRCLE_LENGTH, this->LEDs_per_meter);
     this->pin = PIN;
     this->brightness = brightness;
     pixels = new Adafruit_NeoPixel(max_LEDs, PIN, pixelType);
@@ -303,10 +318,22 @@ void Strip::setBrightness(const uint8_t new_brightness) {
   }
 }
 
-void Strip::setStatusNotify(StripStatus status) {
-  this->status = status;
+void Strip::setStatusNotify(StripStatus s) {
+  this->status = s;
   if (status_char != nullptr) {
-    status_char->setValue(status);
+    status_char->setValue(s);
     status_char->notify();
   }
+}
+
+void Strip::setCountLEDs(uint32_t count) {
+  this->countLEDs = count;
+}
+
+void Strip::setCircleLength(float meter) {
+  circle_length_meter = meter;
+}
+
+float Strip::getLEDsPerMeter() const {
+  return static_cast<float>(max_LEDs) / static_cast<float>(this->circle_length_meter);
 }

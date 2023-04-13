@@ -19,8 +19,11 @@ void app_main() {
   initArduino();
 
   Preferences pref;
-  pref.begin("record", true);
-  auto brightness = pref.getUChar("brightness", 32);
+  pref.begin(STRIP_PREF_RECORD_NAME, true);
+  auto brightness = pref.getUChar(STRIP_BRIGHTNESS_KEY, 32);
+  auto circle_num = pref.getUInt(STRIP_CIRCLE_LEDs_NUM_KEY, STRIP_DEFAULT_CIRCLE_LEDs_NUM);
+  auto track_num = pref.getUInt(STRIP_TRACK_LEDs_NUM_KEY, STRIP_DEFAULT_TRACK_LEDs_NUM);
+  auto circle_length = pref.getFloat(STRIP_CIRCLE_LENGTH_KEY, STRIP_DEFAULT_CIRCLE_LENGTH);
 
   NimBLEDevice::init(BLE_NAME);
   auto pServer = NimBLEDevice::createServer();
@@ -36,6 +39,9 @@ void app_main() {
   };
   // using singleton pattern to avoid memory leak
   auto pStrip = Strip::get();
+  pStrip->setCircleLength(circle_length);
+  pStrip->setCountLEDs(track_num);
+  pStrip->setMaxLEDs(circle_num);
   pStrip->begin(LED_PIN, brightness);
   pStrip->initBLE(pServer);
 

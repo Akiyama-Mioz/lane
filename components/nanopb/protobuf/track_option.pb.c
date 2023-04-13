@@ -6,13 +6,13 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
-PB_BIND(MaxLedLength, MaxLedLength, AUTO)
+PB_BIND(MaxLed, MaxLed, AUTO)
 
 
 PB_BIND(CountLed, CountLed, AUTO)
 
 
-PB_BIND(LedPerMeter, LedPerMeter, AUTO)
+PB_BIND(CircleLength, CircleLength, AUTO)
 
 
 PB_BIND(TrackOptions, TrackOptions, AUTO)

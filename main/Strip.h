@@ -17,17 +17,23 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-// in meters
-static const int DEFAULT_CIRCLE_LENGTH = 400;
-// 12.8 cm per LEDs in the new environment
-// i.e. 1 meter = 7.8125 LEDs (space)
-static const float DEFAULT_LEDs_PER_METER = 7.8125;
+const auto STRIP_PREF_RECORD_NAME = "record";
+const auto STRIP_BRIGHTNESS_KEY = "b";
+const auto STRIP_CIRCLE_LEDs_NUM_KEY = "c";
+const auto STRIP_CIRCLE_LENGTH_KEY = "cl";
+const auto STRIP_TRACK_LEDs_NUM_KEY = "t";
+
+// STRIP_DEFAULT_LEDs_PER_METER is calculated
+/// in count
+const uint32_t STRIP_DEFAULT_CIRCLE_LEDs_NUM = 3050;
+/// in count
+const uint32_t STRIP_DEFAULT_TRACK_LEDs_NUM = 48;
+// in meter
+const uint32_t STRIP_DEFAULT_CIRCLE_LENGTH = 400;
 // in ms
 static const int TRANSMIT_INTERVAL = 1000;
 // in ms
 static const int HALT_INTERVAL = 100;
-// 0.03ms i.e. 30us (microseconds) per LED
-static const float LED_DELAY_TIME_MS = 0.03;
 
 // change this to match the length of StripStatus
 constexpr uint8_t StripStatus_LENGTH = 2;
@@ -60,7 +66,7 @@ public:
   uint32_t color = Adafruit_NeoPixel::Color(255, 255, 255);
 
   [[nodiscard]]
-  int getMaxLength() const {
+  int getMaxShiftLength() const {
     return retriever.getMaxKey();
   }
 
@@ -68,7 +74,8 @@ public:
     this->state = RunState{0, 0, 0, false};
   }
 
-  RunState updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps, float LEDs_per_meter);
+  RunState
+  updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps, float LEDs_per_meter);
 };
 
 class Strip {
@@ -76,19 +83,19 @@ protected:
   bool is_initialized = false;
   bool is_ble_initialized = false;
 public:
-  //distance travelled. MAX = 7
-  constexpr static const float fps = 6;
+  float getLEDsPerMeter() const;
+
+  // it takes 90ms for 3000 LEDs so 10 it should be okay at 10 FPS
+  constexpr static const float fps = 8;
   static const neoPixelType pixelType = NEO_RGB + NEO_KHZ800;
   Preferences pref;
   int pin = 14;
-  // See also DEFAULT_CIRCLE_LENGTH
-  // LEDs_PER_METER
   uint32_t max_LEDs = 0;
   // length should be less than max_LEDs
-  // the LED count that is filled at once
+  // the LED count that is filled at once per track
   uint32_t countLEDs = 10;
   uint8_t brightness = 32;
-  float LEDs_per_meter = DEFAULT_LEDs_PER_METER;
+  float circle_length_meter = STRIP_DEFAULT_CIRCLE_LENGTH;
   Adafruit_NeoPixel *pixels = nullptr;
   StripStatus status = StripStatus::STOP;
 
@@ -125,7 +132,7 @@ public:
   StripError initBLE(NimBLEServer *server);
 
   /**
-   * @brief sets the maximum number of LEDs that can be used.
+   * @brief sets the maximum number of LEDs that can be used. i.e. Circle Length.
    * @warning This function will NOT set the corresponding bluetooth characteristic value.
    * @param new_max_LEDs
    */
@@ -141,9 +148,9 @@ public:
   /**
    * @brief set the status of the strip.
    * @warning This function WILL set the corresponding bluetooth characteristic value and notify.
-   * @param status
+   * @param s
    */
-  void setStatusNotify(StripStatus status);
+  void setStatusNotify(StripStatus s);
 
   static Strip *get();
 
@@ -160,6 +167,11 @@ public:
 
   StripError
   begin(int16_t PIN, uint8_t brightness);
+
+  /// set track length (count LEDs)
+  void setCountLEDs(uint32_t count);
+
+  void setCircleLength(float meter);
 
 protected:
   Strip() = default;

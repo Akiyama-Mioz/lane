@@ -4,6 +4,7 @@
 #ifndef HELLO_WORLD_UTILS_H
 #define HELLO_WORLD_UTILS_H
 
+#include <chrono>
 #include <algorithm>
 #include <sstream>
 #include <iostream>
@@ -134,3 +135,23 @@ struct PbEncodeCallback {
 };
 
 #endif //HELLO_WORLD_UTILS_H
+
+class Instant {
+  decltype(std::chrono::steady_clock::now()) time;
+public:
+  Instant() {
+    this->time = std::chrono::steady_clock::now();
+  }
+
+  /// get the difference between now and the time Instant declared
+  auto elapsed() {
+    auto now = std::chrono::steady_clock::now();
+    auto duration = now - this->time;
+    return duration;
+  }
+
+  /// get inner time
+  [[nodiscard]] decltype(std::chrono::steady_clock::now()) getTime() const {
+    return time;
+  }
+};

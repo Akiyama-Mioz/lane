@@ -11,7 +11,7 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     uint8_t brightness = data[0];
     strip.setBrightness(brightness);
     [[maybe_unused]]
-    auto size = strip.pref.putUChar("brightness", strip.brightness);
+    auto size = strip.pref.putUChar(STRIP_BRIGHTNESS_KEY, strip.brightness);
     ESP_LOGI("BrightnessCharCallback", "Brightness changed to %d", brightness);
   } else {
     ESP_LOGE("BrightnessCharCallback", "Invalid data length: %d", data.length());
@@ -116,22 +116,24 @@ void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     return;
   }
   switch (options.which_options) {
-    case TrackOptions_max_led_length_tag: {
-      auto l = options.options.max_led_length.max_led_length;
+    case TrackOptions_max_led_tag: {
+      auto l = options.options.max_led.num;
       strip.setMaxLEDs(l);
+      strip.pref.putUInt(STRIP_CIRCLE_LEDs_NUM_KEY, l);
       ESP_LOGI("OptionsCharCallback", "max_led_length changed to %d", strip.max_LEDs);
       break;
     }
     case TrackOptions_count_led_tag: {
-      auto c = options.options.count_led.count_led;
-      strip.countLEDs = c;
+      auto c = options.options.count_led.num;
+      strip.setCountLEDs(c);
+      strip.pref.putUInt(STRIP_TRACK_LEDs_NUM_KEY, c);
       ESP_LOGI("OptionsCharCallback", "count_led changed to %d", strip.countLEDs);
       break;
     }
-    case TrackOptions_led_per_meter_tag: {
-      auto l = options.options.led_per_meter.led_per_meter;
-      strip.LEDs_per_meter = l;
-      ESP_LOGI("OptionsCharCallback", "led_per_meter changed to %f", strip.LEDs_per_meter);
+    case TrackOptions_circle_tag: {
+      auto c = options.options.circle.meter;
+      strip.setCircleLength(c);
+      ESP_LOGI("OptionsCharCallback", "circle_length changed to %f", c);
       break;
     }
   }
