@@ -127,7 +127,7 @@ void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
       auto c = options.options.count_led.num;
       strip.setCountLEDs(c);
       strip.pref.putUInt(STRIP_TRACK_LEDs_NUM_KEY, c);
-      ESP_LOGI("OptionsCharCallback", "count_led changed to %d", strip.countLEDs);
+      ESP_LOGI("OptionsCharCallback", "count_led changed to %d", strip.count_LEDs);
       break;
     }
     case TrackOptions_circle_tag: {

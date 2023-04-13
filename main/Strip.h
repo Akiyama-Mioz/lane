@@ -87,15 +87,15 @@ public:
 
   // it takes 90ms for 3000 LEDs so 10 it should be okay at 10 FPS
   constexpr static const float fps = 8;
-  static const neoPixelType pixelType = NEO_RGB + NEO_KHZ800;
+  static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
   Preferences pref;
   int pin = 14;
   uint32_t max_LEDs = 0;
-  // length should be less than max_LEDs
-  // the LED count that is filled at once per track
-  uint32_t countLEDs = 10;
+  /// the LED count that is filled at once per track and should be less than `max_LEDs`
+  uint32_t count_LEDs = 10;
   uint8_t brightness = 32;
-  float circle_length_meter = STRIP_DEFAULT_CIRCLE_LENGTH;
+  /// in meter
+  float circle_length = STRIP_DEFAULT_CIRCLE_LENGTH;
   Adafruit_NeoPixel *pixels = nullptr;
   StripStatus status = StripStatus::STOP;
 

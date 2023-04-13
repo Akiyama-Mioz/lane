@@ -146,8 +146,8 @@ void Strip::run(std::vector<Track> &tracks) {
                             timer_cb);
   xTimerStart(timer, 0);
   // should not change any parameter when running
-  auto circleLength = static_cast<float>(this->circle_length_meter);
-  auto trackLength = LEDsCountToMeter(countLEDs, this->getLEDsPerMeter());
+  auto circleLength = static_cast<float>(this->circle_length);
+  auto trackLength = LEDsCountToMeter(count_LEDs, this->getLEDsPerMeter());
   ESP_LOGD("Strip::run", "enter loop");
   while (status == StripStatus::RUN) {
     auto startTime = Instant();
@@ -229,7 +229,7 @@ void Strip::setMaxLEDs(uint32_t new_max_LEDs) {
    *       'new' keyword with the first constructor syntax (length, pin,
    *       type)
    */
-  pixels = new Adafruit_NeoPixel(max_LEDs, pin, pixelType);
+  pixels = new Adafruit_NeoPixel(max_LEDs, pin, pixel_type);
   pixels->setBrightness(brightness);
   pixels->begin();
 }
@@ -301,7 +301,7 @@ StripError Strip::begin(int16_t PIN, uint8_t brightness) {
     tracks.reserve(5);
     this->pin = PIN;
     this->brightness = brightness;
-    pixels = new Adafruit_NeoPixel(max_LEDs, PIN, pixelType);
+    pixels = new Adafruit_NeoPixel(max_LEDs, PIN, pixel_type);
     pixels->begin();
     pixels->setBrightness(brightness);
     is_initialized = true;
@@ -327,13 +327,13 @@ void Strip::setStatusNotify(StripStatus s) {
 }
 
 void Strip::setCountLEDs(uint32_t count) {
-  this->countLEDs = count;
+  this->count_LEDs = count;
 }
 
 void Strip::setCircleLength(float meter) {
-  circle_length_meter = meter;
+  circle_length = meter;
 }
 
 float Strip::getLEDsPerMeter() const {
-  return static_cast<float>(max_LEDs) / static_cast<float>(this->circle_length_meter);
+  return static_cast<float>(max_LEDs) / static_cast<float>(this->circle_length);
 }
