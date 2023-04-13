@@ -27,7 +27,7 @@ std::string to_hex(const char *s, size_t len);
  * @return T
  */
 template<typename T>
-T retrieve_by_val(std::vector<int> const &keys, std::map<int, T> const &m, int val) {
+T retrieveByVal(std::vector<int> const &keys, std::map<int, T> const &m, int val) {
   size_t idx = 0;
   // since keys is sorted we can get result easily
   for (auto key: keys) {
@@ -66,18 +66,18 @@ public:
   /**
    * @brief Construct a new Value Retriever object
    *
-   * @param m the map whose keys are int. The map should be immutable or call [update_keys] after changing,
+   * @param m the map whose keys are int. The map should be immutable or call [updateKeys] after changing,
    *        otherwise things will be weired.
    */
   explicit ValueRetriever(std::map<int, T> m) : m(m) {
-    update_keys();
+    updateKeys();
   };
 
   /**
    * @brief rebuild the keys and sort them, which is time consuming I guess.
    *        This function will be called in constructor.
    */
-  void update_keys() {
+  void updateKeys() {
     keys.clear();
     // https://stackoverflow.com/questions/26281979/c-loop-through-map
     for (auto &[k, v]: m) {
@@ -88,7 +88,7 @@ public:
   }
 
   T retrieve(int val) const {
-    return retrieve_by_val(keys, m, val);
+    return retrieveByVal(keys, m, val);
   }
 };
 
