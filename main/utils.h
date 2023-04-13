@@ -134,8 +134,6 @@ struct PbEncodeCallback {
   PbEncodeCallback() = delete;
 };
 
-#endif //HELLO_WORLD_UTILS_H
-
 class Instant {
   decltype(std::chrono::steady_clock::now()) time;
 public:
@@ -155,3 +153,5 @@ public:
     return time;
   }
 };
+
+#endif //HELLO_WORLD_UTILS_H
