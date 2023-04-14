@@ -177,7 +177,6 @@ void Strip::run(std::vector<Track> &tracks) {
       return millis / static_cast<float>(MILLI);
     };
 
-    // microseconds
     constexpr long long expectedDelay = secondsToMillis(1) / fps;
     auto elapsed = startTime.elapsed();
     auto elapsedMillis = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();

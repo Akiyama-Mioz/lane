@@ -12,6 +12,7 @@
 #include <vector>
 #include <pb_encode.h>
 #include <map>
+#include <esp_timer.h>
 
 std::string to_hex(const std::basic_string<char> &s);
 
@@ -153,5 +154,25 @@ public:
     return time;
   }
 };
+
+class ESPInstant {
+  decltype(esp_timer_get_time()) time;
+public:
+  ESPInstant() {
+    this->time = esp_timer_get_time();
+  }
+
+  auto elasped() {
+    auto now = esp_timer_get_time();
+    auto diff = now - this->time;
+    auto duration = std::chrono::duration<int64_t, std::micro>(diff);
+    return duration;
+  }
+
+  auto getTime() {
+    return time;
+  }
+};
+
 
 #endif //HELLO_WORLD_UTILS_H

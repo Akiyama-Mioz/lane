@@ -51,7 +51,7 @@ void app_main() {
 
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
               "stripTask", 5120,
-              pStrip, 2,
+              pStrip, configMAX_PRIORITIES - 3,
               nullptr);
 
   pServer->start();
