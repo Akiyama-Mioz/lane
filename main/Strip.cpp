@@ -5,10 +5,22 @@
 #include "StripCommon.h"
 #include "Strip.h"
 
-auto esp_random_binary(){
+auto esp_random_binary() {
   auto n = esp_random();
-  auto cond = UINT32_MAX/2;
-  if (n > cond){
+  auto cond = UINT32_MAX / 2;
+  if (n > cond) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+auto esp_random_ternary() {
+  auto n = esp_random();
+  auto cond = UINT32_MAX / 3;
+  if (n > cond * 2) {
+    return 2;
+  } else if (n > cond) {
     return 1;
   } else {
     return 0;
@@ -63,7 +75,8 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
  * @param pixels
  * @param fps
  */
-inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circle_length, float track_length, float fps, float LEDs_per_meter) {
+inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circle_length, float track_length, float fps,
+                                   float LEDs_per_meter) {
   auto max_shift = getMaxShiftLength();
   // if the shift is larger than the max length, we should stop updating the state.
   // do an early return.
@@ -82,7 +95,8 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circle_lengt
       }
       pixels->fill(color, 0, meterToLEDsCount(position, LEDs_per_meter));
     } else {
-      pixels->fill(color, meterToLEDsCount(position - track_length, LEDs_per_meter), meterToLEDsCount(track_length, LEDs_per_meter));
+      pixels->fill(color, meterToLEDsCount(position - track_length, LEDs_per_meter),
+                   meterToLEDsCount(track_length, LEDs_per_meter));
     }
     return next;
   }
@@ -179,7 +193,7 @@ void Strip::run(std::vector<Track> &tracks) {
     //     very device-specific peripherals to work around it."
     //
     constexpr long long MILLI = 1000;
-    auto secondsToMillis = [](uint seconds){
+    auto secondsToMillis = [](uint seconds) {
       return seconds * MILLI;
     };
     auto millisToSeconds = [](long long millis) {
@@ -188,11 +202,11 @@ void Strip::run(std::vector<Track> &tracks) {
     constexpr long long expectedDelay = secondsToMillis(1) / FPS;
     auto elapsed = startTime.elapsed();
     auto elapsedMillis = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-    auto diff = expectedDelay - elapsedMillis;
+    auto lucky = esp_random_ternary();
+    auto diff = (expectedDelay - elapsedMillis) - lucky;
     if (diff > 0) {
       // remove 1ms randomly
-      auto lucky = esp_random_binary();
-      vTaskDelay(pdMS_TO_TICKS(diff - static_cast<decltype(diff)>(lucky)));
+      vTaskDelay(pdMS_TO_TICKS(diff));
     } else {
       ESP_LOGE("Strip::run", "Loop timeout %.2f", millisToSeconds(elapsedMillis));
     }
@@ -256,7 +270,7 @@ StripError Strip::initBLE(NimBLEServer *server) {
     brightness_char->setCallbacks(brightness_cb);
 
     options_char = service->createCharacteristic(LIGHT_CHAR_OPTIONS_CHAR,
-                                                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+                                                 NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
     auto options_cb = new OptionsCharCallback(*this);
     options_char->setCallbacks(options_cb);
 
