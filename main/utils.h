@@ -149,6 +149,18 @@ public:
     return duration;
   }
 
+  void reset(){
+    auto now = std::chrono::steady_clock::now();
+    this->time = now;
+  }
+
+  auto elapsed_and_reset() {
+    auto now = std::chrono::steady_clock::now();
+    auto duration = now - this->time;
+    this->time = now;
+    return duration;
+  }
+
   /// get inner time
   [[nodiscard]] decltype(std::chrono::steady_clock::now()) getTime() const {
     return time;
@@ -166,6 +178,18 @@ public:
     auto now = esp_timer_get_time();
     auto diff = now - this->time;
     auto duration = std::chrono::duration<int64_t, std::micro>(diff);
+    return duration;
+  }
+
+  void reset(){
+    auto now = esp_timer_get_time();
+    this->time = now;
+  }
+
+  auto elapsed_and_reset() {
+    auto now = esp_timer_get_time();
+    auto duration = now - this->time;
+    this->time = now;
     return duration;
   }
 

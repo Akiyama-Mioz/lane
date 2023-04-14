@@ -33,8 +33,8 @@ const uint32_t STRIP_DEFAULT_TRACK_LEDs_NUM = 48;
 const uint32_t STRIP_DEFAULT_CIRCLE_LENGTH = 400;
 // in ms
 static const int BLUE_TRANSMIT_INTERVAL_MS = 1000;
-// in ms
-static const int HALT_INTERVAL = 100;
+static const int HALT_INTERVAL_MS = 100;
+static const int READY_INTERVAL_MS = 500;
 
 enum class StripError {
   OK = 0,
@@ -78,6 +78,9 @@ protected:
   bool is_ble_initialized = false;
 public:
   float getLEDsPerMeter() const;
+  auto getCircleLEDsNum() const {
+    return max_LEDs;
+  }
 
   // it takes 90ms for 3000 LEDs so 10 it should be okay at 10 FPS
   constexpr static const float FPS = 10;
@@ -171,6 +174,10 @@ protected:
   Strip() = default;
 
   void run(std::vector<Track> &tracks);
+
+  void ready(Instant &last_blink);
+
+  void stop();
 };
 
 

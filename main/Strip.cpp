@@ -102,6 +102,37 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circle_lengt
   }
 }
 
+void Strip::ready(Instant &last_blink) {
+  uint32_t c = 0;
+  auto duration = last_blink.elapsed();
+  auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+  if (millis > READY_INTERVAL_MS) {
+    if (c % 2 == 0) {
+      pixels->clear();
+      pixels->show();
+    } else {
+      auto constexpr front_count = 20;
+      auto constexpr back_count = 20;
+      auto front_color = Adafruit_NeoPixel::Color(255, 0, 0);
+      auto back_color = Adafruit_NeoPixel::Color(0, 0, 255);
+      pixels->clear();
+      pixels->fill(front_color, 0, front_count);
+      pixels->fill(back_color, getCircleLEDsNum(), getCircleLEDsNum() - back_count);
+      pixels->show();
+    }
+    last_blink.reset();
+  }
+  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL_MS);
+  vTaskDelay(delay);
+}
+
+void Strip::stop() {
+  pixels->clear();
+  pixels->show();
+  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL_MS);
+  vTaskDelay(delay);
+}
+
 void Strip::run(std::vector<Track> &tracks) {
   if (tracks.empty()) {
     ESP_LOGE("Strip::run", "no track to run");
@@ -220,15 +251,15 @@ void Strip::run(std::vector<Track> &tracks) {
 void Strip::stripTask() {
   pixels->clear();
   pixels->show();
+  auto instant = Instant();
   for (;;) {
     if (pixels != nullptr) {
       if (status == TrackStatus_RUN) {
         run(tracks);
       } else if (status == TrackStatus_STOP) {
-        pixels->clear();
-        pixels->show();
-        constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL);
-        vTaskDelay(delay);
+        stop();
+      } else if (status == TrackStatus_READY) {
+        ready(instant);
       }
     }
   }
