@@ -5,7 +5,6 @@
 #ifndef HELLO_WORLD_STRIP_H
 #define HELLO_WORLD_STRIP_H
 
-#include <random>
 #include "esp_random.h"
 #include "utils.h"
 #include <Adafruit_NeoPixel.h>
@@ -88,7 +87,7 @@ public:
   float getLEDsPerMeter() const;
 
   // it takes 90ms for 3000 LEDs so 10 it should be okay at 10 FPS
-  constexpr static const float fps = 9;
+  constexpr static const float FPS = 10;
   static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
   Preferences pref;
   int pin = 14;
