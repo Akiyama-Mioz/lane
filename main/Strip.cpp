@@ -5,6 +5,19 @@
 #include "StripCommon.h"
 #include "Strip.h"
 
+static std::random_device dev;
+static std::mt19937 rng(dev());
+static std::uniform_int_distribution<std::mt19937::result_type> dist6(1,0);
+
+auto genRandBinary(){
+  int random_number = std::rand();
+  auto cond = RAND_MAX/2;
+  if (random_number > cond){
+    return 1;
+  } else {
+    return 0;
+  }
+}
 
 static inline int meterToLEDsCount(float meter, float LEDs_per_meter) {
   return abs(round(meter * LEDs_per_meter)) + 1;
@@ -147,7 +160,7 @@ void Strip::run(std::vector<Track> &tracks) {
   auto trackLength = LEDsCountToMeter(count_LEDs, this->getLEDsPerMeter());
   ESP_LOGD("Strip::run", "enter loop");
   while (status == StripStatus::RUN) {
-    auto startTime = Instant();
+    auto startTime = ESPInstant();
     pixels->clear();
     for (auto &track: tracks) {
       auto next = track.updateStrip(pixels, circleLength, trackLength, fps, this->getLEDsPerMeter());
@@ -176,13 +189,14 @@ void Strip::run(std::vector<Track> &tracks) {
     auto millisToSeconds = [](long long millis) {
       return millis / static_cast<float>(MILLI);
     };
-
     constexpr long long expectedDelay = secondsToMillis(1) / fps;
     auto elapsed = startTime.elapsed();
     auto elapsedMillis = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
     auto diff = expectedDelay - elapsedMillis;
     if (diff > 0) {
-      vTaskDelay(pdMS_TO_TICKS(diff));
+      // add 1ms randomly
+      auto lucky = genRandBinary();
+      vTaskDelay(pdMS_TO_TICKS(diff + lucky));
     } else {
       ESP_LOGE("Strip::run", "Loop timeout %.2f", millisToSeconds(elapsedMillis));
     }

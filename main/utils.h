@@ -162,7 +162,7 @@ public:
     this->time = esp_timer_get_time();
   }
 
-  auto elasped() {
+  auto elapsed() {
     auto now = esp_timer_get_time();
     auto diff = now - this->time;
     auto duration = std::chrono::duration<int64_t, std::micro>(diff);
