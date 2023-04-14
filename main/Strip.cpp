@@ -102,7 +102,7 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circle_lengt
   }
 }
 
-void Strip::ready(Instant &last_blink) {
+void Strip::ready(Instant &last_blink) const {
   uint32_t c = 0;
   auto duration = last_blink.elapsed();
   auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
@@ -117,16 +117,17 @@ void Strip::ready(Instant &last_blink) {
       auto back_color = Adafruit_NeoPixel::Color(0, 0, 255);
       pixels->clear();
       pixels->fill(front_color, 0, front_count);
-      pixels->fill(back_color, getCircleLEDsNum(), getCircleLEDsNum() - back_count);
+      pixels->fill(back_color, getCircleLEDsNum() - back_count, back_count);
       pixels->show();
     }
+    c += 1;
     last_blink.reset();
   }
   constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL_MS);
   vTaskDelay(delay);
 }
 
-void Strip::stop() {
+void Strip::stop() const {
   pixels->clear();
   pixels->show();
   constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL_MS);

@@ -175,9 +175,9 @@ protected:
 
   void run(std::vector<Track> &tracks);
 
-  void ready(Instant &last_blink);
+  void ready(Instant &last_blink) const;
 
-  void stop();
+  void stop() const;
 };
 
 
