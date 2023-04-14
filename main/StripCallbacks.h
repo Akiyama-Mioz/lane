@@ -5,42 +5,27 @@
 #ifndef HELLO_WORLD_STRIPCALLBACKS_H
 #define HELLO_WORLD_STRIPCALLBACKS_H
 
+#include "utils.h"
 #include <Adafruit_NeoPixel.h>
 #include "NimBLEDevice.h"
+#include <map>
+#include <iostream>
+#include <vector>
+#include "pb_encode.h"
+#include "pb_decode.h"
+#include "track_config.pb.h"
+#include "track_option.pb.h"
 
-
+class Track;
 class Strip;
+
 // Maybe I should use factory pattern.
-class ColorCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit ColorCharCallback(Strip &strip);
-};
-
 class BrightnessCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit BrightnessCharCallback(Strip &strip);
-};
-
-class DelayCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit DelayCharCallback(Strip &strip);
-};
-
-class MaxLEDsCharCallback : public NimBLECharacteristicCallbacks {
-  Strip &strip;
-public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
-
-  explicit MaxLEDsCharCallback(Strip &strip);
+  explicit BrightnessCharCallback(Strip &strip): strip(strip) {};
 };
 
 class StatusCharCallback : public NimBLECharacteristicCallbacks {
@@ -48,15 +33,23 @@ class StatusCharCallback : public NimBLECharacteristicCallbacks {
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit StatusCharCallback(Strip &strip);
+  explicit StatusCharCallback(Strip &strip): strip(strip) {};
 };
 
-class HaltDelayCharCallback : public NimBLECharacteristicCallbacks {
+class ConfigCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
   void onWrite(NimBLECharacteristic *characteristic) override;
 
-  explicit HaltDelayCharCallback(Strip &strip);
+  explicit ConfigCharCallback(Strip &strip) : strip(strip) {}
+};
+
+class OptionsCharCallback : public NimBLECharacteristicCallbacks {
+  Strip &strip;
+public:
+  void onWrite(NimBLECharacteristic *characteristic) override;
+
+  explicit OptionsCharCallback(Strip &strip) : strip(strip) {}
 };
 
 #endif //HELLO_WORLD_STRIPCALLBACKS_H

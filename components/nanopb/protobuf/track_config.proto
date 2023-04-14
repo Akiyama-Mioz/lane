@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+// should be from 0 to 255
+message Color {
+  int32 red = 1;
+  int32 green = 2;
+  int32 blue = 3;
+}
+
+message TupleIntFloat {
+  int32 dist = 1;
+  float speed =2;
+}
+
+enum Command {
+  ADD = 0;   // push to the vector
+  RESET = 1; // empty the vector then push
+}
+
+message TrackConfig {
+  Command command = 1;
+  int32 id = 2;
+  repeated TupleIntFloat lst = 3;
+  Color color = 4;
+}
+
+message TrackState {
+  int32 id = 1;
+  float shift = 2;
+  float speed = 3;
+}
+
+message TrackStates {
+  repeated TrackState states = 1;
+}
+
+enum TrackStatus {
+  STOP = 0;
+  READY = 1;
+  RUN = 2;
+}
+
+message TrackStatusMsg {
+  TrackStatus status = 1;
+}
+

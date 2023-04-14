@@ -18,5 +18,7 @@ set(GEN_PROTOBUF_INCLUDE_DIR
 
 idf_component_register(
         SRCS nanopb/pb_common.c nanopb/pb_decode.c nanopb/pb_encode.c nanopb_cpp/nanopb_cpp.cpp protobuf/ble.pb.c
+        protobuf/track_config.pb.c
+        protobuf/track_option.pb.c
         INCLUDE_DIRS ${NANOPB_INCLUDE_DIR} ${NANOPB_CPP_INCLUDE_DIR} ${GEN_PROTOBUF_INCLUDE_DIR}
 )

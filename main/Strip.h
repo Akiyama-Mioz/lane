@@ -5,20 +5,36 @@
 #ifndef HELLO_WORLD_STRIP_H
 #define HELLO_WORLD_STRIP_H
 
+#include "esp_random.h"
+#include "utils.h"
 #include <Adafruit_NeoPixel.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
 #include "Preferences.h"
+#include "map"
+#include "vector"
+#include "track_config.pb.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-// change this to match the length of StripStatus
-constexpr uint8_t StripStatus_LENGTH = 4;
-enum class StripStatus {
-  AUTO = 0,
-  FORWARD,
-  REVERSE,
-  STOP,
-};
+const auto STRIP_PREF_RECORD_NAME = "record";
+const auto STRIP_BRIGHTNESS_KEY = "b";
+const auto STRIP_CIRCLE_LEDs_NUM_KEY = "c";
+const auto STRIP_CIRCLE_LENGTH_KEY = "cl";
+const auto STRIP_TRACK_LEDs_NUM_KEY = "t";
+
+// STRIP_DEFAULT_LEDs_PER_METER is calculated
+/// in count
+const uint32_t STRIP_DEFAULT_CIRCLE_LEDs_NUM = 3050;
+/// in count
+const uint32_t STRIP_DEFAULT_TRACK_LEDs_NUM = 48;
+// in meter
+const uint32_t STRIP_DEFAULT_CIRCLE_LENGTH = 400;
+// in ms
+static const int BLUE_TRANSMIT_INTERVAL_MS = 1000;
+static const int HALT_INTERVAL_MS = 100;
+static const int READY_INTERVAL_MS = 500;
 
 enum class StripError {
   OK = 0,
@@ -26,45 +42,79 @@ enum class StripError {
   HAS_INITIALIZED,
 };
 
+struct RunState {
+  float position;
+  float speed;
+  float shift;
+  float extra;
+};
+
+RunState
+nextState(RunState state, const ValueRetriever<float> &retriever, float circleLength, float trackLength, float fps);
+
+class Track {
+public:
+  int32_t id = 0;
+  RunState state = RunState{0, 0, 0, false};
+  ValueRetriever<float> retriever = ValueRetriever<float>(std::map<int, float>());
+  uint32_t color = Adafruit_NeoPixel::Color(255, 255, 255);
+
+  [[nodiscard]]
+  int getMaxShiftLength() const {
+    return retriever.getMaxKey();
+  }
+
+  void resetState() {
+    this->state = RunState{0, 0, 0, false};
+  }
+
+  RunState
+  updateStrip(Adafruit_NeoPixel *pixels, float circle_length, float track_length, float fps, float LEDs_per_meter);
+};
+
 class Strip {
 protected:
   bool is_initialized = false;
   bool is_ble_initialized = false;
 public:
+  float getLEDsPerMeter() const;
+  auto getCircleLEDsNum() const {
+    return max_LEDs;
+  }
+
+  // it takes 90ms for 3000 LEDs so 10 it should be okay at 10 FPS
+  constexpr static const float FPS = 10;
+  static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
   Preferences pref;
   int pin = 14;
-  // 10 LEDs/m foo 24v
-  int max_LEDs = 50;
-  // length should be less than max_LEDs
-  uint16_t length = 10;
-  uint32_t count = 0;
+  uint32_t max_LEDs = 0;
+  /// the LED count that is filled at once per track and should be less than `max_LEDs`
+  uint32_t count_LEDs = 10;
   uint8_t brightness = 32;
+  /// in meter
+  float circle_length = STRIP_DEFAULT_CIRCLE_LENGTH;
   Adafruit_NeoPixel *pixels = nullptr;
-  StripStatus status = StripStatus::AUTO;
-  int delay_ms = 100;
-  int halt_delay = 500;
-  uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255);
+  TrackStatus status = TrackStatus_STOP;
+
   // I don't know how to release the memory of the NimBLECharacteristic
   // or other BLE stuff. So I choose to not free the memory. (the device
   // should be always alive with BLE anyway.)
-  NimBLECharacteristic *count_char = nullptr;
-  NimBLECharacteristic *color_char = nullptr;
   NimBLECharacteristic *status_char = nullptr;
   NimBLECharacteristic *brightness_char = nullptr;
-  NimBLECharacteristic *max_leds_char = nullptr;
-  NimBLECharacteristic *delay_char = nullptr;
-  NimBLECharacteristic *halt_delay_char = nullptr;
-  NimBLEService *service = nullptr;
+  NimBLECharacteristic *options_char = nullptr;
+  NimBLECharacteristic *config_char = nullptr;
+  NimBLECharacteristic *state_char = nullptr;
 
+  NimBLEService *service = nullptr;
   const char *LIGHT_SERVICE_UUID = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
-  const char *LIGHT_CHAR_COLOR_UUID = "87a11e36-7c0e-44aa-a8ca-85307f52ce1e";
+
   const char *LIGHT_CHAR_BRIGHTNESS_UUID = "e3ce8b08-4bb9-4696-b862-3e62a1100adc";
   const char *LIGHT_CHAR_STATUS_UUID = "24207642-0d98-40cd-84bb-910008579114";
-  const char *LIGHT_CHAR_MAX_LEDS_UUID = "28734897-4356-4c4a-af3d-8359ea4657cd";
-  const char *LIGHT_CHAR_DELAY_UUID = "adbbac7f-2c08-4a8d-b3f7-d38d7bd5bc41";
-  const char *LIGHT_CHAR_COUNT_UUID = "b972471a-139c-4211-a591-28c4ec1936f6";
-  const char *LIGHT_CHAR_HALT_DELAY_UUID = "00923454-81de-4e74-b2e0-a873f2cbddcc";
+  const char *LIGHT_CHAR_OPTIONS_CHAR = "9f5806ba-a71b-4194-9854-5d76698200de";
+  const char *LIGHT_CHAR_CONFIG_UUID = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
+  const char *LIGHT_CHAR_STATE_UUID = "ed3eefa1-3c80-b43f-6b65-e652374650b5";
 
+  std::vector<Track> tracks = std::vector<Track>{};
 
   /**
    * @brief Loop the strip.
@@ -78,13 +128,26 @@ public:
 
   StripError initBLE(NimBLEServer *server);
 
-  void setMaxLEDs(int new_max_LEDs);
+  /**
+   * @brief sets the maximum number of LEDs that can be used. i.e. Circle Length.
+   * @warning This function will NOT set the corresponding bluetooth characteristic value.
+   * @param new_max_LEDs
+   */
+  void setMaxLEDs(uint32_t new_max_LEDs);
 
+/**
+ * @brief set the color of the strip.
+ * @warning This function will NOT set the corresponding bluetooth characteristic value.
+ * @param color the color of the strip.
+ */
   void setBrightness(uint8_t new_brightness);
 
-  void fillForward() const;
-
-  void fillReverse() const;
+  /**
+   * @brief set the status of the strip.
+   * @warning This function WILL set the corresponding bluetooth characteristic value and notify.
+   * @param s
+   */
+  void setStatusNotify(TrackStatus s);
 
   static Strip *get();
 
@@ -96,14 +159,25 @@ public:
 
   Strip &operator=(Strip &&) = delete;
 
-  // usually you won't destruct it because it's running in MCU and the resource will be released
+  // usually you won't destruct it because it's running in MCU and the resource will not be released
   ~Strip() = delete;
 
   StripError
-  begin(int max_LEDs, int16_t PIN, uint32_t color = Adafruit_NeoPixel::Color(255, 0, 255), uint8_t brightness = 32);
+  begin(int16_t PIN, uint8_t brightness);
+
+  /// set track length (count LEDs)
+  void setCountLEDs(uint32_t count);
+
+  void setCircleLength(float meter);
 
 protected:
   Strip() = default;
+
+  void run(std::vector<Track> &tracks);
+
+  void ready(Instant &last_blink) const;
+
+  void stop() const;
 };
 
 
