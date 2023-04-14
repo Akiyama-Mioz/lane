@@ -31,7 +31,7 @@ const uint32_t STRIP_DEFAULT_TRACK_LEDs_NUM = 48;
 // in meter
 const uint32_t STRIP_DEFAULT_CIRCLE_LENGTH = 400;
 // in ms
-static const int TRANSMIT_INTERVAL = 1000;
+static const int BLUE_TRANSMIT_INTERVAL_MS = 1000;
 // in ms
 static const int HALT_INTERVAL = 100;
 
@@ -86,7 +86,7 @@ public:
   float getLEDsPerMeter() const;
 
   // it takes 90ms for 3000 LEDs so 10 it should be okay at 10 FPS
-  constexpr static const float fps = 8;
+  constexpr static const float fps = 9;
   static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
   Preferences pref;
   int pin = 14;

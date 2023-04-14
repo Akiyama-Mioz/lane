@@ -39,7 +39,6 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
   if (position > circleLength) {
     position = fmod(position, circleLength);
     if (position <= trackLength) {
-      // trackLength = position + extra
       extra = trackLength - position;
     }
   }
@@ -142,7 +141,7 @@ void Strip::run(std::vector<Track> &tracks) {
     }
   };
   // encode and send the states to the characteristic
-  auto timer = xTimerCreate("sendStatus", pdMS_TO_TICKS(TRANSMIT_INTERVAL), pdTRUE, static_cast<void *>(&param),
+  auto timer = xTimerCreate("sendStatus", pdMS_TO_TICKS(BLUE_TRANSMIT_INTERVAL_MS), pdTRUE, static_cast<void *>(&param),
                             timer_cb);
   xTimerStart(timer, 0);
   // should not change any parameter when running
@@ -193,7 +192,7 @@ void Strip::run(std::vector<Track> &tracks) {
   }
   ESP_LOGD("Strip::run", "exit loop");
   // promise the last state is sent.
-  vTaskDelay(2 * pdMS_TO_TICKS(TRANSMIT_INTERVAL));
+  vTaskDelay(2 * pdMS_TO_TICKS(BLUE_TRANSMIT_INTERVAL_MS));
   xTimerStop(timer, portMAX_DELAY);
 }
 
