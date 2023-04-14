@@ -75,7 +75,7 @@ public:
   }
 
   RunState
-  updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps, float LEDs_per_meter);
+  updateStrip(Adafruit_NeoPixel *pixels, float circle_length, float track_length, float fps, float LEDs_per_meter);
 };
 
 class Strip {

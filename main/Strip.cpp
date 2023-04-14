@@ -6,7 +6,6 @@
 #include "Strip.h"
 
 
-// You need one more LED to make the strip.
 static inline int meterToLEDsCount(float meter, float LEDs_per_meter) {
   return abs(round(meter * LEDs_per_meter)) + 1;
 }
@@ -53,10 +52,9 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
 /**
  * @brief update the strip with the new state and write the pixel data to the strip.
  * @param pixels
- * @param trackLength - counts of the number of LEDs in one track.
  * @param fps
  */
-inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength, float trackLength, float fps, float LEDs_per_meter) {
+inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circle_length, float track_length, float fps, float LEDs_per_meter) {
   auto max_shift = getMaxShiftLength();
   // if the shift is larger than the max length, we should stop updating the state.
   // do an early return.
@@ -64,18 +62,18 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circleLength
     state.speed = 0;
     return state;
   } else {
-    auto next = nextState(state, retriever, circleLength, trackLength, fps);
+    auto next = nextState(state, retriever, circle_length, track_length, fps);
     auto [position, speed, shift, extra] = next;
     this->state = next;
     if (extra != 0) {
       // position may be larger than trackLength if float is not precise enough.
-      if (circleLength < position) {
+      if (circle_length < position) {
         // fill to the end
-        pixels->fill(color, meterToLEDsCount(circleLength - extra, LEDs_per_meter), 0);
+        pixels->fill(color, meterToLEDsCount(circle_length - extra, LEDs_per_meter), 0);
       }
       pixels->fill(color, 0, meterToLEDsCount(position, LEDs_per_meter));
     } else {
-      pixels->fill(color, meterToLEDsCount(position - trackLength, LEDs_per_meter), meterToLEDsCount(trackLength, LEDs_per_meter));
+      pixels->fill(color, meterToLEDsCount(position - track_length, LEDs_per_meter), meterToLEDsCount(track_length, LEDs_per_meter));
     }
     return next;
   }
