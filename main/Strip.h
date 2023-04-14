@@ -36,13 +36,6 @@ static const int BLUE_TRANSMIT_INTERVAL_MS = 1000;
 // in ms
 static const int HALT_INTERVAL = 100;
 
-// change this to match the length of StripStatus
-constexpr uint8_t StripStatus_LENGTH = 2;
-enum class StripStatus {
-  STOP = 0,
-  RUN,
-};
-
 enum class StripError {
   OK = 0,
   ERROR,
@@ -98,7 +91,7 @@ public:
   /// in meter
   float circle_length = STRIP_DEFAULT_CIRCLE_LENGTH;
   Adafruit_NeoPixel *pixels = nullptr;
-  StripStatus status = StripStatus::STOP;
+  TrackStatus status = TrackStatus_STOP;
 
   // I don't know how to release the memory of the NimBLECharacteristic
   // or other BLE stuff. So I choose to not free the memory. (the device
@@ -151,7 +144,7 @@ public:
    * @warning This function WILL set the corresponding bluetooth characteristic value and notify.
    * @param s
    */
-  void setStatusNotify(StripStatus s);
+  void setStatusNotify(TrackStatus s);
 
   static Strip *get();
 

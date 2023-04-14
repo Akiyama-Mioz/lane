@@ -33,3 +33,14 @@ message TrackState {
 message TrackStates {
   repeated TrackState states = 1;
 }
+
+enum TrackStatus {
+  STOP = 0;
+  READY = 1;
+  RUN = 2;
+}
+
+message TrackStatusMsg {
+  TrackStatus status = 1;
+}
+

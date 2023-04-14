@@ -21,5 +21,9 @@ PB_BIND(TrackState, TrackState, AUTO)
 PB_BIND(TrackStates, TrackStates, AUTO)
 
 
+PB_BIND(TrackStatusMsg, TrackStatusMsg, AUTO)
+
+
+
 
 

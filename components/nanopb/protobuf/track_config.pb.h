@@ -15,6 +15,12 @@ typedef enum _Command {
     Command_RESET = 1 /* empty the vector then push */
 } Command;
 
+typedef enum _TrackStatus {
+    TrackStatus_STOP = 0,
+    TrackStatus_READY = 1,
+    TrackStatus_RUN = 2
+} TrackStatus;
+
 /* Struct definitions */
 typedef struct _TrackStates {
     pb_callback_t states;
@@ -32,6 +38,10 @@ typedef struct _TrackState {
     float shift;
     float speed;
 } TrackState;
+
+typedef struct _TrackStatusMsg {
+    TrackStatus status;
+} TrackStatusMsg;
 
 typedef struct _TupleIntFloat {
     int32_t dist;
@@ -52,6 +62,10 @@ typedef struct _TrackConfig {
 #define _Command_MAX Command_RESET
 #define _Command_ARRAYSIZE ((Command)(Command_RESET+1))
 
+#define _TrackStatus_MIN TrackStatus_STOP
+#define _TrackStatus_MAX TrackStatus_RUN
+#define _TrackStatus_ARRAYSIZE ((TrackStatus)(TrackStatus_RUN+1))
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,11 +77,13 @@ extern "C" {
 #define TrackConfig_init_default                 {_Command_MIN, 0, {{NULL}, NULL}, false, Color_init_default}
 #define TrackState_init_default                  {0, 0, 0}
 #define TrackStates_init_default                 {{{NULL}, NULL}}
+#define TrackStatusMsg_init_default              {_TrackStatus_MIN}
 #define Color_init_zero                          {0, 0, 0}
 #define TupleIntFloat_init_zero                  {0, 0}
 #define TrackConfig_init_zero                    {_Command_MIN, 0, {{NULL}, NULL}, false, Color_init_zero}
 #define TrackState_init_zero                     {0, 0, 0}
 #define TrackStates_init_zero                    {{{NULL}, NULL}}
+#define TrackStatusMsg_init_zero                 {_TrackStatus_MIN}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define TrackStates_states_tag                   1
@@ -77,6 +93,7 @@ extern "C" {
 #define TrackState_id_tag                        1
 #define TrackState_shift_tag                     2
 #define TrackState_speed_tag                     3
+#define TrackStatusMsg_status_tag                1
 #define TupleIntFloat_dist_tag                   1
 #define TupleIntFloat_speed_tag                  2
 #define TrackConfig_command_tag                  1
@@ -121,11 +138,17 @@ X(a, CALLBACK, REPEATED, MESSAGE,  states,            1)
 #define TrackStates_DEFAULT NULL
 #define TrackStates_states_MSGTYPE TrackState
 
+#define TrackStatusMsg_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UENUM,    status,            1)
+#define TrackStatusMsg_CALLBACK NULL
+#define TrackStatusMsg_DEFAULT NULL
+
 extern const pb_msgdesc_t Color_msg;
 extern const pb_msgdesc_t TupleIntFloat_msg;
 extern const pb_msgdesc_t TrackConfig_msg;
 extern const pb_msgdesc_t TrackState_msg;
 extern const pb_msgdesc_t TrackStates_msg;
+extern const pb_msgdesc_t TrackStatusMsg_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define Color_fields &Color_msg
@@ -133,12 +156,14 @@ extern const pb_msgdesc_t TrackStates_msg;
 #define TrackConfig_fields &TrackConfig_msg
 #define TrackState_fields &TrackState_msg
 #define TrackStates_fields &TrackStates_msg
+#define TrackStatusMsg_fields &TrackStatusMsg_msg
 
 /* Maximum encoded size of messages (where known) */
 /* TrackConfig_size depends on runtime parameters */
 /* TrackStates_size depends on runtime parameters */
 #define Color_size                               33
 #define TrackState_size                          21
+#define TrackStatusMsg_size                      2
 #define TupleIntFloat_size                       16
 
 #ifdef __cplusplus

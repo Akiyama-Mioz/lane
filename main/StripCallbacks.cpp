@@ -21,20 +21,20 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
-  uint8_t status = data[0];
-  if (status < StripStatus_LENGTH) {
-    auto s = StripStatus(status);
-    strip.status = s;
-    ESP_LOGI("StatusCharCallback", "status changed to %d", status);
-  } else {
-    ESP_LOGE("StatusCharCallback", "Invalid status: %d", status);
-    characteristic->setValue(strip.status);
+  TrackStatusMsg msg = TrackStatusMsg_init_zero;
+  pb_istream_t istream = pb_istream_from_buffer(data, data.length());
+  auto res = pb_decode(&istream, TrackStatusMsg_fields, &msg);
+  if (!res) {
+    ESP_LOGE("Decode Options", "Error: Something goes wrong when decoding");
+    return;
   }
+  auto status = msg.status;
+  strip.status = status;
 }
 
 void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
-  if (strip.status != StripStatus::STOP) {
+  if (strip.status != TrackStatus_STOP) {
     ESP_LOGE("ConfigCharCallback", "Strip is not stopped, cannot change config");
     characteristic->setValue(1);
     return;
@@ -103,7 +103,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
 
 void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   auto data = characteristic->getValue();
-  if (strip.status != StripStatus::STOP) {
+  if (strip.status != TrackStatus_STOP) {
     ESP_LOGE("OptionsCharCallback", "Strip is not stopped, cannot change options");
     characteristic->setValue(0);
     return;

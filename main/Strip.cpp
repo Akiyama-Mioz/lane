@@ -105,7 +105,7 @@ inline RunState Track::updateStrip(Adafruit_NeoPixel *pixels, float circle_lengt
 void Strip::run(std::vector<Track> &tracks) {
   if (tracks.empty()) {
     ESP_LOGE("Strip::run", "no track to run");
-    setStatusNotify(StripStatus::STOP);
+    setStatusNotify(TrackStatus_STOP);
     return;
   }
   // use the max value of the 0 track to determine the length of the track.
@@ -169,7 +169,7 @@ void Strip::run(std::vector<Track> &tracks) {
   auto circleLength = static_cast<float>(this->circle_length);
   auto trackLength = LEDsCountToMeter(count_LEDs, this->getLEDsPerMeter());
   ESP_LOGD("Strip::run", "enter loop");
-  while (status == StripStatus::RUN) {
+  while (status == TrackStatus_RUN) {
     auto startTime = Instant();
     pixels->clear();
     for (auto &track: tracks) {
@@ -182,7 +182,7 @@ void Strip::run(std::vector<Track> &tracks) {
     // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
     if (ceil(tracks.back().state.shift) >= totalLength) {
       ESP_LOGI("Strip::run", "Run finished last shift %f", tracks.back().state.shift);
-      setStatusNotify(StripStatus::STOP);
+      setStatusNotify(TrackStatus_STOP);
     }
     // I expect the delay to be 1/fps seconds.
     // Remember that the Adafruit_NeoPixel::show()
@@ -222,9 +222,9 @@ void Strip::stripTask() {
   pixels->show();
   for (;;) {
     if (pixels != nullptr) {
-      if (status == StripStatus::RUN) {
+      if (status == TrackStatus_RUN) {
         run(tracks);
-      } else if (status == StripStatus::STOP) {
+      } else if (status == TrackStatus_STOP) {
         pixels->clear();
         pixels->show();
         constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL);
@@ -338,10 +338,20 @@ void Strip::setBrightness(const uint8_t new_brightness) {
   }
 }
 
-void Strip::setStatusNotify(StripStatus s) {
+void Strip::setStatusNotify(TrackStatus s) {
   this->status = s;
   if (status_char != nullptr) {
-    status_char->setValue(s);
+    constexpr size_t buf_size = 64;
+    std::array<uint8_t, buf_size> buf{};
+    TrackStatusMsg msg = TrackStatusMsg_init_zero;
+    msg.status = s;
+    auto ostream = pb_ostream_from_buffer(buf.data(), buf_size);
+    auto res = pb_encode(&ostream, TrackStatusMsg_fields, &msg);
+    if (!res) {
+      ESP_LOGE("Strip::setStatusNotify", "pb_encode");
+      return;
+    }
+    status_char->setValue(buf);
     status_char->notify();
   }
 }
