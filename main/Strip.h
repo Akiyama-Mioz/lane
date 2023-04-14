@@ -6,6 +6,7 @@
 #define HELLO_WORLD_STRIP_H
 
 #include <random>
+#include "esp_random.h"
 #include "utils.h"
 #include <Adafruit_NeoPixel.h>
 #include "freertos/FreeRTOS.h"

@@ -7,12 +7,22 @@
 
 static std::random_device dev;
 static std::mt19937 rng(dev());
-static std::uniform_int_distribution<std::mt19937::result_type> dist6(1,0);
+static std::uniform_int_distribution<std::mt19937::result_type> binary_dist(1,0);
 
 auto genRandBinary(){
   int random_number = std::rand();
   auto cond = RAND_MAX/2;
   if (random_number > cond){
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+auto esp_random_binary(){
+  auto n = esp_random();
+  auto cond = UINT32_MAX/2;
+  if (n > cond){
     return 1;
   } else {
     return 0;
@@ -160,7 +170,7 @@ void Strip::run(std::vector<Track> &tracks) {
   auto trackLength = LEDsCountToMeter(count_LEDs, this->getLEDsPerMeter());
   ESP_LOGD("Strip::run", "enter loop");
   while (status == StripStatus::RUN) {
-    auto startTime = ESPInstant();
+    auto startTime = Instant();
     pixels->clear();
     for (auto &track: tracks) {
       auto next = track.updateStrip(pixels, circleLength, trackLength, fps, this->getLEDsPerMeter());
@@ -195,8 +205,8 @@ void Strip::run(std::vector<Track> &tracks) {
     auto diff = expectedDelay - elapsedMillis;
     if (diff > 0) {
       // add 1ms randomly
-      auto lucky = genRandBinary();
-      vTaskDelay(pdMS_TO_TICKS(diff + lucky));
+      auto lucky = esp_random_binary();
+      vTaskDelay(pdMS_TO_TICKS(diff + static_cast<decltype(diff)>(lucky)));
     } else {
       ESP_LOGE("Strip::run", "Loop timeout %.2f", millisToSeconds(elapsedMillis));
     }
