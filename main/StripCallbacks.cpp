@@ -5,7 +5,7 @@
 #include "StripCallbacks.h"
 
 
-void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) {
   auto data = characteristic->getValue();
   if (data.length() >= 1) {
     uint8_t brightness = data[0];
@@ -19,7 +19,7 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   }
 }
 
-void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) {
   auto data = characteristic->getValue();
   TrackStatusMsg msg = TrackStatusMsg_init_zero;
   pb_istream_t istream = pb_istream_from_buffer(data, data.length());
@@ -32,7 +32,7 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   strip.status = status;
 }
 
-void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) {
   auto data = characteristic->getValue();
   if (strip.status != TrackStatus_STOP) {
     ESP_LOGE("ConfigCharCallback", "Strip is not stopped, cannot change config");
@@ -75,13 +75,13 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
       .color = Adafruit_NeoPixel::Color(config.color.red, config.color.green, config.color.blue),
   };
   if (config.command == Command_ADD) {
-    ESP_LOGI("ConfigChar", "Add track id %d", track.id);
+    ESP_LOGI("ConfigChar", "Add track id %ld", track.id);
     bool isDuplicated = std::find_if(strip.tracks.begin(), strip.tracks.end(), [&track](const Track &t) {
       return t.id == track.id;
     }) != strip.tracks.end();
     // If not present, it returns an iterator to one-past-the-end.
     if (isDuplicated) {
-      ESP_LOGE("ConfigChar", "Duplicated track id %d", track.id);
+      ESP_LOGE("ConfigChar", "Duplicated track id %ld", track.id);
       return;
     }
     strip.tracks.emplace_back(std::move(track));
@@ -92,7 +92,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
     // set the value of the characteristic to zero after finishing the operation.
     strip.config_char->setValue(0);
   } else if (config.command == Command_RESET) {
-    ESP_LOGI("ConfigChar", "Reset and add track id %d", track.id);
+    ESP_LOGI("ConfigChar", "Reset and add track id %ld", track.id);
     strip.tracks.clear();
     strip.tracks.emplace_back(std::move(track));
     strip.config_char->setValue(0);
@@ -101,7 +101,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic) {
   }
 }
 
-void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
+void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) {
   auto data = characteristic->getValue();
   if (strip.status != TrackStatus_STOP) {
     ESP_LOGE("OptionsCharCallback", "Strip is not stopped, cannot change options");
@@ -120,14 +120,14 @@ void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic) {
       auto l = options.options.max_led.num;
       strip.setMaxLEDs(l);
       strip.pref.putUInt(STRIP_CIRCLE_LEDs_NUM_KEY, l);
-      ESP_LOGI("OptionsCharCallback", "max_led_length changed to %d", strip.max_LEDs);
+      ESP_LOGI("OptionsCharCallback", "max_led_length changed to %lu", strip.max_LEDs);
       break;
     }
     case TrackOptions_count_led_tag: {
       auto c = options.options.count_led.num;
       strip.setCountLEDs(c);
       strip.pref.putUInt(STRIP_TRACK_LEDs_NUM_KEY, c);
-      ESP_LOGI("OptionsCharCallback", "count_led changed to %d", strip.count_LEDs);
+      ESP_LOGI("OptionsCharCallback", "count_led changed to %lu", strip.count_LEDs);
       break;
     }
     case TrackOptions_circle_tag: {

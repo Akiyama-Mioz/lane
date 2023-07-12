@@ -23,7 +23,7 @@ class Strip;
 class BrightnessCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
+  void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) override;
 
   explicit BrightnessCharCallback(Strip &strip): strip(strip) {};
 };
@@ -31,7 +31,7 @@ public:
 class StatusCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
+  void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) override;
 
   explicit StatusCharCallback(Strip &strip): strip(strip) {};
 };
@@ -39,7 +39,7 @@ public:
 class ConfigCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
+  void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) override;
 
   explicit ConfigCharCallback(Strip &strip) : strip(strip) {}
 };
@@ -47,7 +47,7 @@ public:
 class OptionsCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
 public:
-  void onWrite(NimBLECharacteristic *characteristic) override;
+  void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) override;
 
   explicit OptionsCharCallback(Strip &strip) : strip(strip) {}
 };

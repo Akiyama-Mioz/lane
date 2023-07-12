@@ -29,13 +29,11 @@ public:
 };
 
 class ServerCallbacks : public NimBLEServerCallbacks {
-  void onConnect(NimBLEServer *pServer) override;;
+  void onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) override;
 
-  void onConnect(NimBLEServer *pServer, ble_gap_conn_desc *desc) override;;
+  void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason) override;
 
-  void onDisconnect(NimBLEServer *pServer) override;;
-
-  void onMTUChange(uint16_t MTU, ble_gap_conn_desc *desc) override;;
+  void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) override;
 };
 
 

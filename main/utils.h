@@ -132,7 +132,7 @@ struct PbEncodeCallback {
    * @warning T must be a pointer type (with a little star behind it)
    * @see <a href="https://en.cppreference.com/w/c/language/struct_initialization">Struct Initialization</a>
    */
-  PbEncodeCallback() = delete;
+  // PbEncodeCallback() = delete;
 };
 
 class Instant {

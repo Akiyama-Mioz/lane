@@ -207,7 +207,7 @@ void Strip::run(std::vector<Track> &tracks) {
     for (auto &track: tracks) {
       auto next = track.updateStrip(pixels, circleLength, trackLength, FPS, this->getLEDsPerMeter());
       auto [position, speed, shift, extra] = next;
-      ESP_LOGV("Strip::run::loop", "track: %d, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
+      ESP_LOGV("Strip::run::loop", "track: %ld, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
                shift);
     }
     pixels->show();
