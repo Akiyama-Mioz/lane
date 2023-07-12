@@ -38,6 +38,10 @@ public:
 
 class ConfigCharCallback : public NimBLECharacteristicCallbacks {
   Strip &strip;
+  int last_count = -1;
+  int last_total = 0;
+  size_t last_offset = 0;
+  void reset();
 public:
   void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) override;
 

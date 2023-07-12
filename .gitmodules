@@ -25,3 +25,6 @@
 [submodule "components/esp-protocols"]
 	path = components/esp-protocols
 	url = https://github.com/espressif/esp-protocols
+[submodule "components/idf-extra-components"]
+	path = components/idf-extra-components
+	url = https://github.com/espressif/idf-extra-components

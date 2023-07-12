@@ -17,6 +17,7 @@
 #include "track_config.pb.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+// #include "led_strip.h"
 
 const auto STRIP_PREF_RECORD_NAME = "record";
 const auto STRIP_BRIGHTNESS_KEY = "b";
@@ -35,6 +36,7 @@ const uint32_t STRIP_DEFAULT_CIRCLE_LENGTH = 400;
 static const int BLUE_TRANSMIT_INTERVAL_MS = 1000;
 static const int HALT_INTERVAL_MS = 100;
 static const int READY_INTERVAL_MS = 500;
+constexpr size_t STRIP_DECODE_BUFFER_SIZE = 2048;
 
 enum class StripError {
   OK = 0,
@@ -93,8 +95,11 @@ public:
   uint8_t brightness = 32;
   /// in meter
   float circle_length = STRIP_DEFAULT_CIRCLE_LENGTH;
+
+  // led_strip_handle_t led_strip;
   Adafruit_NeoPixel *pixels = nullptr;
   TrackStatus status = TrackStatus_STOP;
+    std::array<uint8_t, STRIP_DECODE_BUFFER_SIZE> decode_buffer = {0};
 
   // I don't know how to release the memory of the NimBLECharacteristic
   // or other BLE stuff. So I choose to not free the memory. (the device
@@ -169,6 +174,10 @@ public:
   void setCountLEDs(uint32_t count);
 
   void setCircleLength(float meter);
+
+    inline void resetDecodeBuffer() {
+        decode_buffer.fill(0);
+    }
 
 protected:
   Strip() = default;

@@ -7,21 +7,14 @@ message Color {
   int32 blue = 3;
 }
 
-message TupleIntFloat {
-  int32 dist = 1;
-  float speed =2;
-}
-
-enum Command {
-  ADD = 0;   // push to the vector
-  RESET = 1; // empty the vector then push
+message TrackData {
+  int32 id = 1;
+  map<int32, float> pace = 2;
+  Color color = 3;
 }
 
 message TrackConfig {
-  Command command = 1;
-  int32 id = 2;
-  repeated TupleIntFloat lst = 3;
-  Color color = 4;
+  repeated TrackData tracks = 1;
 }
 
 message TrackState {
@@ -43,4 +36,3 @@ enum TrackStatus {
 message TrackStatusMsg {
   TrackStatus status = 1;
 }
-

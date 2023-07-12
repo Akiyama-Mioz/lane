@@ -9,7 +9,10 @@
 PB_BIND(Color, Color, AUTO)
 
 
-PB_BIND(TupleIntFloat, TupleIntFloat, AUTO)
+PB_BIND(TrackData, TrackData, AUTO)
+
+
+PB_BIND(TrackData_PaceEntry, TrackData_PaceEntry, AUTO)
 
 
 PB_BIND(TrackConfig, TrackConfig, AUTO)
@@ -22,8 +25,4 @@ PB_BIND(TrackStates, TrackStates, AUTO)
 
 
 PB_BIND(TrackStatusMsg, TrackStatusMsg, AUTO)
-
-
-
-
 

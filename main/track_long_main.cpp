@@ -58,5 +58,8 @@ void app_main() {
   NimBLEDevice::startAdvertising();
   ESP_LOGI("MAIN", "Characteristic defined! Now you can read it in your phone!");
   pref.end();
+  for(;;){
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
 }
 

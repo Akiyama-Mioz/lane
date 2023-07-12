@@ -109,7 +109,7 @@ void Strip::ready(Instant &last_blink) const {
   if (millis > READY_INTERVAL_MS) {
     if (c % 2 == 0) {
       pixels->clear();
-      pixels->show();
+      // pixels->show();
     } else {
       auto constexpr front_count = 20;
       auto constexpr back_count = 20;
@@ -118,7 +118,7 @@ void Strip::ready(Instant &last_blink) const {
       pixels->clear();
       pixels->fill(front_color, 0, front_count);
       pixels->fill(back_color, getCircleLEDsNum() - back_count, back_count);
-      pixels->show();
+      // pixels->show();
     }
     c += 1;
     last_blink.reset();
@@ -129,7 +129,7 @@ void Strip::ready(Instant &last_blink) const {
 
 void Strip::stop() const {
   pixels->clear();
-  pixels->show();
+  // pixels->show();
   constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL_MS);
   vTaskDelay(delay);
 }
@@ -210,7 +210,7 @@ void Strip::run(std::vector<Track> &tracks) {
       ESP_LOGV("Strip::run::loop", "track: %ld, position: %.2f, speed: %.1f, shift: %.2f", track.id, position, speed,
                shift);
     }
-    pixels->show();
+    // pixels->show();
     // https://stackoverflow.com/questions/44831793/what-is-the-difference-between-vector-back-and-vector-end
     if (ceil(tracks.back().state.shift) >= totalLength) {
       ESP_LOGI("Strip::run", "Run finished last shift %f", tracks.back().state.shift);
@@ -251,7 +251,7 @@ void Strip::run(std::vector<Track> &tracks) {
 
 void Strip::stripTask() {
   pixels->clear();
-  pixels->show();
+  // pixels->show();
   auto instant = Instant();
   for (;;) {
     if (pixels != nullptr) {

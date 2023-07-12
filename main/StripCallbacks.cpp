@@ -4,6 +4,17 @@
 #include "StripCommon.h"
 #include "StripCallbacks.h"
 
+bool decode_map(pb_istream_t *stream, const pb_field_t *field, void **arg) {
+    auto m = (reinterpret_cast<std::map<int, float> *>(*arg));
+    TrackData_PaceEntry t = TrackData_PaceEntry_init_zero;
+    bool status = pb_decode(stream, TrackData_PaceEntry_fields, &t);
+    if (status) {
+        m->insert_or_assign(t.key, t.value);
+        return true;
+    } else {
+        return false;
+    }
+}
 
 void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) {
   auto data = characteristic->getValue();
@@ -33,72 +44,97 @@ void StatusCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
 }
 
 void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) {
-  auto data = characteristic->getValue();
-  if (strip.status != TrackStatus_STOP) {
-    ESP_LOGE("ConfigCharCallback", "Strip is not stopped, cannot change config");
-    characteristic->setValue(1);
-    return;
-  }
-  auto decode_tuple_list = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
-    auto &tuple_list = *(reinterpret_cast<std::vector<TupleIntFloat> *>(*arg)); // ok as reference
-    TupleIntFloat t = TupleIntFloat_init_zero;
-    bool status = pb_decode(stream, TupleIntFloat_fields, &t);
-    if (status) {
-      tuple_list.emplace_back(t);
-      return true;
-    } else {
-      return false;
+    auto data = characteristic->getValue();
+    ESP_LOGI("ConfigCharCallback", "Received %d bytes", data.length());
+    if (strip.status != TrackStatus_STOP) {
+        ESP_LOGE("ConfigCharCallback", "Strip is not stopped, cannot change config");
+        characteristic->setValue(1);
+        return;
     }
-  };
-  TrackConfig config = TrackConfig_init_zero;
-  pb_istream_t istream = pb_istream_from_buffer(data, data.length());
-  // https://stackoverflow.com/questions/7774938/in-c-will-the-vector-function-push-back-increase-the-size-of-an-empty-array
-  auto received_tuple = std::vector<TupleIntFloat>{};
-  received_tuple.reserve(15);
-  config.lst.arg = reinterpret_cast<void *>(&received_tuple);
-  config.lst.funcs.decode = decode_tuple_list;
-  bool success = pb_decode(&istream, TrackConfig_fields, &config);
-  if (!success) {
-    ESP_LOGE("Decode Config", "Error: Something goes wrong when decoding");
-    return;
-  }
-  auto m = std::map<int, float>{};
-  for (auto &t: received_tuple) {
-    m.insert_or_assign(t.dist, t.speed);
-  }
-  // prevent additional copy
-  auto retriever = ValueRetriever<float>(std::move(m));
-  auto track = Track{
-      .id = config.id,
-      .state = RunState{0, 0, 0, false},
-      .retriever = std::move(retriever),
-      .color = Adafruit_NeoPixel::Color(config.color.red, config.color.green, config.color.blue),
-  };
-  if (config.command == Command_ADD) {
-    ESP_LOGI("ConfigChar", "Add track id %ld", track.id);
-    bool isDuplicated = std::find_if(strip.tracks.begin(), strip.tracks.end(), [&track](const Track &t) {
-      return t.id == track.id;
-    }) != strip.tracks.end();
-    // If not present, it returns an iterator to one-past-the-end.
-    if (isDuplicated) {
-      ESP_LOGE("ConfigChar", "Duplicated track id %ld", track.id);
-      return;
+    // big endian
+    uint16_t total = data[0] << 8u | data[1];
+    uint8_t count = data[2];
+    uint8_t current_len = data[3];
+    ESP_LOGI("ConfigCharCallback", "total: %d, count: %d, current_len: %d", total, count, current_len);
+
+    if (total > STRIP_DECODE_BUFFER_SIZE) {
+        ESP_LOGE("ConfigCharCallback", "Invalid total: %d", total);
+        characteristic->setValue(1);
+        reset();
+        return;
     }
-    strip.tracks.emplace_back(std::move(track));
-    // sort the tracks by id from small to large.
-    std::sort(strip.tracks.begin(), strip.tracks.end(), [](const Track &a, const Track &b) {
-      return a.id < b.id;
-    });
-    // set the value of the characteristic to zero after finishing the operation.
-    strip.config_char->setValue(0);
-  } else if (config.command == Command_RESET) {
-    ESP_LOGI("ConfigChar", "Reset and add track id %ld", track.id);
-    strip.tracks.clear();
-    strip.tracks.emplace_back(std::move(track));
-    strip.config_char->setValue(0);
-  } else {
-    ESP_LOGE("ConfigCharCallback", "Invalid command: %d", config.command);
-  }
+
+    if (last_count + 1 != count) {
+        ESP_LOGE("ConfigCharCallback", "Invalid count: %d, last_count: %d", count, last_count);
+        characteristic->setValue(1);
+        reset();
+        return;
+    }
+
+    if (count != 0 && last_total != total) {
+        ESP_LOGE("ConfigCharCallback", "Invalid total: %d, last_total: %d", total, last_total);
+        characteristic->setValue(1);
+        reset();
+        return;
+    }
+
+    auto start = data.begin() + 4;
+    auto end = start + current_len;
+    std::copy(start, end, strip.decode_buffer.begin() + last_offset);
+    last_total = total;
+    last_count = count;
+    last_offset += current_len;
+    ESP_LOGI("ConfigCharCallback", "Received %d/%d", last_offset, last_total);
+    if (last_offset == last_total) {
+        strip.tracks.clear();
+        auto decode_tracks = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
+            auto &tracks_list = *(reinterpret_cast<std::vector<Track> *>(*arg));
+            auto m = std::map<int, float>{};
+            TrackData t = TrackData_init_zero;
+            t.pace.arg = reinterpret_cast<void *>(&m);
+            t.pace.funcs.decode = decode_map;
+            bool status = pb_decode(stream, TrackData_fields, &t);
+            if (status) {
+                if (m.empty()){
+                    ESP_LOGE("ConfigCharCallback", "empty pace");
+                } else {
+                    for (auto &p: m) {
+                        ESP_LOGD("ConfigCharCallback", "id:%ld, key: %d, value: %f", t.id, p.first, p.second);
+                    }
+                }
+                auto retriever = ValueRetriever<float>(std::move(m));
+                tracks_list.emplace_back(Track{
+                        .id = t.id,
+                        .state = RunState{0, 0, 0, false},
+                        .retriever = std::move(retriever),
+                        .color = Adafruit_NeoPixel::Color(t.color.red, t.color.green, t.color.blue),
+                });
+                return true;
+            } else {
+                return false;
+            }
+        };
+        TrackConfig config = TrackConfig_init_zero;
+        pb_istream_t istream = pb_istream_from_buffer(strip.decode_buffer.begin(), total);
+        config.tracks.arg = reinterpret_cast<void *>(&strip.tracks);
+        config.tracks.funcs.decode = decode_tracks;
+        bool success = pb_decode(&istream, TrackConfig_fields, &config);
+        if (!success) {
+            characteristic->setValue(1);
+            ESP_LOGE("ConfigCharCallback", "decode nanopb");
+        } else {
+            characteristic->setValue(0);
+            ESP_LOGI("ConfigCharCallback", "tracks size: %d", strip.tracks.size());
+        }
+        reset();
+    }
+}
+
+void ConfigCharCallback::reset() {
+    last_count = -1;
+    last_total = 0;
+    last_offset = 0;
+    this->strip.resetDecodeBuffer();
 }
 
 void OptionsCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo& connInfo) {
