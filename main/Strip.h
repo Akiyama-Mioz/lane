@@ -97,7 +97,7 @@ public:
   /// in meter
   float circle_length = STRIP_DEFAULT_CIRCLE_LENGTH;
 
-  led_strip_handle_t led_strip;
+  led_strip_handle_t led_strip = nullptr;
   TrackStatus status = TrackStatus_STOP;
     std::array<uint8_t, STRIP_DECODE_BUFFER_SIZE> decode_buffer = {0};
 

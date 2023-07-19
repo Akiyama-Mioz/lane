@@ -286,7 +286,10 @@ void Strip::stripTask() {
 /// i.e. Circle LEDs
 void Strip::setMaxLEDs(uint32_t new_max_LEDs) {
   max_LEDs = new_max_LEDs;
-  led_strip_del(led_strip);
+  if (led_strip != nullptr){
+    led_strip_del(led_strip);
+    led_strip = nullptr;
+  }
   led_strip_config_t strip_config = {
       .strip_gpio_num   = pin,              // The GPIO that connected to the LED strip's data line
       .max_leds         = max_LEDs,         // The number of LEDs in the strip,
