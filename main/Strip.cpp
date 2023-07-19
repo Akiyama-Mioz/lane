@@ -6,9 +6,9 @@
 #include "Strip.h"
 #include <ranges>
 
-// NEO_KHZ800
-const auto LED_STRIP_RMT_RES_HZ = 800 * 1000;
-// const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000);
+
+// the resolution is the clock frequency instead of strip frequency
+const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
 
 auto esp_random_binary() {
   auto n    = esp_random();
