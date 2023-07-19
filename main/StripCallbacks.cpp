@@ -26,7 +26,7 @@ void BrightnessCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBL
     ESP_LOGI("BrightnessCharCallback", "Brightness changed to %d", brightness);
   } else {
     ESP_LOGE("BrightnessCharCallback", "Invalid data length: %d", data.length());
-    characteristic->setValue(strip.pixels->getBrightness());
+    // characteristic->setValue(strip.pixels->getBrightness());
   }
 }
 

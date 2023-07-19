@@ -17,7 +17,7 @@
 #include "track_config.pb.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-// #include "led_strip.h"
+#include "led_strip.h"
 
 const auto STRIP_PREF_RECORD_NAME = "record";
 const auto STRIP_BRIGHTNESS_KEY = "b";
@@ -86,7 +86,8 @@ public:
 
   // it takes 90ms for 3000 LEDs so 10 it should be okay at 10 FPS
   constexpr static const float FPS = 10;
-  static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
+  // static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
+  static const led_pixel_format_t LED_PIXEL_FORMAT = LED_PIXEL_FORMAT_RGB;
   Preferences pref;
   int pin = 14;
   uint32_t max_LEDs = 0;

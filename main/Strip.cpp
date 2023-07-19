@@ -6,7 +6,9 @@
 #include "Strip.h"
 #include <ranges>
 
-const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000);
+// NEO_KHZ800
+const auto LED_STRIP_RMT_RES_HZ = 800 * 1000;
+// const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000);
 
 auto esp_random_binary() {
   auto n    = esp_random();
@@ -284,36 +286,24 @@ void Strip::stripTask() {
 /// i.e. Circle LEDs
 void Strip::setMaxLEDs(uint32_t new_max_LEDs) {
   max_LEDs = new_max_LEDs;
-  // delete already checks if the pointer is still pointing to a valid memory location.
-  // If it is already nullptr, then it does nothing
-  // free up the allocated memory from new
-  //  delete pixels;
-  //  // prevent dangling pointer
-  //  pixels = nullptr;
-  //  /**
-  //   * @note Adafruit_NeoPixel::updateLength(uint16_t n) has been deprecated and only for old projects that
-  //   *       may still be calling it. New projects should instead use the
-  //   *       'new' keyword with the first constructor syntax (length, pin,
-  //   *       type)
-  //   */
-  //  pixels = new Adafruit_NeoPixel(max_LEDs, pin, pixel_type);
-  //  pixels->setBrightness(brightness);
-  //  pixels->begin();
   led_strip_del(led_strip);
-  // LED strip general initialization, according to your led board design
   led_strip_config_t strip_config = {
-      .strip_gpio_num   = pin,                  // The GPIO that connected to the LED strip's data line
-      .max_leds         = max_LEDs,             // The number of LEDs in the strip,
-      .led_pixel_format = LED_PIXEL_FORMAT_GRB, // Pixel format of your LED strip
-      .led_model        = LED_MODEL_WS2812,     // LED strip model
-      .flags.invert_out = false,                // whether to invert the output signal
+      .strip_gpio_num   = pin,              // The GPIO that connected to the LED strip's data line
+      .max_leds         = max_LEDs,         // The number of LEDs in the strip,
+      .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
+      .led_model        = LED_MODEL_WS2812, // LED strip model
+      .flags            = {
+                     .invert_out = false // whether to invert the output signal
+      },
   };
 
   // LED strip backend configuration: RMT
   led_strip_rmt_config_t rmt_config = {
-      .clk_src        = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
-      .resolution_hz  = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
-      .flags.with_dma = false,                // DMA feature is available on ESP target like ESP32-S3
+      .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
+      .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
+      .flags         = {
+                  .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+      },
   };
   led_strip_handle_t new_handle;
   ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &new_handle));
@@ -390,25 +380,26 @@ StripError Strip::begin(int16_t PIN, uint8_t brightness) {
 
     // LED strip general initialization, according to your led board design
     led_strip_config_t strip_config = {
-        .strip_gpio_num   = PIN,                  // The GPIO that connected to the LED strip's data line
-        .max_leds         = max_LEDs,             // The number of LEDs in the strip,
-        .led_pixel_format = LED_PIXEL_FORMAT_GRB, // Pixel format of your LED strip
-        .led_model        = LED_MODEL_WS2812,     // LED strip model
-        .flags.invert_out = false,                // whether to invert the output signal
+        .strip_gpio_num   = pin,              // The GPIO that connected to the LED strip's data line
+        .max_leds         = max_LEDs,         // The number of LEDs in the strip,
+        .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
+        .led_model        = LED_MODEL_WS2812, // LED strip model
+        .flags            = {
+            .invert_out = false // whether to invert the output signal
+        },
     };
 
     // LED strip backend configuration: RMT
     led_strip_rmt_config_t rmt_config = {
-        .clk_src        = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
-        .resolution_hz  = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
-        .flags.with_dma = false,                // DMA feature is available on ESP target like ESP32-S3
+        .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
+        .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
+        .flags         = {
+            .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+        },
     };
     led_strip_handle_t handle;
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &handle));
-    led_strip = handle;
-    //    pixels = new Adafruit_NeoPixel(max_LEDs, PIN, pixel_type);
-    //    pixels->begin();
-    //    pixels->setBrightness(brightness);
+    led_strip      = handle;
     is_initialized = true;
     return StripError::OK;
   } else {
@@ -417,10 +408,6 @@ StripError Strip::begin(int16_t PIN, uint8_t brightness) {
 }
 
 void Strip::setBrightness(const uint8_t new_brightness) {
-  //  if (pixels != nullptr) {
-  //    brightness = new_brightness;
-  //    pixels->setBrightness(brightness);
-  //  }
   // just do nothing since the library does not support brightness
 }
 
