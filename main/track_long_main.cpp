@@ -38,12 +38,12 @@ void app_main() {
     pStrip->stripTask();
   };
   // using singleton pattern to avoid memory leak
-  auto pStrip = Strip::get();
-  pStrip->setCircleLength(circle_length);
-  pStrip->setCountLEDs(track_num);
-  pStrip->setMaxLEDs(circle_num);
-  pStrip->begin(LED_PIN, brightness);
-  pStrip->initBLE(pServer);
+  auto& pStrip = *Strip::get();
+  pStrip.setCircleLength(circle_length);
+  pStrip.setCountLEDs(track_num);
+  pStrip.setMaxLEDs(circle_num);
+  pStrip.begin(LED_PIN, brightness);
+  pStrip.initBLE(pServer);
 
   auto pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(BLE_NAME);
@@ -51,7 +51,7 @@ void app_main() {
 
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
               "stripTask", 5120,
-              pStrip, configMAX_PRIORITIES - 3,
+              &pStrip, configMAX_PRIORITIES - 3,
               nullptr);
 
   pServer->start();

@@ -7,11 +7,11 @@
 
 #include "esp_random.h"
 #include "utils.h"
-#include <Adafruit_NeoPixel.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
 #include "Preferences.h"
+#include "led_strip.h"
 #include "map"
 #include "vector"
 #include "track_config.pb.h"
@@ -71,7 +71,7 @@ public:
   }
 
   RunState
-  updateStrip(Adafruit_NeoPixel *pixels, float circle_length, float track_length, float fps, float LEDs_per_meter);
+  updateStrip(led_strip_handle_t handle, float circle_length, float track_length, float fps, float LEDs_per_meter);
 };
 
 class Strip {
@@ -96,8 +96,7 @@ public:
   /// in meter
   float circle_length = STRIP_DEFAULT_CIRCLE_LENGTH;
 
-  // led_strip_handle_t led_strip;
-  Adafruit_NeoPixel *pixels = nullptr;
+  led_strip_handle_t led_strip;
   TrackStatus status = TrackStatus_STOP;
     std::array<uint8_t, STRIP_DECODE_BUFFER_SIZE> decode_buffer = {0};
 
