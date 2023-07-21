@@ -83,6 +83,7 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     // You should run this in a new thread because the callback is blocking.
     // Never block the scanning thread
     // copilot generated. I don't expect this will work
+    // TODO: delete the task instead of use nullptr since it would be called multiple times and we can't risk memory leak
     xTaskCreate([](void *cb) {
       auto *f = reinterpret_cast<std::function<void()> *>(cb);
       (*f)();
