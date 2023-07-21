@@ -15,8 +15,8 @@
 #include <esp_timer.h>
 
 std::string to_hex(const std::basic_string<char> &s);
-
 std::string to_hex(const char *s, size_t len);
+std::string to_hex(const uint8_t *s, size_t len);
 
 /**
  * @brief a function retrieve value by the number nearing the key. always move a unit up.

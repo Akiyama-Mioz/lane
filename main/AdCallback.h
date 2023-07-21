@@ -8,13 +8,15 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include <map>
+#include <etl/flat_map.h>
+#include <etl/vector.h>
 #include "ble.pb.h"
 
+using DeviceMap = etl::flat_map<std::string, BLEClient*, 10>;
 
 class AdCallback : public BLEAdvertisedDeviceCallbacks {
   NimBLECharacteristic *characteristic = nullptr;
-  // deviceName, payload
-  std::map<std::string, std::string> lastDevices;
+  DeviceMap devices;
 
   /**
    * @brief callback when a device is found

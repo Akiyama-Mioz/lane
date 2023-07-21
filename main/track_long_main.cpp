@@ -25,11 +25,11 @@ void app_main() {
   auto brightness    = pref.getUChar(STRIP_BRIGHTNESS_KEY, 32);
   auto circle_num    = pref.getUInt(STRIP_CIRCLE_LEDs_NUM_KEY, STRIP_DEFAULT_CIRCLE_LEDs_NUM);
   auto track_num     = pref.getUInt(STRIP_TRACK_LEDs_NUM_KEY, STRIP_DEFAULT_TRACK_LEDs_NUM);
-  auto circle_length = pref.getFloat(STRIP_CIRCLE_LENGTH_KEY, STRIP_DEFAULT_CIRCLE_LENGTH);
+  auto circle_length = pref.getFloat(STRIP_CIRCLE_LENGTH_KEY, STRIP_DEFAULT_FULL_LINE_LENGTH);
 
   NimBLEDevice::init(BLE_NAME);
-  auto &ble_server = *NimBLEDevice::createServer();
-  ble_server.setCallbacks(new ServerCallbacks());
+  auto &server = *NimBLEDevice::createServer();
+  server.setCallbacks(new ServerCallbacks());
 
   /**** Initialize NeoPixel. ****/
   /** an aux function used to let FreeRTOS do it work.
@@ -45,22 +45,40 @@ void app_main() {
   strip.setCountLEDs(track_num);
   strip.setMaxLEDs(circle_num);
   strip.begin(LED_PIN, brightness);
-  strip.initBLE(&ble_server);
+  strip.initBLE(&server);
 
-  auto &pAdvertising = *NimBLEDevice::getAdvertising();
-  pAdvertising.setName(BLE_NAME);
-  pAdvertising.setScanResponse(false);
+  auto &ad = *NimBLEDevice::getAdvertising();
+  ad.setName(BLE_NAME);
+  ad.setScanResponse(false);
 
   xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
               "stripTask", 5120,
               &strip, configMAX_PRIORITIES - 3,
               nullptr);
 
-  ble_server.start();
+  server.start();
   NimBLEDevice::startAdvertising();
-  ESP_LOGI("MAIN", "Characteristic defined! Now you can read it in your phone!");
+  auto &scan = *BLEDevice::getScan();
+  // get list of connected devices here
+  auto pScanCb = new AdCallback(nullptr);
+  scan.setScanCallbacks(pScanCb);
+  scan.setInterval(1349);
+  scan.setWindow(449);
+  scan.setActiveScan(true);
+  auto scanTime = std::chrono::milliseconds(3000);
+  // scan time + sleep time
+  auto scanTotalTime = std::chrono::milliseconds(5000);
+  ESP_LOGI("MAIN", "Initiated");
   pref.end();
+  // scan forever
   for (;;) {
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+//    auto founded = scan.getResults(scanTime.count());
+//    ESP_LOGI("SCAN", "Found %d devices", founded.getCount());
+//    for (auto &device :founded){
+//      ESP_LOGI("SCAN", "%s::%s", device->getName().c_str(), device->getAddress().toString().c_str());
+//    }
+//    scan.clearResults();
+    scan.start(scanTime.count(), false);
+    vTaskDelay(scanTotalTime.count() / portTICK_PERIOD_MS);
   }
 }
