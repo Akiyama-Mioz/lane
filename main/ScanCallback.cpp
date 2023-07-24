@@ -2,7 +2,7 @@
 // Created by Kurosu Chan on 2022/8/4.
 //
 
-#include "AdCallback.h"
+#include "ScanCallback.h"
 #include <thread>
 #include <esp_pthread.h>
 #include <freertos/FreeRTOS.h>
@@ -11,18 +11,23 @@
 static auto TAG        = "AdCallback";
 static auto NOTIFY_TAG = "NotifyCallback";
 
-void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
-  auto name                = advertisedDevice->getName();
-  auto payload             = std::string(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31);
+struct ScanCallbackParam {
+  std::function<void()> *cb;
+  TaskHandle_t handle;
+};
+
+void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
+  auto name    = advertisedDevice->getName();
+  auto payload = std::string(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31);
   if (advertisedDevice->getName().find("T03") != std::string::npos) {
     ESP_LOGI(TAG, "Name: %s, Data: %s, RSSI: %d", name.c_str(),
              to_hex(payload.c_str(), 31).c_str(),
              advertisedDevice->getRSSI());
-    auto& device_map = this->devices;
-    bool is_scanned = device_map.find(name) != device_map.end();
-    bool is_connected = [is_scanned, name, &device_map](){
-      if(is_scanned){
-        auto& client = *device_map.at(name);
+    auto &device_map  = this->devices;
+    bool is_scanned   = device_map.find(name) != device_map.end();
+    bool is_connected = [is_scanned, name, &device_map]() {
+      if (is_scanned) {
+        auto &client = *device_map.at(name);
         return client.isConnected();
       }
       return false;
@@ -30,8 +35,10 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     if (is_connected) {
       return;
     }
-    auto cb = [advertisedDevice, name, &device_map](){
-      auto configClient = [advertisedDevice, &name](BLEClient& client){
+
+    // allocate in heap
+    auto cb = [advertisedDevice, name, &device_map]() {
+      auto configClient = [advertisedDevice, &name](BLEClient &client) {
         const auto serviceUUID   = "180D";
         const auto heartRateUUID = "2A37";
         client.connect(advertisedDevice);
@@ -54,10 +61,10 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
           return;
         }
         auto notify = [name](
-            NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
-            const uint8_t *pData,
-            size_t length,
-            bool isNotify) {
+                          NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
+                          const uint8_t *pData,
+                          size_t length,
+                          bool isNotify) {
           if (length >= 2) {
             // the first byte is always 0x04. the second byte is the heart rate.
             auto hr = pData[1];
@@ -80,30 +87,30 @@ void AdCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
         }
       }
     };
+    auto param = new ScanCallbackParam{
+        new std::function<void()>(cb),
+        nullptr};
     // You should run this in a new thread because the callback is blocking.
     // Never block the scanning thread
-    // copilot generated. I don't expect this will work
-    // TODO: delete the task instead of use nullptr since it would be called multiple times and we can't risk memory leak
-    xTaskCreate([](void *cb) {
-      auto *f = reinterpret_cast<std::function<void()> *>(cb);
+    // copilot generated. I don't expect this will work, but somehow it works.
+    auto res = xTaskCreate([](void *cb) {
+      auto &param = *reinterpret_cast<ScanCallbackParam *>(cb);
+      auto f      = param.cb;
       (*f)();
       delete f;
-      vTaskDelete(nullptr);
-    }, "connect", 4096, new std::function<void()>(cb), 1, nullptr);
+      if (param.handle != nullptr) {
+        vTaskDelete(param.handle);
+      }
+      delete &param;
+    },
+                           "connect", 4096, param, 1, &param->handle);
+    if (res != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create task");
+      delete param;
+      return;
+    }
   }
 }
-
-// void ServerCallbacks::onConnect(NimBLEServer *pServer, ble_gap_conn_desc *desc) {
-//  ESP_LOGI("onConnect", "Client address: %s", NimBLEAddress(desc->peer_ota_addr).toString().c_str());
-//  /** We can use the connection handle here to ask for different connection parameters.
-//   *  Args: connection handle, min connection interval, max connection interval
-//   *  latency, supervision timeout.
-//   *  Units; Min/Max Intervals: 1.25 millisecond increments.
-//   *  Latency: number of intervals allowed to skip.
-//   *  Timeout: 10 millisecond increments, try for 5x interval time for best results.
-//   */
-//  pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
-//}
 
 /** Alternative onConnect() method to extract details of the connection.
  *  See: src/ble_gap.h for the details of the ble_gap_conn_desc struct.

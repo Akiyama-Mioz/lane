@@ -8,7 +8,7 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "StripCommon.h"
-#include "AdCallback.h"
+#include "ScanCallback.h"
 
 extern "C" {
 void app_main();
@@ -60,24 +60,18 @@ void app_main() {
   NimBLEDevice::startAdvertising();
   auto &scan = *BLEDevice::getScan();
   // get list of connected devices here
-  auto pScanCb = new AdCallback(nullptr);
+  auto pScanCb = new ScanCallback(nullptr);
   scan.setScanCallbacks(pScanCb);
   scan.setInterval(1349);
   scan.setWindow(449);
   scan.setActiveScan(true);
-  auto scanTime = std::chrono::milliseconds(3000);
+  const auto scanTime = std::chrono::milliseconds(3000);
   // scan time + sleep time
-  auto scanTotalTime = std::chrono::milliseconds(5000);
+  const auto scanTotalTime = std::chrono::milliseconds(5000);
   ESP_LOGI("MAIN", "Initiated");
   pref.end();
   // scan forever
   for (;;) {
-//    auto founded = scan.getResults(scanTime.count());
-//    ESP_LOGI("SCAN", "Found %d devices", founded.getCount());
-//    for (auto &device :founded){
-//      ESP_LOGI("SCAN", "%s::%s", device->getName().c_str(), device->getAddress().toString().c_str());
-//    }
-//    scan.clearResults();
     scan.start(scanTime.count(), false);
     vTaskDelay(scanTotalTime.count() / portTICK_PERIOD_MS);
   }

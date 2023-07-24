@@ -14,7 +14,7 @@
 
 using DeviceMap = etl::flat_map<std::string, BLEClient*, 10>;
 
-class AdCallback : public BLEAdvertisedDeviceCallbacks {
+class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   NimBLECharacteristic *characteristic = nullptr;
   DeviceMap devices;
 
@@ -27,7 +27,7 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice *advertisedDevice) override;
 
 public:
-  explicit AdCallback(NimBLECharacteristic *c) : characteristic(c) {}
+  explicit ScanCallback(NimBLECharacteristic *c) : characteristic(c) {}
 };
 
 class ServerCallbacks : public NimBLEServerCallbacks {
