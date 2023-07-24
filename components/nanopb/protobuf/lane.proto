@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+message LaneLengthConfig {
+  uint32 lane_total_length_cm = 1;
+  uint32 lace_active_length_cm = 2;
+  uint32 lace_leds_num = 3;
+  // we could calculate the distance between each led with the above two
+}
+
+enum LaneStatus {
+  FORWARD = 0;
+  BACKWARD = 1;
+  STOP = 2;
+}
+
+message LaneColorConfig {
+  uint32 rgb = 1;
+  // reserved
+  reserved 2;
+}
+
+message LaneSetStatus {
+  LaneStatus status = 1;
+}
+
+message LaneSetSpeed {
+  // in m/s
+  double speed = 1;
+}
+
+message LaneMessage {
+  oneof msg {
+    LaneLengthConfig length_cfg = 1;
+    LaneColorConfig color_cfg = 2;
+    LaneSetStatus set_status = 3;
+    LaneSetSpeed set_speed = 4;
+  }
+}

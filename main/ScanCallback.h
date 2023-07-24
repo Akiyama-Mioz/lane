@@ -12,7 +12,7 @@
 #include <etl/vector.h>
 #include "ble.pb.h"
 
-using DeviceMap = etl::flat_map<std::string, BLEClient*, 10>;
+using DeviceMap = etl::flat_map<int, BLEClient*, 10>;
 
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   NimBLECharacteristic *characteristic = nullptr;
@@ -28,6 +28,7 @@ class ScanCallback : public BLEAdvertisedDeviceCallbacks {
 
 public:
   explicit ScanCallback(NimBLECharacteristic *c) : characteristic(c) {}
+  DeviceMap& getDevices() { return devices; }
 };
 
 class ServerCallbacks : public NimBLEServerCallbacks {

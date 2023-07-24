@@ -3,7 +3,8 @@
 //
 
 #include "ScanCallback.h"
-#include <thread>
+#include <string_view>
+#include <charconv>
 #include <esp_pthread.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -24,10 +25,20 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
              to_hex(payload.c_str(), 31).c_str(),
              advertisedDevice->getRSSI());
     auto &device_map  = this->devices;
-    bool is_scanned   = device_map.find(name) != device_map.end();
-    bool is_connected = [is_scanned, name, &device_map]() {
+    // return the start of the band id (index)
+    // add with additional space
+    auto brand_pos = name.find("T03") + 4;
+    auto band_id_str = std::string_view(name).substr(brand_pos, name.length() - brand_pos);
+    int band_id;
+    auto [ptr, ec] = std::from_chars(band_id_str.data(), band_id_str.data() + band_id_str.size(), band_id);
+    if (ec != std::errc()) {
+      ESP_LOGE(TAG, "Failed to parse band id: %s", band_id_str.data());
+      return;
+    }
+    bool is_scanned   = device_map.find(band_id) != device_map.end();
+    bool is_connected = [is_scanned, band_id, &device_map]() {
       if (is_scanned) {
-        auto &client = *device_map.at(name);
+        auto &client = *device_map.at(band_id);
         return client.isConnected();
       }
       return false;
@@ -37,7 +48,7 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     }
 
     // allocate in heap
-    auto cb = [advertisedDevice, name, &device_map]() {
+    auto cb = [advertisedDevice, name, band_id, &device_map]() {
       auto configClient = [advertisedDevice, &name](BLEClient &client) {
         const auto serviceUUID   = "180D";
         const auto heartRateUUID = "2A37";
@@ -76,12 +87,12 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
         pCharacteristic->subscribe(true, notify);
         ESP_LOGI(TAG, "Connected to %s", name.c_str());
       };
-      if (device_map.find(name) == device_map.end()) {
+      if (device_map.find(band_id) == device_map.end()) {
         auto &client = *BLEDevice::createClient();
         configClient(client);
-        device_map.insert(etl::pair(name, &client));
+        device_map.insert(etl::pair(band_id, &client));
       } else {
-        auto &client = *device_map.at(name);
+        auto &client = *device_map.at(band_id);
         if (!client.isConnected()) {
           configClient(client);
         }
