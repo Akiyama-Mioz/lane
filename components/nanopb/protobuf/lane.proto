@@ -28,11 +28,30 @@ message LaneSetSpeed {
   double speed = 1;
 }
 
-message LaneMessage {
+// go through Control Characteristic via Notify/Read
+message LaneState {
+  LaneStatus status = 1;
+  /// the distance between the start/end of the lane and the head of trail
+  /// if the status is FORWARD, the head is the distance from the start
+  /// if the status is BACKWARD, the head is the distance from the end
+  uint32 head_cm = 2;
+}
+
+// use to config the lane
+// go through Config Characteristic
+message LaneConfig {
   oneof msg {
     LaneLengthConfig length_cfg = 1;
     LaneColorConfig color_cfg = 2;
-    LaneSetStatus set_status = 3;
-    LaneSetSpeed set_speed = 4;
+  }
+}
+
+// use to control the lane
+// go through Control Characteristic vid Write. The lane would clear the characteristic after processing and
+// replace the buffer with `LaneState`
+message LaneControl {
+  oneof msg {
+    LaneSetStatus set_status = 1;
+    LaneSetSpeed set_speed = 2;
   }
 }

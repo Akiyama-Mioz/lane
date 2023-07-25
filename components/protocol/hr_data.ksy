@@ -7,6 +7,11 @@ doc: |
 seq:
   - id: num_pairs
     type: u1
+  - id: updated_id
+    type: u1
+    doc:|
+        Which band was updated. Only one band is updated at a time.
+        You should iterate over the pairs and find the one that matches.
   - id: pairs
     type: pair
     repeat: expr

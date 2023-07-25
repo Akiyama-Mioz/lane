@@ -4,7 +4,7 @@
 
 #ifndef HELLO_WORLD_STRIPCOMMON_H
 #define HELLO_WORLD_STRIPCOMMON_H
-#include "StripCallbacks.h"
-#include "Strip.h"
+#include "LaneCallbacks.h"
+#include "Lane.h"
 
 #endif //HELLO_WORLD_STRIPCOMMON_H

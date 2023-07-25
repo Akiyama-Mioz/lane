@@ -73,10 +73,19 @@ public:
   updateStrip(led_strip_handle_t handle, float circle_length, float track_length, float fps, float LEDs_per_meter);
 };
 
-class Strip {
+struct LaneBLE {
+  // I don't know how to release the memory of the NimBLECharacteristic
+  // or other BLE stuff. So I choose to not free the memory. (the device
+  // should be always alive with BLE anyway.)
+  NimBLECharacteristic *ctrl_char       = nullptr;
+  NimBLECharacteristic *config_char     = nullptr;
+
+  NimBLEService *service         = nullptr;
+};
+
+class Lane {
 protected:
   bool is_initialized     = false;
-  bool is_ble_initialized = false;
 
 public:
   float getLEDsPerMeter() const;
@@ -101,24 +110,7 @@ public:
   TrackStatus status                                          = TrackStatus_STOP;
   std::array<uint8_t, STRIP_DECODE_BUFFER_SIZE> decode_buffer = {0};
 
-  // I don't know how to release the memory of the NimBLECharacteristic
-  // or other BLE stuff. So I choose to not free the memory. (the device
-  // should be always alive with BLE anyway.)
-  NimBLECharacteristic *status_char     = nullptr;
-  NimBLECharacteristic *brightness_char = nullptr;
-  NimBLECharacteristic *options_char    = nullptr;
-  NimBLECharacteristic *config_char     = nullptr;
-  NimBLECharacteristic *state_char      = nullptr;
-
-  NimBLEService *service         = nullptr;
-  const char *LIGHT_SERVICE_UUID = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
-
-  const char *LIGHT_CHAR_BRIGHTNESS_UUID = "e3ce8b08-4bb9-4696-b862-3e62a1100adc";
-  const char *LIGHT_CHAR_STATUS_UUID     = "24207642-0d98-40cd-84bb-910008579114";
-  const char *LIGHT_CHAR_OPTIONS_CHAR    = "9f5806ba-a71b-4194-9854-5d76698200de";
-  const char *LIGHT_CHAR_CONFIG_UUID     = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
-  const char *LIGHT_CHAR_STATE_UUID      = "ed3eefa1-3c80-b43f-6b65-e652374650b5";
-
+  LaneBLE ble;
   std::vector<Track> tracks = std::vector<Track>{};
 
   /**
@@ -128,9 +120,11 @@ public:
    * @param void void
    * @return No return
    */
-  [[noreturn]] void stripTask();
+  [[noreturn]] void loop();
 
-  StripError initBLE(NimBLEServer *server);
+  void setBLE(LaneBLE ble) {
+    this->ble = ble;
+  };
 
   /**
    * @brief sets the maximum number of LEDs that can be used. i.e. Circle Length.
@@ -153,18 +147,18 @@ public:
    */
   void setStatusNotify(TrackStatus s);
 
-  static Strip *get();
+  static Lane *get();
 
-  Strip(Strip const &) = delete;
+  Lane(Lane const &) = delete;
 
-  Strip &operator=(Strip const &) = delete;
+  Lane &operator=(Lane const &) = delete;
 
-  Strip(Strip &&) = delete;
+  Lane(Lane &&) = delete;
 
-  Strip &operator=(Strip &&) = delete;
+  Lane &operator=(Lane &&) = delete;
 
   // usually you won't destruct it because it's running in MCU and the resource will not be released
-  ~Strip() = delete;
+  ~Lane() = delete;
 
   StripError
   begin(int16_t PIN, uint8_t brightness);
@@ -179,7 +173,7 @@ public:
   }
 
 protected:
-  Strip() = default;
+  Lane() = default;
 
   void run(std::vector<Track> &tracks);
 

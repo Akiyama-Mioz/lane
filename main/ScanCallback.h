@@ -22,7 +22,9 @@ struct DeviceInfo {
 using DeviceMap = etl::flat_map<uint16_t, DeviceInfo*, 10>;
 
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
-  NimBLECharacteristic *characteristic = nullptr;
+  // the characteristic to send the heart rate data to the client with the format described in
+  // `hr_data.ksy`
+  NimBLECharacteristic *hr_char = nullptr;
   DeviceMap devices;
 
   /**
@@ -34,7 +36,7 @@ class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice *advertisedDevice) override;
 
 public:
-  explicit ScanCallback(NimBLECharacteristic *c) : characteristic(c) {}
+  explicit ScanCallback(NimBLECharacteristic *c) : hr_char(c) {}
   DeviceMap& getDevices() { return devices; }
 };
 

@@ -1,9 +1,9 @@
 idf_component_register(SRCS
-        track_long_main.cpp
-        Strip.cpp
+        lane_main.cpp
+        Lane.cpp
         ScanCallback.cpp
         utils.cpp
-        StripCallbacks.cpp
+        LaneCallbacks.cpp
         INCLUDE_DIRS
         REQUIRES spi_flash esp_partition
         nanopb esp_timer arduino-libs
