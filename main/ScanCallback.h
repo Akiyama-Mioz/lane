@@ -12,7 +12,14 @@
 #include <etl/vector.h>
 #include "ble.pb.h"
 
-using DeviceMap = etl::flat_map<int, BLEClient*, 10>;
+struct DeviceInfo {
+  BLEClient* client;
+  int64_t last_seen;
+  uint8_t last_hr;
+};
+
+/// Should not touch the info pointer (Read Only)
+using DeviceMap = etl::flat_map<uint16_t, DeviceInfo*, 10>;
 
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   NimBLECharacteristic *characteristic = nullptr;

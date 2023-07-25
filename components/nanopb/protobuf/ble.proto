@@ -7,6 +7,3 @@ message BLEAdvertisingData {
   // Uses Variable Length Encoding. They are efficient in encoding for negative numbers.
   sint32 rssi = 3;
 }
-
-message
-
