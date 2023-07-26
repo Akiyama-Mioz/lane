@@ -51,11 +51,11 @@ extern "C" void app_main() {
   initArduino();
 
   Preferences pref;
-  pref.begin(STRIP_PREF_RECORD_NAME, true);
-  auto brightness    = pref.getUChar(STRIP_BRIGHTNESS_KEY, 32);
-  auto circle_num    = pref.getUInt(STRIP_CIRCLE_LEDs_NUM_KEY, STRIP_DEFAULT_CIRCLE_LEDs_NUM);
-  auto track_num     = pref.getUInt(STRIP_TRACK_LEDs_NUM_KEY, STRIP_DEFAULT_TRACK_LEDs_NUM);
-  auto circle_length = pref.getFloat(STRIP_CIRCLE_LENGTH_KEY, STRIP_DEFAULT_FULL_LINE_LENGTH);
+  pref.begin(LANE_PREF_RECORD_NAME, true);
+  auto brightness    = pref.getUChar(LANE_BRIGHTNESS_KEY, 32);
+  auto circle_num    = pref.getUInt(LANE_CIRCLE_LEDs_NUM_KEY, LANE_DEFAULT_CIRCLE_LEDs_NUM);
+  auto track_num     = pref.getUInt(LANE_TRACK_LEDs_NUM_KEY, LANE_DEFAULT_TRACK_LEDs_NUM);
+  auto circle_length = pref.getFloat(LANE_CIRCLE_LENGTH_KEY, LANE_DEFAULT_LINE_LENGTH);
 
   NimBLEDevice::init(BLE_NAME);
   auto &server = *NimBLEDevice::createServer();

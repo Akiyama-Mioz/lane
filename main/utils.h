@@ -13,6 +13,7 @@
 #include <pb_encode.h>
 #include <map>
 #include <esp_timer.h>
+#include <concepts>
 
 std::string to_hex(const std::basic_string<char> &s);
 std::string to_hex(const char *s, size_t len);
@@ -27,11 +28,11 @@ std::string to_hex(const uint8_t *s, size_t len);
  * @param val a value you want
  * @return T
  */
-template<typename T>
+template <typename T>
 T retrieveByVal(std::vector<int> const &keys, std::map<int, T> const &m, int val) {
   size_t idx = 0;
   // since keys is sorted we can get result easily
-  for (auto key: keys) {
+  for (auto key : keys) {
     if (val < key) {
       break;
     }
@@ -43,15 +44,15 @@ T retrieveByVal(std::vector<int> const &keys, std::map<int, T> const &m, int val
   return m.at(keys[idx]);
 }
 
-template<class T>
+template <class T>
 class ValueRetriever {
 private:
   std::map<int, T> m;
   std::vector<int> keys;
   int max_key = 0;
+
 public:
-  [[nodiscard]]
-  int getMaxKey() const {
+  [[nodiscard]] int getMaxKey() const {
     return max_key;
   }
 
@@ -59,8 +60,7 @@ public:
     return m;
   }
 
-  [[nodiscard]]
-  const std::vector<int> &getKeys() const {
+  [[nodiscard]] const std::vector<int> &getKeys() const {
     return keys;
   }
 
@@ -81,7 +81,7 @@ public:
   void updateKeys() {
     keys.clear();
     // https://stackoverflow.com/questions/26281979/c-loop-through-map
-    for (auto &[k, v]: m) {
+    for (auto &[k, v] : m) {
       keys.push_back(k);
     }
     std::sort(keys.begin(), keys.end());
@@ -98,7 +98,7 @@ public:
  *        This exists because the need for
  * @warning: T must be a pointer type (with a little star behind it)
  */
-template<class T>
+template <class T>
 struct PbEncodeCallback {
   using PbEncodeFunc = bool (*)(pb_ostream_t *stream, const pb_field_t *field, T const *arg);
   using PbEncodeVoid = bool (*)(pb_ostream_t *stream, const pb_field_t *field, void *const *arg);
@@ -135,8 +135,11 @@ struct PbEncodeCallback {
   // PbEncodeCallback() = delete;
 };
 
+using tp = decltype(std::chrono::steady_clock::now());
+
 class Instant {
-  decltype(std::chrono::steady_clock::now()) time;
+  tp time;
+
 public:
   Instant() {
     this->time = std::chrono::steady_clock::now();
@@ -144,20 +147,20 @@ public:
 
   /// get the difference between now and the time Instant declared
   auto elapsed() {
-    auto now = std::chrono::steady_clock::now();
+    auto now      = std::chrono::steady_clock::now();
     auto duration = now - this->time;
     return duration;
   }
 
-  void reset(){
-    auto now = std::chrono::steady_clock::now();
+  void reset() {
+    auto now   = std::chrono::steady_clock::now();
     this->time = now;
   }
 
   auto elapsed_and_reset() {
-    auto now = std::chrono::steady_clock::now();
+    auto now      = std::chrono::steady_clock::now();
     auto duration = now - this->time;
-    this->time = now;
+    this->time    = now;
     return duration;
   }
 
@@ -169,27 +172,28 @@ public:
 
 class ESPInstant {
   decltype(esp_timer_get_time()) time;
+
 public:
   ESPInstant() {
     this->time = esp_timer_get_time();
   }
 
   auto elapsed() {
-    auto now = esp_timer_get_time();
-    auto diff = now - this->time;
+    auto now      = esp_timer_get_time();
+    auto diff     = now - this->time;
     auto duration = std::chrono::duration<int64_t, std::micro>(diff);
     return duration;
   }
 
-  void reset(){
-    auto now = esp_timer_get_time();
+  void reset() {
+    auto now   = esp_timer_get_time();
     this->time = now;
   }
 
   auto elapsed_and_reset() {
-    auto now = esp_timer_get_time();
+    auto now      = esp_timer_get_time();
     auto duration = now - this->time;
-    this->time = now;
+    this->time    = now;
     return duration;
   }
 
@@ -198,5 +202,56 @@ public:
   }
 };
 
+namespace utils {
+template <typename T>
+concept is_intmax_t = std::is_same_v<T, decltype(std::ratio<1>::num) &>;
 
-#endif //HELLO_WORLD_UTILS_H
+template <typename T>
+concept is_ratio = requires(T t) {
+  { t.num } -> is_intmax_t;
+  { t.den } -> is_intmax_t;
+};
+
+template <class Rep, class RI = std::ratio<1>>
+  requires is_ratio<RI> && std::is_arithmetic_v<Rep>
+class length {
+  Rep value;
+
+public:
+  using rep   = Rep;
+  using ratio = RI;
+  Rep count() const {
+    return value;
+  }
+  length() = default;
+  explicit length(Rep rep) : value(rep) {}
+};
+
+template <class FromLength, class ToLength,
+          class RI = typename std::ratio_divide<typename FromLength::ratio, typename ToLength::ratio>::type>
+struct __length_cast {
+  ToLength operator()(const FromLength &fl) const {
+    using _Ct = typename std::common_type<typename FromLength::rep, typename ToLength::rep, intmax_t>::type;
+    return ToLength(static_cast<typename ToLength::rep>(
+        static_cast<_Ct>(fl.count()) * static_cast<_Ct>(RI::num) / static_cast<_Ct>(RI::den)));
+  };
+};
+
+template <class ToLength, class Rep, class RI>
+requires std::is_arithmetic_v<Rep> && is_ratio<RI>
+ToLength length_cast(const length<Rep, RI> &fl) {
+  return __length_cast<length<Rep, RI>, ToLength>()(fl);
+}
+
+using picometer  = length<int, std::pico>;
+using micrometer = length<int, std::micro>;
+using milimeter  = length<int, std::milli>;
+using centimeter = length<int, std::centi>;
+using meter      = length<int, std::ratio<1>>;
+using inch       = length<int, std::ratio<254, 10000>>;
+using feet       = length<int, std::ratio<328, 1000>>;
+using kilometer  = length<int, std::kilo>;
+
+};
+
+#endif // HELLO_WORLD_UTILS_H

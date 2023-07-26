@@ -9,28 +9,6 @@
 // the resolution is the clock frequency instead of strip frequency
 const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
 
-auto esp_random_binary() {
-  auto n    = esp_random();
-  auto cond = UINT32_MAX / 2;
-  if (n > cond) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
-auto esp_random_ternary() {
-  auto n    = esp_random();
-  auto cond = UINT32_MAX / 3;
-  if (n > cond * 2) {
-    return 2;
-  } else if (n > cond) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
 static inline int meterToLEDsCount(float meter, float LEDs_per_meter) {
   return std::abs(static_cast<int>(std::round(meter * LEDs_per_meter))) + 1;
 }
@@ -56,6 +34,35 @@ static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, size_t sta
   return ESP_OK;
 }
 
+/**
+ *
+ * @param handle
+ * @param start the distance from the start
+ * @param count
+ * @param color
+ * @return ESP_OK if success
+ * @note only fill but not refresh
+ */
+static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t count, uint32_t color){
+  led_strip_clean_clear(handle);
+  return led_strip_set_many_pixels(handle, start, count, color);
+}
+
+/**
+ *
+ * @param handle
+ * @param total
+ * @param start the distance from the end
+ * @param count
+ * @param color
+ * @return ESP_OK if success
+ */
+static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color){
+  led_strip_clean_clear(handle);
+  return led_strip_set_many_pixels(handle, total - start - count, count, color);
+}
+
+namespace lane {
 /**
  * @brief get the next state. should be a pure function.
  * @param state the current state.
@@ -91,42 +98,16 @@ nextState(RunState state, const ValueRetriever<float> &retriever, float circleLe
  * @param handle
  * @param fps
  */
-inline RunState Track::updateStrip(led_strip_handle_t handle, float circle_length, float track_length, float fps,
-                                   float LEDs_per_meter) {
-  auto max_shift = getMaxShiftLength();
-  // if the shift is larger than the max length, we should stop updating the state.
-  // do an early return.
-  if (floor(state.shift) >= max_shift) {
-    state.speed = 0;
-    return state;
-  } else {
-    auto next                            = nextState(state, retriever, circle_length, track_length, fps);
-    auto [position, speed, shift, extra] = next;
-    this->state                          = next;
-    if (extra != 0) {
-      // position may be larger than trackLength if float is not precise enough.
-      if (circle_length < position) {
-        // fill to the end
-        // handle->fill(color, meterToLEDsCount(circle_length - extra, LEDs_per_meter), 0);
-        led_strip_set_many_pixels(handle, meterToLEDsCount(circle_length - extra, LEDs_per_meter), 0, color);
-      }
-      // handle->fill(color, 0, meterToLEDsCount(position, LEDs_per_meter));
-      led_strip_set_many_pixels(handle, 0, meterToLEDsCount(position, LEDs_per_meter), color);
-    } else {
-      //      handle->fill(color, meterToLEDsCount(position - track_length, LEDs_per_meter),
-      //                   meterToLEDsCount(track_length, LEDs_per_meter));
-      led_strip_set_many_pixels(handle, meterToLEDsCount(position - track_length, LEDs_per_meter),
-                                meterToLEDsCount(track_length, LEDs_per_meter), color);
-    }
-    return next;
-  }
+inline RunState updateStrip(led_strip_handle_t handle, float circle_length, float track_length, float fps,
+                            float LEDs_per_meter) {
+  // TODO
 }
 
 void Lane::ready(Instant &last_blink) const {
   uint32_t c    = 0;
   auto duration = last_blink.elapsed();
   auto millis   = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-  if (millis > READY_INTERVAL_MS) {
+  if (millis > READY_INTERVAL) {
     if (c % 2 == 0) {
       led_strip_clear(led_strip);
     } else {
@@ -136,19 +117,19 @@ void Lane::ready(Instant &last_blink) const {
       auto back_color            = Adafruit_NeoPixel::Color(0, 0, 255);
       led_strip_clean_clear(led_strip);
       led_strip_set_many_pixels(led_strip, 0, front_count, front_color);
-      led_strip_set_many_pixels(led_strip, getCircleLEDsNum() - back_count, back_count, back_color);
+      led_strip_set_many_pixels(led_strip, getLaneLEDsNum() - back_count, back_count, back_color);
       led_strip_refresh(led_strip);
     }
     c += 1;
     last_blink.reset();
   }
-  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL_MS);
+  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL);
   vTaskDelay(delay);
 }
 
 void Lane::stop() const {
   led_strip_clear(led_strip);
-  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL_MS);
+  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL);
   vTaskDelay(delay);
 }
 
@@ -161,7 +142,7 @@ void Lane::loop() {
   auto instant = Instant();
   for (;;) {
     if (status == TrackStatus_RUN) {
-      run(tracks);
+      //
     } else if (status == TrackStatus_STOP) {
       stop();
     } else if (status == TrackStatus_READY) {
@@ -183,7 +164,7 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
       .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
       .led_model        = LED_MODEL_WS2812, // LED strip model
       .flags            = {
-                     .invert_out = false // whether to invert the output signal
+          .invert_out = false // whether to invert the output signal
       },
   };
 
@@ -192,7 +173,7 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
       .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
       .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
       .flags         = {
-                  .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+          .with_dma = false // DMA feature is available on ESP target like ESP32-S3
       },
   };
   led_strip_handle_t new_handle;
@@ -215,15 +196,10 @@ Lane *Lane::get() {
  * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-StripError Lane::begin(int16_t PIN, uint8_t brightness) {
+LaneError Lane::begin(int16_t PIN, uint8_t brightness) {
   if (!is_initialized) {
-    pref.begin(STRIP_PREF_RECORD_NAME, false);
-    tracks.clear();
-    // reserve some space for the tracks
-    // avoid the reallocation of the vector
-    tracks.reserve(5);
-    this->pin        = PIN;
-    this->brightness = brightness;
+    pref.begin(LANE_PREF_RECORD_NAME, false);
+    this->pin = PIN;
 
     // LED strip general initialization, according to your led board design
     led_strip_config_t strip_config = {
@@ -232,7 +208,7 @@ StripError Lane::begin(int16_t PIN, uint8_t brightness) {
         .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
         .led_model        = LED_MODEL_WS2812, // LED strip model
         .flags            = {
-                       .invert_out = false // whether to invert the output signal
+            .invert_out = false // whether to invert the output signal
         },
     };
 
@@ -241,24 +217,20 @@ StripError Lane::begin(int16_t PIN, uint8_t brightness) {
         .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
         .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
         .flags         = {
-                    .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+            .with_dma = false // DMA feature is available on ESP target like ESP32-S3
         },
     };
     led_strip_handle_t handle;
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &handle));
     led_strip      = handle;
     is_initialized = true;
-    return StripError::OK;
+    return LaneError::OK;
   } else {
-    return StripError::HAS_INITIALIZED;
+    return LaneError::HAS_INITIALIZED;
   }
 }
 
-void Lane::setBrightness(const uint8_t new_brightness) {
-  // just do nothing since the library does not support brightness
-}
-
-void Lane::setStatusNotify(TrackStatus s) {
+void Lane::setStatusNotify(LaneStatus s) {
   // TODO
 }
 
@@ -273,3 +245,5 @@ void Lane::setCircleLength(float meter) {
 float Lane::getLEDsPerMeter() const {
   return static_cast<float>(max_LEDs) / static_cast<float>(this->circle_length);
 }
+}
+
