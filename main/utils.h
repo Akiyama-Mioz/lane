@@ -227,23 +227,39 @@ public:
   length() = default;
   explicit length(Rep rep) : value(rep) {}
 
-  Self operator+=(const Self rhs) {
+  Self operator+=(const Self rhs) const {
     value += rhs.value;
     return *this;
   }
 
-  Self operator-=(const Self rhs) {
+  Self operator-=(const Self rhs) const {
     value -= rhs.value;
     return *this;
   }
 
-  Self operator+(Self rhs) {
+  Self operator+(Self rhs) const {
     return Self(value + rhs.value);
   }
 
-  Self operator-(const Self rhs) {
+  Self operator-(const Self rhs) const {
     return Self(value - rhs.value);
   }
+
+  // Scalar operations
+
+  template <class U>
+    requires std::is_arithmetic_v<U>
+  Self operator*(U rhs) const {
+    return Self(value * rhs);
+  }
+
+  template <class U>
+    requires std::is_arithmetic_v<U>
+  Self operator/(U rhs) const {
+    return Self(value / rhs);
+  }
+
+  // Comparison operators
 
   bool operator==(const Self rhs) const {
     return value == rhs.value;

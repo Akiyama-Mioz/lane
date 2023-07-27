@@ -36,9 +36,8 @@ const auto DEFAULT_ACTIVE_LENGTH = centimeter(60);
 const auto DEFAULT_LINE_LENGTH = meter(50);
 // like shift
 const auto DEFAULT_TARGET_LENGTH = meter(1000);
-
-/// in count
-const auto DEFAULT_LINE_LEDs_NUM = static_cast<uint32_t>(100 / 3.3);
+const auto DEFAULT_LINE_LEDs_NUM = static_cast<uint32_t>(DEFAULT_LINE_LENGTH.count() * (100 / 3.3));
+const auto DEFAULT_FPS           = 10;
 
 static const auto BLUE_TRANSMIT_INTERVAL = std::chrono::milliseconds(1000);
 static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
@@ -121,7 +120,7 @@ public:
 
   Preferences pref;
   static const led_pixel_format_t LED_PIXEL_FORMAT = LED_PIXEL_FORMAT_RGB;
-  int pin                                          = 14;
+  int pin                                          = 23;
 
   /// in meter
   led_strip_handle_t led_strip                          = nullptr;
@@ -136,10 +135,10 @@ public:
       .line_length   = DEFAULT_LINE_LENGTH,
       .active_length = utils::length_cast<meter>(DEFAULT_ACTIVE_LENGTH),
       .total_length  = DEFAULT_TARGET_LENGTH,
-      .line_LEDs_num = 1515,
-      .fps           = 10,
+      .line_LEDs_num = DEFAULT_LINE_LEDs_NUM,
+      .fps           = DEFAULT_FPS,
   };
-  LaneState state = LaneState::zero();
+  LaneState state   = LaneState::zero();
   LaneParams params = {
       .speed  = 0,
       .status = LaneStatus::STOP,
