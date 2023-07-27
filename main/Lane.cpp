@@ -2,7 +2,6 @@
 // Created by Kurosu Chan on 2022/7/13.
 //
 
-#include "LaneCommon.h"
 #include "Lane.h"
 #include <ranges>
 
@@ -43,7 +42,7 @@ static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, size_t sta
  * @return ESP_OK if success
  * @note only fill but not refresh
  */
-static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t count, uint32_t color){
+static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t count, uint32_t color) {
   led_strip_clean_clear(handle);
   return led_strip_set_many_pixels(handle, start, count, color);
 }
@@ -57,114 +56,120 @@ static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t co
  * @param color
  * @return ESP_OK if success
  */
-static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color){
+static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
   led_strip_clean_clear(handle);
   return led_strip_set_many_pixels(handle, total - start - count, count, color);
 }
 
 namespace lane {
+inline LaneStatus revert_state(LaneStatus state) {
+  if (state == LaneStatus::STOP) {
+    return LaneStatus::STOP;
+  }
+  if (state == LaneStatus::FORWARD) {
+    return LaneStatus::BACKWARD;
+  } else {
+    return LaneStatus::FORWARD;
+  }
+}
 /**
  * @brief get the next state. should be a pure function.
- * @param state the current state.
- * @param retriever
- * @param fps frames per second
+ * @param last_state
+ * @param cfg
+ * @param [in, out]input param
  * @return the next state.
  */
-inline RunState
-nextState(RunState state, const ValueRetriever<float> &retriever, float circleLength, float trackLength, float fps) {
-  float position; // late
-  float shift = state.shift;
-  float speed = retriever.retrieve(static_cast<int>(state.shift));
-  float extra = 0; // late
-  // distance unit is `meter`
-  // total length will not be considered here.
-  shift    = shift + speed / fps; // speed per frame in m/s
-  position = shift;
-  if (position > circleLength) {
-    position = fmod(position, circleLength);
-    if (position <= trackLength) {
-      extra = trackLength - position;
+inline LaneState
+nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
+  auto TAG        = "lane::nextState";
+  auto zero_state = LaneState::zero();
+  switch (last_state.status) {
+    case LaneStatus::STOP: {
+      switch (input.status) {
+        case LaneStatus::FORWARD: {
+          auto ret   = zero_state;
+          ret.speed  = input.speed;
+          ret.status = LaneStatus::FORWARD;
+          return ret;
+        }
+        case LaneStatus::BACKWARD: {
+          auto ret   = zero_state;
+          ret.speed  = input.speed;
+          ret.status = LaneStatus::BACKWARD;
+          return ret;
+        }
+        case LaneStatus::STOP: {
+          return zero_state;
+        }
+      }
+    }
+    default: {
+      if (input.status == LaneStatus::STOP) {
+        return zero_state;
+      }
+      if (input.status != last_state.status) {
+        ESP_LOGW(TAG, "Invalid status changed from %s to %s", statusToStr(last_state.status).c_str(), statusToStr(input.status).c_str());
+        input.status = last_state.status;
+      }
+      auto ret  = last_state;
+      ret.speed = input.speed;
+      // I assume every time call this function the time interval is 1/fps
+      ret.shift      = last_state.shift + meter(ret.speed / cfg.fps);
+      auto temp_head = last_state.head + meter(ret.speed / cfg.fps);
+      if (temp_head > (cfg.active_length + cfg.line_length)) {
+        ret.status = revert_state(last_state.status);
+        ret.head   = temp_head - (cfg.active_length + cfg.line_length);
+        ret.tail   = meter(0);
+      } else if (temp_head > cfg.line_length) {
+        ret.head = cfg.line_length;
+        ret.tail = temp_head - cfg.line_length;
+      } else {
+        ret.head       = temp_head;
+        auto temp_tail = temp_head - cfg.active_length;
+        ret.tail       = temp_tail > meter(0) ? temp_tail : meter(0);
+      }
+      return ret;
     }
   }
-  return RunState{
-      position,
-      speed,
-      shift,
-      extra};
-}
-
-/**
- * @brief update the strip with the new state and write the pixel data to the strip.
- * @param handle
- * @param fps
- */
-inline RunState updateStrip(led_strip_handle_t handle, float circle_length, float track_length, float fps,
-                            float LEDs_per_meter) {
-  // TODO
-}
-
-void Lane::ready(Instant &last_blink) const {
-  uint32_t c    = 0;
-  auto duration = last_blink.elapsed();
-  auto millis   = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-  if (millis > READY_INTERVAL) {
-    if (c % 2 == 0) {
-      led_strip_clear(led_strip);
-    } else {
-      auto constexpr front_count = 20;
-      auto constexpr back_count  = 20;
-      auto front_color           = Adafruit_NeoPixel::Color(255, 0, 0);
-      auto back_color            = Adafruit_NeoPixel::Color(0, 0, 255);
-      led_strip_clean_clear(led_strip);
-      led_strip_set_many_pixels(led_strip, 0, front_count, front_color);
-      led_strip_set_many_pixels(led_strip, getLaneLEDsNum() - back_count, back_count, back_color);
-      led_strip_refresh(led_strip);
-    }
-    c += 1;
-    last_blink.reset();
-  }
-  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL);
-  vTaskDelay(delay);
 }
 
 void Lane::stop() const {
   led_strip_clear(led_strip);
-  constexpr uint delay = pdMS_TO_TICKS(HALT_INTERVAL);
+  const auto delay = pdMS_TO_TICKS(HALT_INTERVAL.count());
   vTaskDelay(delay);
 }
 
-void Lane::run(std::vector<Track> &tracks) {
-}
-
 void Lane::loop() {
-  led_strip_clear(led_strip);
-  // pixels->show();
   auto instant = Instant();
   for (;;) {
-    if (status == TrackStatus_RUN) {
-      //
-    } else if (status == TrackStatus_STOP) {
-      stop();
-    } else if (status == TrackStatus_READY) {
-      ready(instant);
+    if (state.status != LaneStatus::STOP) {
+      instant.reset();
+      run();
+      auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
+      auto delay = pdMS_TO_TICKS((1000 / cfg.fps - diff.count()));
+      vTaskDelay(delay);
+    } else {
+      led_strip_clear(led_strip);
+      led_strip_refresh(led_strip);
+      vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
     }
   }
 }
 
 /// i.e. Circle LEDs
-void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
-  max_LEDs = new_max_LEDs;
+void Lane::setMaxLEDs(uint32_t new_max_LEDs, LaneConfig &cfg) {
+  cfg.line_LEDs_num = new_max_LEDs;
   if (led_strip != nullptr) {
     led_strip_del(led_strip);
     led_strip = nullptr;
   }
   led_strip_config_t strip_config = {
       .strip_gpio_num   = pin,              // The GPIO that connected to the LED strip's data line
-      .max_leds         = max_LEDs,         // The number of LEDs in the strip,
+      .max_leds         = new_max_LEDs,     // The number of LEDs in the strip,
       .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
       .led_model        = LED_MODEL_WS2812, // LED strip model
       .flags            = {
-          .invert_out = false // whether to invert the output signal
+                     .invert_out = false // whether to invert the output signal
       },
   };
 
@@ -173,7 +178,7 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
       .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
       .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
       .flags         = {
-          .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+                  .with_dma = false // DMA feature is available on ESP target like ESP32-S3
       },
   };
   led_strip_handle_t new_handle;
@@ -198,17 +203,17 @@ Lane *Lane::get() {
  */
 LaneError Lane::begin(int16_t PIN, uint8_t brightness) {
   if (!is_initialized) {
-    pref.begin(LANE_PREF_RECORD_NAME, false);
+    pref.begin(PREF_RECORD_NAME, false);
     this->pin = PIN;
 
     // LED strip general initialization, according to your led board design
     led_strip_config_t strip_config = {
-        .strip_gpio_num   = pin,              // The GPIO that connected to the LED strip's data line
-        .max_leds         = max_LEDs,         // The number of LEDs in the strip,
-        .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
-        .led_model        = LED_MODEL_WS2812, // LED strip model
+        .strip_gpio_num   = pin,                     // The GPIO that connected to the LED strip's data line
+        .max_leds         = this->cfg.line_LEDs_num, // The number of LEDs in the strip,
+        .led_pixel_format = LED_PIXEL_FORMAT,        // Pixel format of your LED strip
+        .led_model        = LED_MODEL_WS2812,        // LED strip model
         .flags            = {
-            .invert_out = false // whether to invert the output signal
+                       .invert_out = false // whether to invert the output signal
         },
     };
 
@@ -217,7 +222,7 @@ LaneError Lane::begin(int16_t PIN, uint8_t brightness) {
         .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
         .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
         .flags         = {
-            .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+                    .with_dma = false // DMA feature is available on ESP target like ESP32-S3
         },
     };
     led_strip_handle_t handle;
@@ -230,20 +235,68 @@ LaneError Lane::begin(int16_t PIN, uint8_t brightness) {
   }
 }
 
-void Lane::setStatusNotify(LaneStatus s) {
-  // TODO
+void Lane::notifyState(LaneState s) {
+//  this->status = s;
+//  if (status_char != nullptr) {
+//    constexpr size_t buf_size = 64;
+//    std::array<uint8_t, buf_size> buf{};
+//    TrackStatusMsg msg = TrackStatusMsg_init_zero;
+//    msg.status         = s;
+//    auto ostream       = pb_ostream_from_buffer(buf.data(), buf_size);
+//    auto res           = pb_encode(&ostream, TrackStatusMsg_fields, &msg);
+//    if (!res) {
+//      ESP_LOGE("Strip::setStatusNotify", "pb_encode");
+//      return;
+//    }
+//    status_char->setValue(buf);
+//    status_char->notify();
+//  }
 }
 
+/// always success and
 void Lane::setCountLEDs(uint32_t count) {
-  this->count_LEDs = count;
+  this->cfg.line_LEDs_num = count;
 }
 
-void Lane::setCircleLength(float meter) {
-  circle_length = meter;
+void Lane::setCircleLength(float l) {
+  this->cfg.line_length = meter(l);
 }
 
 float Lane::getLEDsPerMeter() const {
-  return static_cast<float>(max_LEDs) / static_cast<float>(this->circle_length);
-}
+  auto l = this->cfg.line_length.count();
+  auto n = this->cfg.line_LEDs_num;
+  return static_cast<float>(l / n);
 }
 
+void Lane::run() {
+  auto next_state = nextState(this->state, this->cfg, this->params);
+  // meter
+  auto head       = this->state.head.count();
+  auto tail       = this->state.tail.count();
+  auto length     = head - tail >= 0 ? head - tail : 0;
+  auto head_index = meterToLEDsCount(head, getLEDsPerMeter());
+  auto count      = meterToLEDsCount(length, getLEDsPerMeter());
+  this->state     = next_state;
+  switch (next_state.status) {
+    case LaneStatus::FORWARD: {
+      auto err = fill_forward(led_strip, head_index, count, cfg.color);
+      if (err != ESP_OK) {
+        ESP_LOGE("LANE", "Error when filling forward: %s", esp_err_to_name(err));
+      }
+      led_strip_refresh(led_strip);
+      break;
+    }
+    case LaneStatus::BACKWARD: {
+      auto err = fill_backward(led_strip, cfg.line_LEDs_num, head, count, cfg.color);
+      if (err != ESP_OK) {
+        ESP_LOGE("LANE", "Error when filling backward: %s", esp_err_to_name(err));
+      }
+      led_strip_refresh(led_strip);
+      break;
+    }
+    default:
+      // unreachable
+      return;
+  }
+}
+}

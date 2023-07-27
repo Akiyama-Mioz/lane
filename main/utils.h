@@ -220,11 +220,54 @@ class length {
 public:
   using rep   = Rep;
   using ratio = RI;
+  using Self  = length<Rep, RI>;
   Rep count() const {
     return value;
   }
   length() = default;
   explicit length(Rep rep) : value(rep) {}
+
+  Self operator+=(const Self rhs) {
+    value += rhs.value;
+    return *this;
+  }
+
+  Self operator-=(const Self rhs) {
+    value -= rhs.value;
+    return *this;
+  }
+
+  Self operator+(Self rhs) {
+    return Self(value + rhs.value);
+  }
+
+  Self operator-(const Self rhs) {
+    return Self(value - rhs.value);
+  }
+
+  bool operator==(const Self rhs) const {
+    return value == rhs.value;
+  }
+
+  bool operator!=(const Self rhs) const {
+    return value != rhs.value;
+  }
+
+  bool operator<(const Self rhs) const {
+    return value < rhs.value;
+  }
+
+  bool operator>(const Self rhs) const {
+    return value > rhs.value;
+  }
+
+  bool operator<=(const Self rhs) const {
+    return value <= rhs.value;
+  }
+
+  bool operator>=(const Self rhs) const {
+    return value >= rhs.value;
+  }
 };
 
 template <class FromLength, class ToLength,
@@ -238,7 +281,7 @@ struct __length_cast {
 };
 
 template <class ToLength, class Rep, class RI>
-requires std::is_arithmetic_v<Rep> && is_ratio<RI>
+  requires std::is_arithmetic_v<Rep> && is_ratio<RI>
 ToLength length_cast(const length<Rep, RI> &fl) {
   return __length_cast<length<Rep, RI>, ToLength>()(fl);
 }
@@ -252,6 +295,26 @@ using inch       = length<int, std::ratio<254, 10000>>;
 using feet       = length<int, std::ratio<328, 1000>>;
 using kilometer  = length<int, std::kilo>;
 
+struct Color {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+
+  Color(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
+  Color(uint32_t rgb) {
+    r = (rgb >> 16) & 0xff;
+    g = (rgb >> 8) & 0xff;
+    b = rgb & 0xff;
+  }
+
+  /**
+   * @brief convert to uint32_t
+   * @return implicit conversion. operator overloading.
+   */
+  operator uint32_t() const {
+    return (r << 16) | (g << 8) | b;
+  }
+};
 };
 
 #endif // HELLO_WORLD_UTILS_H

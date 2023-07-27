@@ -1,9 +1,10 @@
 syntax = "proto3";
 
 message LaneLengthConfig {
-  uint32 lane_total_length_cm = 1;
-  uint32 lace_active_length_cm = 2;
-  uint32 lace_leds_num = 3;
+  uint32 total_length_cm = 1;
+  uint32 line_length_cm = 2;
+  uint32 active_length_cm = 3;
+  uint32 line_leds_num = 4;
   // we could calculate the distance between each led with the above two
 }
 
