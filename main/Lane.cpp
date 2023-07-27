@@ -62,7 +62,6 @@ static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t s
 }
 
 namespace lane {
-
 std::string statusToStr(LaneStatus status) {
   static const std::map<LaneStatus, std::string> LANE_STATUS_STR = {
       {LaneStatus::FORWARD, "FORWARD"},
@@ -155,8 +154,8 @@ struct UpdateTaskParam {
 };
 
 void Lane::loop() {
-  auto instant             = Instant();
-  auto update_instance     = Instant();
+  auto instant         = Instant();
+  auto update_instance = Instant();
   for (;;) {
     if (state.status != LaneStatus::STOP) {
       instant.reset();
@@ -236,7 +235,7 @@ Lane *Lane::get() {
  * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-LaneError Lane::begin(int16_t PIN) {
+esp_err_t Lane::begin(int16_t PIN) {
   if (!is_initialized) {
     pref.begin(PREF_RECORD_NAME, false);
     this->pin = PIN;
@@ -264,9 +263,9 @@ LaneError Lane::begin(int16_t PIN) {
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &handle));
     led_strip      = handle;
     is_initialized = true;
-    return LaneError::OK;
+    return ESP_OK;
   } else {
-    return LaneError::HAS_INITIALIZED;
+    return ESP_ERR_INVALID_STATE;
   }
 }
 
@@ -382,4 +381,3 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
   }
 }
 };
-

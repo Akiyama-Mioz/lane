@@ -186,8 +186,7 @@ public:
   // usually you won't destruct it because it's running in MCU and the resource will not be released
   ~Lane() = delete;
 
-  LaneError
-  begin(int16_t PIN);
+  esp_err_t begin(int16_t PIN);
 
   /// set track length (count LEDs)
   void setCountLEDs(uint32_t count);
