@@ -10,7 +10,6 @@
 #include <map>
 #include <etl/flat_map.h>
 #include <etl/vector.h>
-#include "ble.pb.h"
 
 struct DeviceInfo {
   BLEClient* client;

@@ -1,9 +1,9 @@
 syntax = "proto3";
 
 message LaneLengthConfig {
-  uint32 total_length_cm = 1;
-  uint32 line_length_cm = 2;
-  uint32 active_length_cm = 3;
+  float total_length_m = 1;
+  float line_length_m = 2;
+  float active_length_m = 3;
   uint32 line_leds_num = 4;
   // we could calculate the distance between each led with the above two
 }
@@ -15,6 +15,10 @@ enum LaneStatus {
 }
 
 message LaneColorConfig {
+  // first byte reserved.
+  // second byte is the red value,
+  // third byte is the green value,
+  // fourth byte is the blue value
   uint32 rgb = 1;
   // reserved
   reserved 2;
@@ -31,11 +35,14 @@ message LaneSetSpeed {
 
 // go through Control Characteristic via Notify/Read
 message LaneState {
-  LaneStatus status = 1;
+  float shift = 1;
+  float speed = 2;
+  float head = 3;
+  float tail = 4;
   /// the distance between the start/end of the lane and the head of trail
   /// if the status is FORWARD, the head is the distance from the start
   /// if the status is BACKWARD, the head is the distance from the end
-  uint32 head_cm = 2;
+  LaneStatus status = 5;
 }
 
 // use to config the lane

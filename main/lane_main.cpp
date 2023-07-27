@@ -12,6 +12,7 @@
 
 static auto BLE_NAME          = "lane-011";
 static const uint16_t LED_PIN = 23;
+//static const uint16_t LED_PIN = 2;
 
 static const char *LIGHT_SERVICE_UUID        = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
 static const char *LIGHT_CHAR_STATUS_UUID    = "24207642-0d98-40cd-84bb-910008579114";
@@ -47,15 +48,13 @@ void initBLE(NimBLEServer *server, LaneBLE &ble, Lane &lane) {
   ble.service->start();
 }
 
-extern "C" void app_main() {
+extern "C" [[noreturn]] void app_main() {
   initArduino();
 
   Preferences pref;
   pref.begin(PREF_RECORD_NAME, true);
-  //  auto brightness    = pref.getUChar(BRIGHTNESS_KEY, 32);
-  //  auto circle_num    = pref.getUInt(CIRCLE_LEDs_NUM_KEY, DEFAULT_CIRCLE_LEDs_NUM);
-  //  auto track_num     = pref.getUInt(TRACK_LEDs_NUM_KEY, DEFAULT_TRACK_LEDs_NUM);
-  //  auto circle_length = pref.getFloat(CIRCLE_LENGTH_KEY, DEFAULT_ACTIVE_LENGTH);
+  // TODO: persist the config
+  pref.end();
 
   NimBLEDevice::init(BLE_NAME);
   auto &server = *NimBLEDevice::createServer();
@@ -66,35 +65,36 @@ extern "C" void app_main() {
    * since FreeRTOS is implemented in C where we can't have lambda capture, so pStrip must be
    * passed as parameter.
    **/
-  auto pFunc = [](Lane *pStrip) {
-    pStrip->loop();
+  auto lane_loop = [](void *param) {
+    auto &lane = *static_cast<Lane *>(param);
+    lane.loop();
   };
   // using singleton pattern to avoid memory leak
-  auto &lane = *Lane::get();
-  //  lane.setCircleLength(circle_length);
-  //  lane.setCountLEDs(track_num);
-  //  lane.setMaxLEDs(circle_num);
-  //  lane.begin(LED_PIN, brightness);
+  auto &lane    = *Lane::get();
   auto lane_ble = LaneBLE();
   lane.setBLE(lane_ble);
   initBLE(&server, lane_ble, lane);
-  auto &lane_ble_service = *lane_ble.service;
-  auto &hr_char          = *lane_ble_service.createCharacteristic(LIGHT_CHAR_STATE_UUID,
-                                                                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  lane.begin(LED_PIN);
+
+  //************** HR char initialization ****************
+
+  auto &hr_service = *server.createService("180D");
+  auto &hr_char    = *hr_service.createCharacteristic(LIGHT_CHAR_STATE_UUID,
+                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  hr_service.start();
 
   auto &ad = *NimBLEDevice::getAdvertising();
   ad.setName(BLE_NAME);
   ad.setScanResponse(false);
 
-  xTaskCreate(reinterpret_cast<TaskFunction_t>(*pFunc),
+  xTaskCreate(lane_loop,
               "lane", 5120,
               &lane, configMAX_PRIORITIES - 3,
               nullptr);
 
   server.start();
   NimBLEDevice::startAdvertising();
-  auto &scan = *BLEDevice::getScan();
-  // get list of connected devices here
+  auto &scan   = *BLEDevice::getScan();
   auto pScanCb = new ScanCallback(&hr_char);
   scan.setScanCallbacks(pScanCb);
   scan.setInterval(1349);
@@ -105,7 +105,6 @@ extern "C" void app_main() {
   const auto scanTotalTime = std::chrono::milliseconds(5000);
   ESP_LOGI("MAIN", "Initiated");
   pref.end();
-  // scan forever
   for (;;) {
     scan.start(scanTime.count(), false);
     vTaskDelay(scanTotalTime.count() / portTICK_PERIOD_MS);

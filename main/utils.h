@@ -315,6 +315,20 @@ struct Color {
     return (r << 16) | (g << 8) | b;
   }
 };
+namespace Colors {
+  const auto Red     = Color(0xff0000);
+  const auto Green   = Color(0x00ff00);
+  const auto Blue    = Color(0x0000ff);
+  const auto White   = Color(0xffffff);
+  const auto Cyan    = Color(0x00ffff);
+  const auto Magenta = Color(0xff00ff);
+  const auto Yellow  = Color(0xffff00);
+  const auto Amber   = Color(0xffbf00);
+  const auto Orange  = Color(0xff8000);
+  const auto Purple  = Color(0x8000ff);
+  const auto Pink    = Color(0xff0080);
+  const auto Azure   = Color(0x0080ff);
+}
 };
 
 #endif // HELLO_WORLD_UTILS_H

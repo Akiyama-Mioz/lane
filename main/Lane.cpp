@@ -62,6 +62,16 @@ static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t s
 }
 
 namespace lane {
+
+std::string statusToStr(LaneStatus status) {
+  static const std::map<LaneStatus, std::string> LANE_STATUS_STR = {
+      {LaneStatus::FORWARD, "FORWARD"},
+      {LaneStatus::BACKWARD, "BACKWARD"},
+      {LaneStatus::STOP, "STOP"},
+  };
+  return LANE_STATUS_STR.at(status);
+}
+
 inline LaneStatus revert_state(LaneStatus state) {
   if (state == LaneStatus::STOP) {
     return LaneStatus::STOP;
@@ -139,12 +149,37 @@ void Lane::stop() const {
   vTaskDelay(delay);
 }
 
+struct UpdateTaskParam {
+  std::function<void()> *fn;
+  TaskHandle_t handle;
+};
+
 void Lane::loop() {
-  auto instant = Instant();
+  auto instant             = Instant();
+  auto update_instance     = Instant();
   for (;;) {
     if (state.status != LaneStatus::STOP) {
       instant.reset();
-      run();
+      runOnce();
+      if (update_instance.elapsed() > BLUE_TRANSMIT_INTERVAL) {
+        auto task = [](void *param) {
+          auto &update_param = *static_cast<UpdateTaskParam *>(param);
+          (*update_param.fn)();
+          if (update_param.handle != nullptr) {
+            vTaskDelete(update_param.handle);
+          }
+        };
+        auto &l          = *this;
+        auto update_task = [&l]() {
+          l.notifyState(l.state);
+        };
+        auto param = UpdateTaskParam{
+            .fn     = new std::function(update_task),
+            .handle = nullptr,
+        };
+        xTaskCreate(task, "update_state", 2048, &param, 1, &param.handle);
+        update_instance.reset();
+      }
       auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
       auto delay = pdMS_TO_TICKS((1000 / cfg.fps - diff.count()));
       vTaskDelay(delay);
@@ -201,7 +236,7 @@ Lane *Lane::get() {
  * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-LaneError Lane::begin(int16_t PIN, uint8_t brightness) {
+LaneError Lane::begin(int16_t PIN) {
   if (!is_initialized) {
     pref.begin(PREF_RECORD_NAME, false);
     this->pin = PIN;
@@ -236,21 +271,22 @@ LaneError Lane::begin(int16_t PIN, uint8_t brightness) {
 }
 
 void Lane::notifyState(LaneState s) {
-//  this->status = s;
-//  if (status_char != nullptr) {
-//    constexpr size_t buf_size = 64;
-//    std::array<uint8_t, buf_size> buf{};
-//    TrackStatusMsg msg = TrackStatusMsg_init_zero;
-//    msg.status         = s;
-//    auto ostream       = pb_ostream_from_buffer(buf.data(), buf_size);
-//    auto res           = pb_encode(&ostream, TrackStatusMsg_fields, &msg);
-//    if (!res) {
-//      ESP_LOGE("Strip::setStatusNotify", "pb_encode");
-//      return;
-//    }
-//    status_char->setValue(buf);
-//    status_char->notify();
-//  }
+  auto &notify_char = *this->ble.ctrl_char;
+  auto buf          = std::array<uint8_t, 32>();
+  ::LaneState st    = LaneState_init_zero;
+  st.head           = s.head.count();
+  st.tail           = s.tail.count();
+  st.shift          = s.shift.count();
+  st.speed          = s.speed;
+  st.status         = static_cast<::LaneStatus>(s.status);
+  auto stream       = pb_ostream_from_buffer(buf.data(), buf.size());
+  auto ok           = pb_encode(&stream, LaneState_fields, &st);
+  if (!ok) {
+    ESP_LOGE("LANE", "Failed to encode the state");
+    return;
+  }
+  notify_char.setValue(buf.data(), stream.bytes_written);
+  notify_char.notify();
 }
 
 /// always success and
@@ -268,7 +304,7 @@ float Lane::getLEDsPerMeter() const {
   return static_cast<float>(l / n);
 }
 
-void Lane::run() {
+void Lane::runOnce() {
   auto next_state = nextState(this->state, this->cfg, this->params);
   // meter
   auto head       = this->state.head.count();
@@ -287,7 +323,7 @@ void Lane::run() {
       break;
     }
     case LaneStatus::BACKWARD: {
-      auto err = fill_backward(led_strip, cfg.line_LEDs_num, head, count, cfg.color);
+      auto err = fill_backward(led_strip, cfg.line_LEDs_num, head_index, count, cfg.color);
       if (err != ESP_OK) {
         ESP_LOGE("LANE", "Error when filling backward: %s", esp_err_to_name(err));
       }
@@ -300,3 +336,50 @@ void Lane::run() {
   }
 }
 }
+
+//****************************** Callback ************************************/
+
+namespace lane {
+void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
+  auto data                 = characteristic->getValue();
+  ::LaneControl control_msg = LaneControl_init_zero;
+  auto ostream              = pb_istream_from_buffer(data.data(), data.size());
+  auto ok                   = pb_decode(&ostream, LaneControl_fields, &control_msg);
+  if (!ok) {
+    ESP_LOGE("LANE", "Failed to decode the control message");
+    return;
+  }
+  switch (control_msg.which_msg) {
+    case LaneControl_set_speed_tag:
+      lane.setSpeed(control_msg.msg.set_speed.speed);
+      break;
+    case LaneControl_set_status_tag:
+      lane.setStatus(control_msg.msg.set_status.status);
+      break;
+  }
+}
+
+void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
+  auto data               = characteristic->getValue();
+  ::LaneConfig config_msg = LaneConfig_init_zero;
+  auto ostream            = pb_istream_from_buffer(data.data(), data.size());
+  auto ok                 = pb_decode(&ostream, LaneConfig_fields, &config_msg);
+  if (!ok) {
+    ESP_LOGE("LANE", "Failed to decode the config message");
+    return;
+  }
+  switch (config_msg.which_msg) {
+    case LaneConfig_color_cfg_tag:
+      lane.setColor(config_msg.msg.color_cfg.rgb);
+      break;
+    case LaneConfig_length_cfg_tag: {
+      lane.cfg.line_length   = meter(config_msg.msg.length_cfg.line_length_m);
+      lane.cfg.active_length = meter(config_msg.msg.length_cfg.active_length_m);
+      lane.cfg.total_length  = meter(config_msg.msg.length_cfg.total_length_m);
+      lane.cfg.line_LEDs_num = config_msg.msg.length_cfg.line_leds_num;
+      break;
+    }
+  }
+}
+};
+

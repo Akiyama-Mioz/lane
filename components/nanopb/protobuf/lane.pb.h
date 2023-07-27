@@ -18,13 +18,17 @@ typedef enum _LaneStatus {
 
 /* Struct definitions */
 typedef struct _LaneColorConfig {
+    /* first byte reserved.
+ second byte is the red value,
+ third byte is the green value,
+ fourth byte is the blue value */
     uint32_t rgb;
 } LaneColorConfig;
 
 typedef struct _LaneLengthConfig {
-    uint32_t total_length_cm;
-    uint32_t line_length_cm;
-    uint32_t active_length_cm;
+    float total_length_m;
+    float line_length_m;
+    float active_length_m;
     uint32_t line_leds_num; /* we could calculate the distance between each led with the above two */
 } LaneLengthConfig;
 
@@ -39,11 +43,14 @@ typedef struct _LaneSetStatus {
 
 /* go through Control Characteristic via Notify/Read */
 typedef struct _LaneState {
-    LaneStatus status;
+    float shift;
+    float speed;
+    float head;
+    float tail;
     /* / the distance between the start/end of the lane and the head of trail
 / if the status is FORWARD, the head is the distance from the start
 / if the status is BACKWARD, the head is the distance from the end */
-    uint32_t head_cm;
+    LaneStatus status;
 } LaneState;
 
 /* use to config the lane
@@ -83,27 +90,30 @@ extern "C" {
 #define LaneColorConfig_init_default             {0}
 #define LaneSetStatus_init_default               {_LaneStatus_MIN}
 #define LaneSetSpeed_init_default                {0}
-#define LaneState_init_default                   {_LaneStatus_MIN, 0}
+#define LaneState_init_default                   {0, 0, 0, 0, _LaneStatus_MIN}
 #define LaneConfig_init_default                  {0, {LaneLengthConfig_init_default}}
 #define LaneControl_init_default                 {0, {LaneSetStatus_init_default}}
 #define LaneLengthConfig_init_zero               {0, 0, 0, 0}
 #define LaneColorConfig_init_zero                {0}
 #define LaneSetStatus_init_zero                  {_LaneStatus_MIN}
 #define LaneSetSpeed_init_zero                   {0}
-#define LaneState_init_zero                      {_LaneStatus_MIN, 0}
+#define LaneState_init_zero                      {0, 0, 0, 0, _LaneStatus_MIN}
 #define LaneConfig_init_zero                     {0, {LaneLengthConfig_init_zero}}
 #define LaneControl_init_zero                    {0, {LaneSetStatus_init_zero}}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define LaneColorConfig_rgb_tag                  1
-#define LaneLengthConfig_total_length_cm_tag     1
-#define LaneLengthConfig_line_length_cm_tag      2
-#define LaneLengthConfig_active_length_cm_tag    3
+#define LaneLengthConfig_total_length_m_tag      1
+#define LaneLengthConfig_line_length_m_tag       2
+#define LaneLengthConfig_active_length_m_tag     3
 #define LaneLengthConfig_line_leds_num_tag       4
 #define LaneSetSpeed_speed_tag                   1
 #define LaneSetStatus_status_tag                 1
-#define LaneState_status_tag                     1
-#define LaneState_head_cm_tag                    2
+#define LaneState_shift_tag                      1
+#define LaneState_speed_tag                      2
+#define LaneState_head_tag                       3
+#define LaneState_tail_tag                       4
+#define LaneState_status_tag                     5
 #define LaneConfig_length_cfg_tag                1
 #define LaneConfig_color_cfg_tag                 2
 #define LaneControl_set_status_tag               1
@@ -111,9 +121,9 @@ extern "C" {
 
 /* Struct field encoding specification for nanopb */
 #define LaneLengthConfig_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UINT32,   total_length_cm,   1) \
-X(a, STATIC,   SINGULAR, UINT32,   line_length_cm,    2) \
-X(a, STATIC,   SINGULAR, UINT32,   active_length_cm,   3) \
+X(a, STATIC,   SINGULAR, FLOAT,    total_length_m,    1) \
+X(a, STATIC,   SINGULAR, FLOAT,    line_length_m,     2) \
+X(a, STATIC,   SINGULAR, FLOAT,    active_length_m,   3) \
 X(a, STATIC,   SINGULAR, UINT32,   line_leds_num,     4)
 #define LaneLengthConfig_CALLBACK NULL
 #define LaneLengthConfig_DEFAULT NULL
@@ -134,8 +144,11 @@ X(a, STATIC,   SINGULAR, DOUBLE,   speed,             1)
 #define LaneSetSpeed_DEFAULT NULL
 
 #define LaneState_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UENUM,    status,            1) \
-X(a, STATIC,   SINGULAR, UINT32,   head_cm,           2)
+X(a, STATIC,   SINGULAR, FLOAT,    shift,             1) \
+X(a, STATIC,   SINGULAR, FLOAT,    speed,             2) \
+X(a, STATIC,   SINGULAR, FLOAT,    head,              3) \
+X(a, STATIC,   SINGULAR, FLOAT,    tail,              4) \
+X(a, STATIC,   SINGULAR, UENUM,    status,            5)
 #define LaneState_CALLBACK NULL
 #define LaneState_DEFAULT NULL
 
@@ -174,12 +187,12 @@ extern const pb_msgdesc_t LaneControl_msg;
 
 /* Maximum encoded size of messages (where known) */
 #define LaneColorConfig_size                     6
-#define LaneConfig_size                          26
+#define LaneConfig_size                          23
 #define LaneControl_size                         11
-#define LaneLengthConfig_size                    24
+#define LaneLengthConfig_size                    21
 #define LaneSetSpeed_size                        9
 #define LaneSetStatus_size                       2
-#define LaneState_size                           8
+#define LaneState_size                           22
 
 #ifdef __cplusplus
 } /* extern "C" */

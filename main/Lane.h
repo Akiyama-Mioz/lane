@@ -15,6 +15,8 @@
 #include "map"
 #include "vector"
 #include "lane.pb.h"
+#include "pb_common.h"
+#include "pb_decode.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "led_strip.h"
@@ -31,7 +33,7 @@ using meter      = utils::length<float, std::ratio<1>>;
 // the line would be active for this length
 const auto DEFAULT_ACTIVE_LENGTH = centimeter(60);
 // line... it would wrap around
-const auto DEFAULT_LINE_LENGTH = meter(25);
+const auto DEFAULT_LINE_LENGTH = meter(50);
 // like shift
 const auto DEFAULT_TARGET_LENGTH = meter(1000);
 
@@ -49,14 +51,7 @@ enum class LaneStatus {
   STOP     = ::LaneStatus_STOP,
 };
 
-std::string statusToStr(LaneStatus status) {
-  static const std::map<LaneStatus, std::string> LANE_STATUS_STR = {
-      {LaneStatus::FORWARD, "FORWARD"},
-      {LaneStatus::BACKWARD, "BACKWARD"},
-      {LaneStatus::STOP, "STOP"},
-  };
-  return LANE_STATUS_STR.at(status);
-}
+std::string statusToStr(LaneStatus status);
 
 enum class LaneError {
   OK = 0,
@@ -66,14 +61,14 @@ enum class LaneError {
 
 struct LaneState {
   // scalar cumulative distance shift
-  meter shift;
+  meter shift = meter(0);
   // m/s
-  float speed;
+  float speed = 0;
   // head should be always larger than tail
-  meter head;
-  meter tail;
-  LaneStatus status;
-  static LaneState zero(){
+  meter head        = meter(0);
+  meter tail        = meter(0);
+  LaneStatus status = LaneStatus::STOP;
+  static LaneState zero() {
     return LaneState{
         .shift  = meter(0),
         .speed  = 0,
@@ -129,18 +124,26 @@ public:
   int pin                                          = 14;
 
   /// in meter
-  // utils::centimeter total_length = LANE_DEFAULT_LINE_LENGTH;
-
   led_strip_handle_t led_strip                          = nullptr;
   std::array<uint8_t, DECODE_BUFFER_SIZE> decode_buffer = {0};
-  LaneBLE ble = {
-      .ctrl_char = nullptr,
-      .config_char = nullptr,
-      .service = nullptr,
+  LaneBLE ble                                           = {
+                                                .ctrl_char   = nullptr,
+                                                .config_char = nullptr,
+                                                .service     = nullptr,
   };
-  LaneConfig cfg;
-  LaneState state;
-  LaneParams params;
+  LaneConfig cfg = {
+      .color         = utils::Colors::Red,
+      .line_length   = DEFAULT_LINE_LENGTH,
+      .active_length = utils::length_cast<meter>(DEFAULT_ACTIVE_LENGTH),
+      .total_length  = DEFAULT_TARGET_LENGTH,
+      .line_LEDs_num = 1515,
+      .fps           = 10,
+  };
+  LaneState state = LaneState::zero();
+  LaneParams params = {
+      .speed  = 0,
+      .status = LaneStatus::STOP,
+  };
 
   /**
    * @brief Loop the strip.
@@ -184,12 +187,29 @@ public:
   ~Lane() = delete;
 
   LaneError
-  begin(int16_t PIN, uint8_t brightness);
+  begin(int16_t PIN);
 
   /// set track length (count LEDs)
   void setCountLEDs(uint32_t count);
 
   void setCircleLength(float meter);
+
+  void setSpeed(float speed) {
+    this->params.speed = speed;
+  };
+
+  void setColor(uint32_t color) {
+    this->cfg.color = color;
+  };
+
+  void setStatus(LaneStatus status) {
+    this->params.status = status;
+  };
+
+  void setStatus(::LaneStatus status) {
+    auto s              = static_cast<LaneStatus>(status);
+    this->params.status = s;
+  }
 
   inline void resetDecodeBuffer() {
     decode_buffer.fill(0);
@@ -199,7 +219,7 @@ protected:
   bool is_initialized = false;
   Lane()              = default;
 
-  void run();
+  void runOnce();
 
   void stop() const;
 };
