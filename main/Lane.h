@@ -22,16 +22,23 @@
 #include "led_strip.h"
 
 namespace lane {
-const auto PREF_RECORD_NAME    = "record";
-const auto CIRCLE_LEDs_NUM_KEY = "c";
-const auto CIRCLE_LENGTH_KEY   = "cl";
-const auto TRACK_LEDs_NUM_KEY  = "t";
+const auto PREF_RECORD_NAME = "rec";
+// float
+const auto PREF_LINE_LENGTH_NAME = "ll";
+// float
+const auto PREF_ACTIVE_LENGTH_NAME = "al";
+// uint32_t
+const auto PREF_LINE_LEDs_NUM_NAME = "ln";
+// float
+const auto PREF_TOTAL_LENGTH_NAME = "to";
+// uint32_t
+const auto PREF_COLOR_NAME = "co";
 
 using centimeter = utils::length<float, std::centi>;
 using meter      = utils::length<float, std::ratio<1>>;
 
 // the line would be active for this length
-const auto DEFAULT_ACTIVE_LENGTH = centimeter(60);
+const auto DEFAULT_ACTIVE_LENGTH = meter(0.6);
 // line... it would wrap around
 const auto DEFAULT_LINE_LENGTH = meter(50);
 // like shift
@@ -112,12 +119,11 @@ struct LaneBLE {
  * @brief The Lane class
  */
 class Lane {
-public:
-  [[nodiscard]] float getLEDsPerMeter() const;
-  [[nodiscard]] auto getLaneLEDsNum() const {
-    return this->cfg.line_LEDs_num;
-  }
+  friend class ControlCharCallback;
+  friend class ConfigCharCallback;
 
+protected:
+  bool is_initialized = false;
   Preferences pref;
   static const led_pixel_format_t LED_PIXEL_FORMAT = LED_PIXEL_FORMAT_RGB;
   int pin                                          = 23;
@@ -143,6 +149,19 @@ public:
       .speed  = 0,
       .status = LaneStatus::STOP,
   };
+
+  Lane() = default;
+
+  /// iterate the strip
+  void iterate();
+
+  void stop() const;
+
+public:
+  [[nodiscard]] float getLEDsPerMeter() const;
+  [[nodiscard]] auto getLaneLEDsNum() const {
+    return this->cfg.line_LEDs_num;
+  }
 
   /**
    * @brief Loop the strip.
@@ -187,6 +206,10 @@ public:
 
   esp_err_t begin(int16_t PIN);
 
+  void setConfig(LaneConfig cfg) {
+    this->cfg = cfg;
+  };
+
   /// set track length (count LEDs)
   void setCountLEDs(uint32_t count);
 
@@ -212,14 +235,6 @@ public:
   inline void resetDecodeBuffer() {
     decode_buffer.fill(0);
   }
-
-protected:
-  bool is_initialized = false;
-  Lane()              = default;
-
-  void runOnce();
-
-  void stop() const;
 };
 
 //*********************************** Callbacks ****************************************/
@@ -240,7 +255,10 @@ class ConfigCharCallback : public NimBLECharacteristicCallbacks {
   lane::Lane &lane;
 
 public:
+  /// would expect LaneConfig variant
   void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) override;
+  /// would output LaneConfigRO variant
+  void onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override;
 
   explicit ConfigCharCallback(lane::Lane &lane) : lane(lane) {}
 };

@@ -18,20 +18,34 @@ static auto NOTIFY_TAG = "NotifyCallback";
 struct ScanCallbackParam {
   std::function<void()> *cb;
   TaskHandle_t handle;
+  ~ScanCallbackParam() {
+    if (handle != nullptr) {
+      vTaskDelete(handle);
+    }
+    delete cb;
+  }
 };
 
 // see hr_data.ksy. would mutate the output
-etl::optional<size_t> encode(uint8_t updated_id, DeviceMap &device_map, etl::span<uint8_t> &output) {
+etl::optional<size_t> encode(const std::string &updated_id, const DeviceMap &device_map, etl::span<uint8_t> &output) {
   auto sz        = device_map.size();
   size_t offset  = 0;
   output[offset] = static_cast<uint8_t>(sz);
   offset += 1;
-  output[offset] = updated_id;
+  auto first_three_byte = std::string_view(updated_id).substr(0, 3);
+  for (auto c : first_three_byte) {
+    output[offset] = c;
+    offset += 1;
+  }
   offset += 1;
   for (auto &[id, info_p] : device_map) {
     if (info_p != nullptr) {
-      auto &info     = *info_p;
-      output[offset] = id;
+      auto &info   = *info_p;
+      auto f3bytes = std::string_view(id).substr(0, 3);
+      for (auto c : f3bytes) {
+        output[offset] = c;
+        offset += 1;
+      }
       offset += 1;
       output[offset] = info.last_hr;
       if (offset >= output.size()) {
@@ -58,18 +72,12 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     auto &device_map = this->devices;
     // return the start of the band id (index)
     // add with additional space
-    auto brand_pos   = name.find("T03") + 4;
-    auto band_id_str = std::string_view(name).substr(brand_pos, name.length() - brand_pos);
-    uint8_t band_id;
-    auto [ptr, ec] = std::from_chars(band_id_str.data(), band_id_str.data() + band_id_str.size(), band_id);
-    if (ec != std::errc()) {
-      ESP_LOGE(TAG, "Failed to parse band id %s with ec %d", band_id_str.data(), static_cast<int>(ec));
-      return;
-    }
-    bool is_scanned   = device_map.find(band_id) != device_map.end();
-    bool is_connected = [is_scanned, band_id, &device_map]() {
+    auto brand_pos    = name.find("T03") + 4;
+    auto band_id_str  = name.substr(brand_pos, name.length() - brand_pos);
+    bool is_scanned   = device_map.find(band_id_str) != device_map.end();
+    bool is_connected = [is_scanned, band_id_str, &device_map]() {
       if (is_scanned) {
-        auto &client = *device_map.at(band_id)->client;
+        auto &client = *device_map.at(band_id_str)->client;
         return client.isConnected();
       }
       return false;
@@ -79,7 +87,7 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
     }
 
     // allocate in heap
-    auto cb = [advertisedDevice, name, band_id, pHrChar, &device_map]() {
+    auto cb = [advertisedDevice, name, band_id_str, pHrChar, &device_map]() {
       /// user should check the return value of this function
       auto configClient = [advertisedDevice, &name](BLEClient &client) -> NimBLERemoteCharacteristic * {
         const auto serviceUUID   = "180D";
@@ -107,7 +115,7 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
         ESP_LOGI(TAG, "Connected to %s", name.c_str());
         return pCharacteristic;
       };
-      if (device_map.find(band_id) == device_map.end()) {
+      if (device_map.find(band_id_str) == device_map.end()) {
         auto &client = *BLEDevice::createClient();
         /// Note, intended to be allocated in heap
         auto info = new DeviceInfo{
@@ -116,7 +124,7 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
             0,
         };
         auto pChar  = configClient(client);
-        auto notify = [band_id, info, pHrChar, &device_map](
+        auto notify = [band_id_str, info, pHrChar, &device_map](
                           NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
                           const uint8_t *pData,
                           size_t length,
@@ -128,10 +136,10 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
               if (info != nullptr) {
                 info->last_hr   = hr;
                 info->last_seen = esp_timer_get_time();
-                ESP_LOGI(NOTIFY_TAG, "%d bpm from %d", hr, band_id);
+                ESP_LOGI(NOTIFY_TAG, "%d bpm from %s", hr, band_id_str.c_str());
                 auto buf  = new uint8_t[sizeNeeded(device_map)];
                 auto span = etl::span<uint8_t>(buf, sizeNeeded(device_map));
-                auto sz   = encode(band_id, device_map, span);
+                auto sz   = encode(band_id_str, device_map, span);
                 if (sz.has_value()) {
                   if (pHrChar != nullptr) {
                     pHrChar->setValue(span.data(), sz.value());
@@ -147,7 +155,7 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
                 delete[] buf;
               } else {
                 ESP_LOGE(NOTIFY_TAG, "Info is null. Remove the device.");
-                device_map.erase(band_id);
+                device_map.erase(band_id_str);
                 pBLERemoteCharacteristic->unsubscribe();
               }
             }
@@ -155,12 +163,12 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
         };
         if (pChar != nullptr) {
           pChar->subscribe(true, notify);
-          device_map.insert(etl::pair(band_id, info));
+          device_map.insert(etl::pair(band_id_str, info));
         } else {
           delete info;
         }
       } else {
-        auto info_n = device_map.at(band_id);
+        auto info_n = device_map.at(band_id_str);
         if (info_n != nullptr) {
           auto &info   = *info_n;
           auto &client = *info.client;
@@ -169,7 +177,7 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
           }
         } else {
           ESP_LOGE(TAG, "Info is null. Remove the device.");
-          device_map.erase(band_id);
+          device_map.erase(band_id_str);
         }
       }
     };
@@ -184,10 +192,7 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
       auto &param = *reinterpret_cast<ScanCallbackParam *>(cb);
       auto f      = param.cb;
       (*f)();
-      delete f;
-      if (param.handle != nullptr) {
-        vTaskDelete(param.handle);
-      }
+      // handled by the destructor
       delete &param;
     },
                            "connect", 4096, param, 1, &param->handle);

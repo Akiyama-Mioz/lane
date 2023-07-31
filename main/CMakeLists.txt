@@ -1,6 +1,7 @@
 idf_component_register(SRCS
         lane_main.cpp
         Lane.cpp
+        LaneCallback.cpp
         ScanCallback.cpp
         utils.cpp
         INCLUDE_DIRS

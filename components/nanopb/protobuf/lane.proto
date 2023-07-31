@@ -54,6 +54,13 @@ message LaneConfig {
   }
 }
 
+// LaneConfigRO is the read-only version of LaneConfig
+// which contains all of the current config of the lane
+message LaneConfigRO {
+  LaneLengthConfig length_cfg = 1;
+  LaneColorConfig color_cfg = 2;
+}
+
 // use to control the lane
 // go through Control Characteristic vid Write. The lane would clear the characteristic after processing and
 // replace the buffer with `LaneState`

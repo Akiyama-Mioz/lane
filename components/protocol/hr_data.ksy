@@ -8,7 +8,9 @@ seq:
   - id: num_pairs
     type: u1
   - id: updated_id
-    type: u1
+    type: str
+    size: 3
+    encoding: UTF-8
     doc:|
         Which band was updated. Only one band is updated at a time.
         You should iterate over the pairs and find the one that matches.
@@ -21,6 +23,8 @@ types:
   pair:
     seq:
       - id: band_id
-        type: u1
+        type: str
+        size: 3
+        encoding: UTF-8
       - id: heart_rate
         type: u1

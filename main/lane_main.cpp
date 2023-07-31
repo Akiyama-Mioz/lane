@@ -12,7 +12,7 @@
 
 static auto BLE_NAME          = "lane-011";
 static const uint16_t LED_PIN = 23;
-//static const uint16_t LED_PIN = 2;
+// static const uint16_t LED_PIN = 2;
 
 static const char *LIGHT_SERVICE_UUID        = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
 static const char *LIGHT_CHAR_STATUS_UUID    = "24207642-0d98-40cd-84bb-910008579114";
@@ -53,8 +53,20 @@ extern "C" [[noreturn]] void app_main() {
 
   Preferences pref;
   pref.begin(PREF_RECORD_NAME, true);
-  // TODO: persist the config
+  auto line_length   = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
+  auto active_length = pref.getFloat(PREF_ACTIVE_LENGTH_NAME, DEFAULT_ACTIVE_LENGTH.count());
+  auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
+  auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
+  auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
   pref.end();
+  auto default_cfg = lane::LaneConfig{
+      .color         = color,
+      .line_length   = lane::meter(line_length),
+      .active_length = lane::meter(active_length),
+      .total_length  = lane::meter(total_length),
+      .line_LEDs_num = line_LEDs_num,
+      .fps           = DEFAULT_FPS,
+  };
 
   NimBLEDevice::init(BLE_NAME);
   auto &server = *NimBLEDevice::createServer();
@@ -73,6 +85,7 @@ extern "C" [[noreturn]] void app_main() {
   auto &lane    = *Lane::get();
   auto lane_ble = LaneBLE();
   lane.setBLE(lane_ble);
+  lane.setConfig(default_cfg);
   initBLE(&server, lane_ble, lane);
   ESP_ERROR_CHECK_WITHOUT_ABORT(lane.begin(LED_PIN));
 

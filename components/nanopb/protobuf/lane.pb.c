@@ -24,6 +24,9 @@ PB_BIND(LaneState, LaneState, AUTO)
 PB_BIND(LaneConfig, LaneConfig, AUTO)
 
 
+PB_BIND(LaneConfigRO, LaneConfigRO, AUTO)
+
+
 PB_BIND(LaneControl, LaneControl, AUTO)
 
 

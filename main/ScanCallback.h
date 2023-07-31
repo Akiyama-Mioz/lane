@@ -18,7 +18,7 @@ struct DeviceInfo {
 };
 
 /// Should not touch the info pointer (Read Only)
-using DeviceMap = etl::flat_map<uint16_t, DeviceInfo*, 10>;
+using DeviceMap = etl::flat_map<std::string, DeviceInfo*, 10>;
 
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   // the characteristic to send the heart rate data to the client with the format described in

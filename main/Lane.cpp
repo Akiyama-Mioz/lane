@@ -151,6 +151,12 @@ void Lane::stop() const {
 struct UpdateTaskParam {
   std::function<void()> *fn;
   TaskHandle_t handle;
+  ~UpdateTaskParam() {
+    if (handle != nullptr) {
+      vTaskDelete(handle);
+    }
+    delete fn;
+  }
 };
 
 void Lane::loop() {
@@ -159,24 +165,27 @@ void Lane::loop() {
   for (;;) {
     if (state.status != LaneStatus::STOP) {
       instant.reset();
-      runOnce();
+      iterate();
       if (update_instance.elapsed() > BLUE_TRANSMIT_INTERVAL) {
         auto task = [](void *param) {
           auto &update_param = *static_cast<UpdateTaskParam *>(param);
           (*update_param.fn)();
-          if (update_param.handle != nullptr) {
-            vTaskDelete(update_param.handle);
-          }
+          // handled in the destructor
+          delete &update_param;
         };
         auto &l          = *this;
         auto update_task = [&l]() {
           l.notifyState(l.state);
         };
-        auto param = UpdateTaskParam{
+        auto param = new UpdateTaskParam{
             .fn     = new std::function(update_task),
             .handle = nullptr,
         };
-        xTaskCreate(task, "update_state", 2048, &param, 1, &param.handle);
+        auto res = xTaskCreate(task, "update_state", 2048, param, 1, &param->handle);
+        if (res != pdPASS) {
+          ESP_LOGE("LANE", "Failed to create task: %s", esp_err_to_name(res));
+          delete param;
+        }
         update_instance.reset();
       }
       auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
@@ -303,7 +312,7 @@ float Lane::getLEDsPerMeter() const {
   return static_cast<float>(l / n);
 }
 
-void Lane::runOnce() {
+void Lane::iterate() {
   auto next_state = nextState(this->state, this->cfg, this->params);
   // meter
   auto head       = this->state.head.count();
@@ -335,49 +344,3 @@ void Lane::runOnce() {
   }
 }
 }
-
-//****************************** Callback ************************************/
-
-namespace lane {
-void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
-  auto data                 = characteristic->getValue();
-  ::LaneControl control_msg = LaneControl_init_zero;
-  auto ostream              = pb_istream_from_buffer(data.data(), data.size());
-  auto ok                   = pb_decode(&ostream, LaneControl_fields, &control_msg);
-  if (!ok) {
-    ESP_LOGE("LANE", "Failed to decode the control message");
-    return;
-  }
-  switch (control_msg.which_msg) {
-    case LaneControl_set_speed_tag:
-      lane.setSpeed(control_msg.msg.set_speed.speed);
-      break;
-    case LaneControl_set_status_tag:
-      lane.setStatus(control_msg.msg.set_status.status);
-      break;
-  }
-}
-
-void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
-  auto data               = characteristic->getValue();
-  ::LaneConfig config_msg = LaneConfig_init_zero;
-  auto ostream            = pb_istream_from_buffer(data.data(), data.size());
-  auto ok                 = pb_decode(&ostream, LaneConfig_fields, &config_msg);
-  if (!ok) {
-    ESP_LOGE("LANE", "Failed to decode the config message");
-    return;
-  }
-  switch (config_msg.which_msg) {
-    case LaneConfig_color_cfg_tag:
-      lane.setColor(config_msg.msg.color_cfg.rgb);
-      break;
-    case LaneConfig_length_cfg_tag: {
-      lane.cfg.line_length   = meter(config_msg.msg.length_cfg.line_length_m);
-      lane.cfg.active_length = meter(config_msg.msg.length_cfg.active_length_m);
-      lane.cfg.total_length  = meter(config_msg.msg.length_cfg.total_length_m);
-      lane.cfg.line_LEDs_num = config_msg.msg.length_cfg.line_leds_num;
-      break;
-    }
-  }
-}
-};

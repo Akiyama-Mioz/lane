@@ -63,6 +63,15 @@ typedef struct _LaneConfig {
     } msg;
 } LaneConfig;
 
+/* LaneConfigRO is the read-only version of LaneConfig
+ which contains all of the current config of the lane */
+typedef struct _LaneConfigRO {
+    bool has_length_cfg;
+    LaneLengthConfig length_cfg;
+    bool has_color_cfg;
+    LaneColorConfig color_cfg;
+} LaneConfigRO;
+
 /* use to control the lane
  go through Control Characteristic vid Write. The lane would clear the characteristic after processing and
  replace the buffer with `LaneState` */
@@ -92,6 +101,7 @@ extern "C" {
 #define LaneSetSpeed_init_default                {0}
 #define LaneState_init_default                   {0, 0, 0, 0, _LaneStatus_MIN}
 #define LaneConfig_init_default                  {0, {LaneLengthConfig_init_default}}
+#define LaneConfigRO_init_default                {false, LaneLengthConfig_init_default, false, LaneColorConfig_init_default}
 #define LaneControl_init_default                 {0, {LaneSetStatus_init_default}}
 #define LaneLengthConfig_init_zero               {0, 0, 0, 0}
 #define LaneColorConfig_init_zero                {0}
@@ -99,6 +109,7 @@ extern "C" {
 #define LaneSetSpeed_init_zero                   {0}
 #define LaneState_init_zero                      {0, 0, 0, 0, _LaneStatus_MIN}
 #define LaneConfig_init_zero                     {0, {LaneLengthConfig_init_zero}}
+#define LaneConfigRO_init_zero                   {false, LaneLengthConfig_init_zero, false, LaneColorConfig_init_zero}
 #define LaneControl_init_zero                    {0, {LaneSetStatus_init_zero}}
 
 /* Field tags (for use in manual encoding/decoding) */
@@ -116,6 +127,8 @@ extern "C" {
 #define LaneState_status_tag                     5
 #define LaneConfig_length_cfg_tag                1
 #define LaneConfig_color_cfg_tag                 2
+#define LaneConfigRO_length_cfg_tag              1
+#define LaneConfigRO_color_cfg_tag               2
 #define LaneControl_set_status_tag               1
 #define LaneControl_set_speed_tag                2
 
@@ -160,6 +173,14 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,color_cfg,msg.color_cfg),   2)
 #define LaneConfig_msg_length_cfg_MSGTYPE LaneLengthConfig
 #define LaneConfig_msg_color_cfg_MSGTYPE LaneColorConfig
 
+#define LaneConfigRO_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  length_cfg,        1) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  color_cfg,         2)
+#define LaneConfigRO_CALLBACK NULL
+#define LaneConfigRO_DEFAULT NULL
+#define LaneConfigRO_length_cfg_MSGTYPE LaneLengthConfig
+#define LaneConfigRO_color_cfg_MSGTYPE LaneColorConfig
+
 #define LaneControl_FIELDLIST(X, a) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,set_status,msg.set_status),   1) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,set_speed,msg.set_speed),   2)
@@ -174,6 +195,7 @@ extern const pb_msgdesc_t LaneSetStatus_msg;
 extern const pb_msgdesc_t LaneSetSpeed_msg;
 extern const pb_msgdesc_t LaneState_msg;
 extern const pb_msgdesc_t LaneConfig_msg;
+extern const pb_msgdesc_t LaneConfigRO_msg;
 extern const pb_msgdesc_t LaneControl_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
@@ -183,10 +205,12 @@ extern const pb_msgdesc_t LaneControl_msg;
 #define LaneSetSpeed_fields &LaneSetSpeed_msg
 #define LaneState_fields &LaneState_msg
 #define LaneConfig_fields &LaneConfig_msg
+#define LaneConfigRO_fields &LaneConfigRO_msg
 #define LaneControl_fields &LaneControl_msg
 
 /* Maximum encoded size of messages (where known) */
 #define LaneColorConfig_size                     6
+#define LaneConfigRO_size                        31
 #define LaneConfig_size                          23
 #define LaneControl_size                         11
 #define LaneLengthConfig_size                    21
