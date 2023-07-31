@@ -29,6 +29,7 @@ struct ScanCallbackParam {
 // see hr_data.ksy. would mutate the output
 etl::optional<size_t> encode(const std::string &updated_id, const DeviceMap &device_map, etl::span<uint8_t> &output) {
   auto sz        = device_map.size();
+  // offset is the offset of next byte to be written
   size_t offset  = 0;
   output[offset] = static_cast<uint8_t>(sz);
   offset += 1;
@@ -46,9 +47,9 @@ etl::optional<size_t> encode(const std::string &updated_id, const DeviceMap &dev
         output[offset] = c;
         offset += 1;
       }
-      offset += 1;
       output[offset] = info.last_hr;
-      if (offset >= output.size()) {
+      if (offset > output.size()) {
+        ESP_LOGE(NOTIFY_TAG, "expected size: %d, offset: %d", output.size(), offset);
         return etl::nullopt;
       }
       offset += 1;
@@ -57,8 +58,8 @@ etl::optional<size_t> encode(const std::string &updated_id, const DeviceMap &dev
   return offset;
 }
 
-size_t sizeNeeded(DeviceMap &device_map) {
-  return 2 + device_map.size() * 2;
+size_t sizeNeeded(const DeviceMap &device_map) {
+  return 4 + device_map.size() * 4;
 }
 
 void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
