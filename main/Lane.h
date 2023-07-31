@@ -101,6 +101,7 @@ struct LaneParams {
   LaneStatus status;
 };
 
+// note: I assume every time call this function the time interval is 1/fps
 LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input);
 
 struct LaneBLE {

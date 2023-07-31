@@ -11,6 +11,7 @@
 #include <span>
 #include <etl/optional.h>
 #include <etl/span.h>
+#include <esp_check.h>
 
 static auto TAG        = "AdCallback";
 static auto NOTIFY_TAG = "NotifyCallback";

@@ -4,6 +4,9 @@
 
 #include "Lane.h"
 #include <ranges>
+#include <esp_check.h>
+
+static const auto TAG = "LANE";
 
 // the resolution is the clock frequency instead of strip frequency
 const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
@@ -25,10 +28,7 @@ static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, size_t sta
   auto g = (color >> 8) & 0xff;
   auto b = color & 0xff;
   for (std::integral auto i : std::ranges::iota_view(start, start + count)) {
-    auto err = led_strip_set_pixel(handle, i, r, g, b);
-    if (err != ESP_OK) {
-      return err;
-    }
+    ESP_RETURN_ON_ERROR(led_strip_set_pixel(handle, i, r, g, b), TAG, "Failed to set pixel %d", i);
   }
   return ESP_OK;
 }
@@ -43,7 +43,7 @@ static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, size_t sta
  * @note only fill but not refresh
  */
 static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t count, uint32_t color) {
-  led_strip_clean_clear(handle);
+  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
   return led_strip_set_many_pixels(handle, start, count, color);
 }
 
@@ -57,7 +57,7 @@ static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t co
  * @return ESP_OK if success
  */
 static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
-  led_strip_clean_clear(handle);
+  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
   return led_strip_set_many_pixels(handle, total - start - count, count, color);
 }
 
@@ -81,6 +81,7 @@ inline LaneStatus revert_state(LaneStatus state) {
     return LaneStatus::FORWARD;
   }
 }
+
 /**
  * @brief get the next state. should be a pure function.
  * @param last_state
@@ -88,8 +89,7 @@ inline LaneStatus revert_state(LaneStatus state) {
  * @param [in, out]input param
  * @return the next state.
  */
-inline LaneState
-nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
+LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
   auto TAG        = "lane::nextState";
   auto zero_state = LaneState::zero();
   switch (last_state.status) {
@@ -166,6 +166,7 @@ void Lane::loop() {
     if (state.status != LaneStatus::STOP) {
       instant.reset();
       iterate();
+      // I could use the timer from FreeRTOS, but I prefer SystemClock now.
       if (update_instance.elapsed() > BLUE_TRANSMIT_INTERVAL) {
         auto task = [](void *param) {
           auto &update_param = *static_cast<UpdateTaskParam *>(param);
@@ -182,15 +183,20 @@ void Lane::loop() {
             .handle = nullptr,
         };
         auto res = xTaskCreate(task, "update_state", 2048, param, 1, &param->handle);
-        if (res != pdPASS) {
-          ESP_LOGE("LANE", "Failed to create task: %s", esp_err_to_name(res));
+        if (res != pdPASS) [[unlikely]] {
+          ESP_LOGE(TAG, "Failed to create task: %s", esp_err_to_name(res));
           delete param;
         }
         update_instance.reset();
       }
       auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
-      auto delay = pdMS_TO_TICKS((1000 / cfg.fps - diff.count()));
-      vTaskDelay(delay);
+      auto delay = std::chrono::milliseconds(static_cast<uint16_t>(1000 / cfg.fps)) - diff;
+      if (delay < std::chrono::milliseconds(0)) [[unlikely]] {
+        ESP_LOGW(TAG, "delay timeout %lld", delay.count());
+      } else {
+        auto ticks = pdMS_TO_TICKS(delay.count());
+        vTaskDelay(ticks);
+      }
     } else {
       led_strip_clear(led_strip);
       led_strip_refresh(led_strip);
@@ -323,19 +329,13 @@ void Lane::iterate() {
   this->state     = next_state;
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
-      auto err = fill_forward(led_strip, head_index, count, cfg.color);
-      if (err != ESP_OK) {
-        ESP_LOGE("LANE", "Error when filling forward: %s", esp_err_to_name(err));
-      }
-      led_strip_refresh(led_strip);
+      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_forward(led_strip, head_index, count, cfg.color));
+      ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
       break;
     }
     case LaneStatus::BACKWARD: {
-      auto err = fill_backward(led_strip, cfg.line_LEDs_num, head_index, count, cfg.color);
-      if (err != ESP_OK) {
-        ESP_LOGE("LANE", "Error when filling backward: %s", esp_err_to_name(err));
-      }
-      led_strip_refresh(led_strip);
+      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_backward(led_strip, cfg.line_LEDs_num, head_index, count, cfg.color));
+      ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
       break;
     }
     default:

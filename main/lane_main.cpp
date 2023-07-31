@@ -87,7 +87,7 @@ extern "C" [[noreturn]] void app_main() {
   lane.setBLE(lane_ble);
   lane.setConfig(default_cfg);
   initBLE(&server, lane_ble, lane);
-  ESP_ERROR_CHECK_WITHOUT_ABORT(lane.begin(LED_PIN));
+  ESP_ERROR_CHECK(lane.begin(LED_PIN));
 
   //************** HR char initialization ****************
 
