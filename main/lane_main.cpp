@@ -14,11 +14,11 @@ static auto BLE_NAME          = "lane-011";
 static const uint16_t LED_PIN = 23;
 // static const uint16_t LED_PIN = 2;
 
-static const char *LIGHT_SERVICE_UUID        = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
-static const char *LIGHT_CHAR_STATUS_UUID    = "24207642-0d98-40cd-84bb-910008579114";
-static const char *LIGHT_CHAR_CONFIG_UUID    = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
-static const char *LIGHT_CHAR_STATE_UUID     = "ed3eefa1-3c80-b43f-6b65-e652374650b5";
-static const char *LIGHT_CHAR_HEARTBEAT_UUID = "048b8928-d0a5-43e2-ada9-b925ec62ba27";
+static const char *BLE_SERVICE_UUID         = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
+static const char *BLE_CHAR_HR_SERVICE_UUID = "180d";
+static const char *BLE_CHAR_CONTROL_UUID    = "24207642-0d98-40cd-84bb-910008579114";
+static const char *BLE_CHAR_CONFIG_UUID     = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
+static const char *BLE_CHAR_HEARTBEAT_UUID  = "048b8928-d0a5-43e2-ada9-b925ec62ba27";
 
 using namespace lane;
 /**
@@ -32,15 +32,15 @@ void initBLE(NimBLEServer *server, LaneBLE &ble, Lane &lane) {
     return;
   }
 
-  ble.service = server->createService(LIGHT_SERVICE_UUID);
+  ble.service = server->createService(BLE_SERVICE_UUID);
 
-  ble.ctrl_char = ble.service->createCharacteristic(LIGHT_CHAR_STATUS_UUID,
+  ble.ctrl_char = ble.service->createCharacteristic(BLE_CHAR_CONTROL_UUID,
                                                     NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
   auto ctrl_cb  = new ControlCharCallback(lane);
   ble.ctrl_char->setCallbacks(ctrl_cb);
 
   /// write to control and read/notify for the state
-  ble.config_char = ble.service->createCharacteristic(LIGHT_CHAR_CONFIG_UUID,
+  ble.config_char = ble.service->createCharacteristic(BLE_CHAR_CONFIG_UUID,
                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   auto config_cb  = new ConfigCharCallback(lane);
   ble.config_char->setCallbacks(config_cb);
@@ -91,8 +91,8 @@ extern "C" [[noreturn]] void app_main() {
 
   //************** HR char initialization ****************
 
-  auto &hr_service = *server.createService("180D");
-  auto &hr_char    = *hr_service.createCharacteristic(LIGHT_CHAR_STATE_UUID,
+  auto &hr_service = *server.createService(BLE_CHAR_HR_SERVICE_UUID);
+  auto &hr_char    = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,
                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   hr_service.start();
 
