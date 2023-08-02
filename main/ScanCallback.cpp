@@ -39,7 +39,6 @@ etl::optional<size_t> encode(const std::string &updated_id, const DeviceMap &dev
     output[offset] = c;
     offset += 1;
   }
-  offset += 1;
   for (auto &[id, info_p] : device_map) {
     if (info_p != nullptr) {
       auto &info   = *info_p;
