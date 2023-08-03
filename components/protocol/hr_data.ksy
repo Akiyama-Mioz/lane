@@ -11,7 +11,7 @@ seq:
     type: str
     size: 3
     encoding: UTF-8
-    doc:|
+    doc: |
         Which band was updated. Only one band is updated at a time.
         You should iterate over the pairs and find the one that matches.
   - id: pairs

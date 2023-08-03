@@ -29,7 +29,7 @@ struct ScanCallbackParam {
 
 // see hr_data.ksy. would mutate the output
 etl::optional<size_t> encode(const std::string &updated_id, const DeviceMap &device_map, etl::span<uint8_t> &output) {
-  auto sz        = device_map.size();
+  auto sz = device_map.size();
   // offset is the offset of next byte to be written
   size_t offset  = 0;
   output[offset] = static_cast<uint8_t>(sz);
@@ -116,20 +116,13 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
         ESP_LOGI(TAG, "Connected to %s", name.c_str());
         return pCharacteristic;
       };
-      if (device_map.find(band_id_str) == device_map.end()) {
-        auto &client = *BLEDevice::createClient();
-        /// Note, intended to be allocated in heap
-        auto info = new DeviceInfo{
-            &client,
-            esp_timer_get_time(),
-            0,
-        };
-        auto pChar  = configClient(client);
-        auto notify = [band_id_str, info, pHrChar, &device_map](
-                          NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
-                          const uint8_t *pData,
-                          size_t length,
-                          bool isNotify) {
+      /// make a notify callback
+      auto make_notify = [band_id_str, pHrChar, &device_map](DeviceInfo *info) {
+        return [band_id_str, info, pHrChar, &device_map](
+                   NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
+                   const uint8_t *pData,
+                   size_t length,
+                   bool isNotify) {
           if (length >= 2) {
             // the first byte is always 0x04. the second byte is the heart rate.
             auto hr = pData[1];
@@ -162,19 +155,35 @@ void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
             }
           }
         };
+      };
+      if (device_map.find(band_id_str) == device_map.end()) {
+        ESP_LOGI(TAG, "Configure new band %s", band_id_str.c_str());
+        auto &client = *BLEDevice::createClient();
+        /// Note, intended to be allocated in heap
+        auto info = new DeviceInfo{
+            &client,
+            esp_timer_get_time(),
+            0,
+        };
+        auto pChar = configClient(client);
         if (pChar != nullptr) {
+          auto notify = make_notify(info);
           pChar->subscribe(true, notify);
           device_map.insert(etl::pair(band_id_str, info));
         } else {
           delete info;
         }
       } else {
+        ESP_LOGI(TAG, "Reconfigure known band %s", band_id_str.c_str());
         auto info_n = device_map.at(band_id_str);
         if (info_n != nullptr) {
           auto &info   = *info_n;
           auto &client = *info.client;
-          if (!client.isConnected()) {
-            auto _ = configClient(client);
+          auto pChar   = configClient(client);
+          auto notify  = make_notify(&info);
+          // What would happen to the old notify callback?
+          if (pChar != nullptr) {
+            pChar->subscribe(true, notify);
           }
         } else {
           ESP_LOGE(TAG, "Info is null. Remove the device.");
