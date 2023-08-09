@@ -51,6 +51,7 @@ static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
 static const auto READY_INTERVAL         = std::chrono::milliseconds(500);
 constexpr size_t DECODE_BUFFER_SIZE      = 2048;
 
+
 enum class LaneStatus {
   FORWARD  = ::LaneStatus_FORWARD,
   BACKWARD = ::LaneStatus_BACKWARD,
@@ -72,6 +73,8 @@ struct LaneState {
   float speed = 0;
   // head should be always larger than tail
   meter head        = meter(0);
+  /// hidden head for calculation
+  meter _head       = meter(0);
   meter tail        = meter(0);
   LaneStatus status = LaneStatus::STOP;
   static LaneState zero() {
@@ -79,6 +82,7 @@ struct LaneState {
         .shift  = meter(0),
         .speed  = 0,
         .head   = meter(0),
+        ._head  = meter(0),
         .tail   = meter(0),
         .status = LaneStatus::STOP,
     };
@@ -153,13 +157,15 @@ protected:
 
   Lane() = default;
 
+  Instant my_debug_instant = Instant();
+
   /// iterate the strip
   void iterate();
 
   void stop() const;
 
 public:
-  [[nodiscard]] float getLEDsPerMeter() const;
+  [[nodiscard]] meter lengthPerLED() const;
   [[nodiscard]] auto getLaneLEDsNum() const {
     return this->cfg.line_LEDs_num;
   }
@@ -236,6 +242,7 @@ public:
   inline void resetDecodeBuffer() {
     decode_buffer.fill(0);
   }
+  float LEDsPerMeter() const;
 };
 
 //*********************************** Callbacks ****************************************/

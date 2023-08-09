@@ -124,16 +124,21 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
       ret.speed = input.speed;
       // I assume every time call this function the time interval is 1/fps
       ret.shift      = last_state.shift + meter(ret.speed / cfg.fps);
-      auto temp_head = last_state.head + meter(ret.speed / cfg.fps);
-      if (temp_head > (cfg.active_length + cfg.line_length)) {
+      auto temp_head = last_state._head + meter(ret.speed / cfg.fps);
+      auto err = meter(ret.speed / cfg.fps);
+      if (temp_head >= (cfg.active_length + cfg.line_length - err)) {
         ret.status = revert_state(last_state.status);
-        ret.head   = temp_head - (cfg.active_length + cfg.line_length);
+        auto t = temp_head - (cfg.active_length + cfg.line_length) - err;
+        ret.head   = t > meter(0) ? t : meter(0);
+        ret._head = ret.head;
         ret.tail   = meter(0);
-      } else if (temp_head > cfg.line_length) {
+      } else if (temp_head >= cfg.line_length) {
+        ret._head = temp_head;
         ret.head = cfg.line_length;
         ret.tail = temp_head - cfg.line_length;
       } else {
         ret.head       = temp_head;
+        ret._head = temp_head;
         auto temp_tail = temp_head - cfg.active_length;
         ret.tail       = temp_tail > meter(0) ? temp_tail : meter(0);
       }
@@ -171,7 +176,7 @@ void Lane::loop() {
       instant.reset();
       iterate();
       if (debug_instant.elapsed() > DEBUG_INTERVAL) {
-        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str());
+        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0lx06x", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str(), cfg.color);
         debug_instant.reset();
       }
       // I could use the timer from FreeRTOS, but I prefer SystemClock now.
@@ -332,10 +337,16 @@ void Lane::setCircleLength(float l) {
   this->cfg.line_length = meter(l);
 }
 
-float Lane::getLEDsPerMeter() const {
+meter Lane::lengthPerLED() const {
+  auto l = this->cfg.line_length;
+  auto n = this->cfg.line_LEDs_num;
+  return l / n;
+}
+
+float Lane::LEDsPerMeter() const {
   auto l = this->cfg.line_length.count();
   auto n = this->cfg.line_LEDs_num;
-  return static_cast<float>(l / n);
+  return n / l;
 }
 
 void Lane::iterate() {
@@ -344,11 +355,21 @@ void Lane::iterate() {
   auto head       = this->state.head.count();
   auto tail       = this->state.tail.count();
   auto length     = head - tail >= 0 ? head - tail : 0;
-  auto head_index = meterToLEDsCount(head, getLEDsPerMeter());
-  auto count      = meterToLEDsCount(length, getLEDsPerMeter());
+  auto head_index = meterToLEDsCount(head, LEDsPerMeter());
+  auto count      = meterToLEDsCount(length, LEDsPerMeter());
+  if (head_index > this->cfg.line_LEDs_num) {
+    head_index = this->cfg.line_LEDs_num - count;
+  }
+  if (head_index + count > this->cfg.line_LEDs_num) {
+    count = this->cfg.line_LEDs_num - head_index;
+  }
   this->state     = next_state;
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
+      if (this->my_debug_instant.elapsed() > std::chrono::milliseconds(500)) {
+        ESP_LOGI("Lane::iterate", "head: %d, count: %d", head_index, count);
+        my_debug_instant.reset();
+      }
       ESP_ERROR_CHECK_WITHOUT_ABORT(fill_forward(led_strip, head_index, count, cfg.color));
       ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
       break;

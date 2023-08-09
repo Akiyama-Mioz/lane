@@ -82,7 +82,7 @@ void ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLECon
     return;
   }
   auto h = to_hex(data, ostream.bytes_written);
-  ESP_LOGI(TAG, "Encoded data(%d): %s", ostream.bytes_written, h.c_str());
+  ESP_LOGD(TAG, "Encoded data(%d): %s", ostream.bytes_written, h.c_str());
 
   pCharacteristic->setValue(data, ostream.bytes_written);
 }
