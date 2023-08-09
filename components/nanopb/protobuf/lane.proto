@@ -12,6 +12,7 @@ enum LaneStatus {
   FORWARD = 0;
   BACKWARD = 1;
   STOP = 2;
+  BLINK = 3;
 }
 
 message LaneColorConfig {

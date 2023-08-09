@@ -107,25 +107,31 @@ inline LaneStatus revert_state(LaneStatus state) {
 LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
   auto TAG        = "lane::nextState";
   auto zero_state = LaneState::zero();
+  auto stop_case  = [=]() {
+    switch (input.status) {
+      case LaneStatus::FORWARD: {
+        auto ret   = zero_state;
+        ret.speed  = input.speed;
+        ret.status = LaneStatus::FORWARD;
+        return ret;
+      }
+      case LaneStatus::BACKWARD: {
+        auto ret   = zero_state;
+        ret.speed  = input.speed;
+        ret.status = LaneStatus::BACKWARD;
+        return ret;
+      }
+      default:
+        return zero_state;
+    }
+    return zero_state;
+  };
   switch (last_state.status) {
     case LaneStatus::STOP: {
-      switch (input.status) {
-        case LaneStatus::FORWARD: {
-          auto ret   = zero_state;
-          ret.speed  = input.speed;
-          ret.status = LaneStatus::FORWARD;
-          return ret;
-        }
-        case LaneStatus::BACKWARD: {
-          auto ret   = zero_state;
-          ret.speed  = input.speed;
-          ret.status = LaneStatus::BACKWARD;
-          return ret;
-        }
-        case LaneStatus::STOP: {
-          return zero_state;
-        }
-      }
+      return stop_case();
+    }
+    case LaneStatus::BLINK: {
+      return stop_case();
     }
     default: {
       if (input.status == LaneStatus::STOP) {
@@ -187,7 +193,7 @@ void Lane::loop() {
   auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "start loop");
   for (;;) {
-    if (params.status != LaneStatus::STOP) {
+    if (params.status == LaneStatus::FORWARD || params.status == LaneStatus::BACKWARD) {
       instant.reset();
       iterate();
       if (debug_instant.elapsed() > DEBUG_INTERVAL) {
@@ -229,11 +235,21 @@ void Lane::loop() {
         auto ticks = pdMS_TO_TICKS(delay.count());
         vTaskDelay(ticks);
       }
-    } else {
+    } else if (params.status == LaneStatus::STOP) {
       this->state = LaneState::zero();
       led_strip_clear(led_strip);
       led_strip_refresh(led_strip);
       vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
+    } else if (params.status == LaneStatus::BLINK) {
+      auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
+      auto delay                = pdMS_TO_TICKS(BLINK_INTERVAL.count());
+      led_strip_clear(led_strip);
+      vTaskDelay(delay);
+      led_strip_set_many_pixels(led_strip, 0, cfg.line_LEDs_num, cfg.color);
+      led_strip_refresh(led_strip);
+      vTaskDelay(delay);
+    } else {
+      // unreachable
     }
   }
 }
@@ -259,6 +275,7 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
   led_strip_rmt_config_t rmt_config = {
       .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
       .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
+      .mem_block_symbols = RMT_MEM_BLOCK_NUM,
       .flags         = {
                   .with_dma = false // DMA feature is available on ESP target like ESP32-S3
       },
@@ -303,6 +320,7 @@ esp_err_t Lane::begin(int16_t PIN) {
     led_strip_rmt_config_t rmt_config = {
         .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
         .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
+        .mem_block_symbols = RMT_MEM_BLOCK_NUM,
         .flags         = {
                     .with_dma = false // DMA feature is available on ESP target like ESP32-S3
         },

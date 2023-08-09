@@ -49,6 +49,8 @@ const auto DEFAULT_FPS           = 10;
 static const auto BLUE_TRANSMIT_INTERVAL = std::chrono::milliseconds(1000);
 static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
 static const auto READY_INTERVAL         = std::chrono::milliseconds(500);
+// mem_block_symbols must be even and at least 64
+static const auto RMT_MEM_BLOCK_NUM = 384;
 constexpr size_t DECODE_BUFFER_SIZE      = 2048;
 
 
@@ -56,6 +58,7 @@ enum class LaneStatus {
   FORWARD  = ::LaneStatus_FORWARD,
   BACKWARD = ::LaneStatus_BACKWARD,
   STOP     = ::LaneStatus_STOP,
+  BLINK   = ::LaneStatus_BLINK,
 };
 
 std::string statusToStr(LaneStatus status);

@@ -100,10 +100,12 @@ extern "C" [[noreturn]] void app_main() {
   ad.setName(BLE_NAME);
   ad.setScanResponse(false);
 
-  xTaskCreate(lane_loop,
+  // https://github.com/espressif/esp-idf/issues/11651
+  // https://lang-ship.com/reference/unofficial/M5StickC/Functions/freertos/task/
+  xTaskCreatePinnedToCore(lane_loop,
               "lane", 5120,
               &lane, configMAX_PRIORITIES - 3,
-              nullptr);
+              nullptr, 1);
 
   server.start();
   NimBLEDevice::startAdvertising();

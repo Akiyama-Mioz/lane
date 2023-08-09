@@ -13,7 +13,8 @@
 typedef enum _LaneStatus {
     LaneStatus_FORWARD = 0,
     LaneStatus_BACKWARD = 1,
-    LaneStatus_STOP = 2
+    LaneStatus_STOP = 2,
+    LaneStatus_BLINK = 3
 } LaneStatus;
 
 /* Struct definitions */
@@ -86,8 +87,8 @@ typedef struct _LaneControl {
 
 /* Helper constants for enums */
 #define _LaneStatus_MIN LaneStatus_FORWARD
-#define _LaneStatus_MAX LaneStatus_STOP
-#define _LaneStatus_ARRAYSIZE ((LaneStatus)(LaneStatus_STOP+1))
+#define _LaneStatus_MAX LaneStatus_BLINK
+#define _LaneStatus_ARRAYSIZE ((LaneStatus)(LaneStatus_BLINK+1))
 
 
 #ifdef __cplusplus
