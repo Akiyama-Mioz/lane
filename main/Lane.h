@@ -189,7 +189,7 @@ public:
    * @param new_max_LEDs
    * @param [in,out]cfg mutate in place
    */
-  void setMaxLEDs(uint32_t new_max_LEDs, LaneConfig &cfg);
+  void setMaxLEDs(uint32_t new_max_LEDs);
 
   /**
    * @brief set the status of the strip.

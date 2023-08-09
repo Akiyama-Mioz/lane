@@ -23,11 +23,17 @@ static inline float LEDsCountToMeter(uint32_t count, float LEDs_per_meter) {
   }
 }
 
-static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, size_t start, size_t count, uint32_t color) {
+static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, int start, int count, uint32_t color) {
   auto r = (color >> 16) & 0xff;
   auto g = (color >> 8) & 0xff;
   auto b = color & 0xff;
   for (std::integral auto i : std::ranges::iota_view(start, start + count)) {
+    // theoretically, i should be unsigned and never be negative.
+    // However I can safely ignore the negative value and continue the iteration.
+    if (i < 0) {
+      ESP_LOGW(TAG, "Invalid index %d", i);
+      continue;
+    }
     ESP_RETURN_ON_ERROR(led_strip_set_pixel(handle, i, r, g, b), TAG, "Failed to set pixel %d", i);
   }
   return ESP_OK;
@@ -44,6 +50,15 @@ static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, size_t sta
  */
 static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t count, uint32_t color) {
   ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
+  return led_strip_set_many_pixels(handle, start, count, color);
+}
+
+/// in parallel with fill_backward. You don't need the total parameter though.
+static esp_err_t fill_forward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
+  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
+  if (start + count > total) {
+    ESP_LOGW(TAG, "Invalid start %d, count %d; %d > %d ", start, count, start + count, total);
+  }
   return led_strip_set_many_pixels(handle, start, count, color);
 }
 
@@ -125,20 +140,20 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
       // I assume every time call this function the time interval is 1/fps
       ret.shift      = last_state.shift + meter(ret.speed / cfg.fps);
       auto temp_head = last_state._head + meter(ret.speed / cfg.fps);
-      auto err = meter(ret.speed / cfg.fps);
+      auto err       = meter(ret.speed / cfg.fps);
       if (temp_head >= (cfg.active_length + cfg.line_length - err)) {
         ret.status = revert_state(last_state.status);
-        auto t = temp_head - (cfg.active_length + cfg.line_length) - err;
-        ret.head   = t > meter(0) ? t : meter(0);
-        ret._head = ret.head;
+        ret.head   = meter(0);
+        ret._head  = ret.head;
         ret.tail   = meter(0);
       } else if (temp_head >= cfg.line_length) {
         ret._head = temp_head;
-        ret.head = cfg.line_length;
-        ret.tail = temp_head - cfg.line_length;
+        ret.head  = cfg.line_length;
+        auto t    = temp_head - cfg.active_length;
+        ret.tail  = t > cfg.line_length ? cfg.line_length : t;
       } else {
         ret.head       = temp_head;
-        ret._head = temp_head;
+        ret._head      = temp_head;
         auto temp_tail = temp_head - cfg.active_length;
         ret.tail       = temp_tail > meter(0) ? temp_tail : meter(0);
       }
@@ -166,9 +181,9 @@ struct UpdateTaskParam {
 };
 
 void Lane::loop() {
-  auto instant         = Instant();
-  auto update_instant  = Instant();
-  auto debug_instant = Instant();
+  auto instant                  = Instant();
+  auto update_instant           = Instant();
+  auto debug_instant            = Instant();
   auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "start loop");
   for (;;) {
@@ -215,6 +230,7 @@ void Lane::loop() {
         vTaskDelay(ticks);
       }
     } else {
+      this->state = LaneState::zero();
       led_strip_clear(led_strip);
       led_strip_refresh(led_strip);
       vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
@@ -223,7 +239,7 @@ void Lane::loop() {
 }
 
 /// i.e. Circle LEDs
-void Lane::setMaxLEDs(uint32_t new_max_LEDs, LaneConfig &cfg) {
+void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
   cfg.line_LEDs_num = new_max_LEDs;
   if (led_strip != nullptr) {
     led_strip_del(led_strip);
@@ -303,7 +319,7 @@ esp_err_t Lane::begin(int16_t PIN) {
 
 void Lane::notifyState(LaneState s) {
   const auto TAG = "Lane::notifyState";
-  if (this->ble.ctrl_char == nullptr){
+  if (this->ble.ctrl_char == nullptr) {
     ESP_LOGE(TAG, "BLE not initialized");
     return;
   }
@@ -321,7 +337,7 @@ void Lane::notifyState(LaneState s) {
     ESP_LOGE(TAG, "Failed to encode the state");
     return;
   }
-  auto h = to_hex(buf.cbegin(), stream.bytes_written);
+  auto h             = to_hex(buf.cbegin(), stream.bytes_written);
   auto current_value = to_hex(notify_char.getValue());
   ESP_LOGI(TAG, "Notify: %s", h.c_str());
   notify_char.setValue(buf.cbegin(), stream.bytes_written);
@@ -356,26 +372,24 @@ void Lane::iterate() {
   auto tail       = this->state.tail.count();
   auto length     = head - tail >= 0 ? head - tail : 0;
   auto head_index = meterToLEDsCount(head, LEDsPerMeter());
+  auto tail_index = meterToLEDsCount(tail, LEDsPerMeter());
   auto count      = meterToLEDsCount(length, LEDsPerMeter());
   if (head_index > this->cfg.line_LEDs_num) {
-    head_index = this->cfg.line_LEDs_num - count;
+    head_index = this->cfg.line_LEDs_num;
   }
-  if (head_index + count > this->cfg.line_LEDs_num) {
-    count = this->cfg.line_LEDs_num - head_index;
-  }
-  this->state     = next_state;
+  this->state = next_state;
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
       if (this->my_debug_instant.elapsed() > std::chrono::milliseconds(500)) {
         ESP_LOGI("Lane::iterate", "head: %d, count: %d", head_index, count);
         my_debug_instant.reset();
       }
-      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_forward(led_strip, head_index, count, cfg.color));
+      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_forward(led_strip, cfg.line_LEDs_num, tail_index, count, cfg.color));
       ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
       break;
     }
     case LaneStatus::BACKWARD: {
-      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_backward(led_strip, cfg.line_LEDs_num, head_index, count, cfg.color));
+      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_backward(led_strip, cfg.line_LEDs_num, tail_index, count, cfg.color));
       ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
       break;
     }

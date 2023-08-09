@@ -48,6 +48,10 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
       lane.setColor(config_msg.msg.color_cfg.rgb);
       break;
     case LaneConfig_length_cfg_tag: {
+      if (lane.state.status != LaneStatus::STOP) {
+        ESP_LOGE((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Can't change the length while the lane is running");
+        return;
+      }
       ESP_LOGI((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Set line length to %.2f; active length %.2f; total length %.2f; line LEDs: %ld;", config_msg.msg.length_cfg.line_length_m, config_msg.msg.length_cfg.active_length_m, config_msg.msg.length_cfg.total_length_m, config_msg.msg.length_cfg.line_leds_num);
       lane.pref.putFloat(PREF_LINE_LENGTH_NAME, config_msg.msg.length_cfg.line_length_m);
       lane.pref.putFloat(PREF_ACTIVE_LENGTH_NAME, config_msg.msg.length_cfg.active_length_m);
@@ -56,7 +60,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
       lane.cfg.line_length   = meter(config_msg.msg.length_cfg.line_length_m);
       lane.cfg.active_length = meter(config_msg.msg.length_cfg.active_length_m);
       lane.cfg.total_length  = meter(config_msg.msg.length_cfg.total_length_m);
-      lane.cfg.line_LEDs_num = config_msg.msg.length_cfg.line_leds_num;
+      lane.setMaxLEDs(config_msg.msg.length_cfg.line_leds_num);
       break;
     }
   }
