@@ -84,9 +84,9 @@ extern "C" [[noreturn]] void app_main() {
   // using singleton pattern to avoid memory leak
   auto &lane    = *Lane::get();
   auto lane_ble = LaneBLE();
+  initBLE(&server, lane_ble, lane);
   lane.setBLE(lane_ble);
   lane.setConfig(default_cfg);
-  initBLE(&server, lane_ble, lane);
   ESP_ERROR_CHECK(lane.begin(LED_PIN));
 
   //************** HR char initialization ****************

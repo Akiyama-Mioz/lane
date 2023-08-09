@@ -152,22 +152,30 @@ struct UpdateTaskParam {
   std::function<void()> *fn;
   TaskHandle_t handle;
   ~UpdateTaskParam() {
+    delete fn;
+    fn = nullptr;
     if (handle != nullptr) {
       vTaskDelete(handle);
     }
-    delete fn;
   }
 };
 
 void Lane::loop() {
   auto instant         = Instant();
-  auto update_instance = Instant();
+  auto update_instant  = Instant();
+  auto debug_instant = Instant();
+  auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
+  ESP_LOGI(TAG, "start loop");
   for (;;) {
-    if (state.status != LaneStatus::STOP) {
+    if (params.status != LaneStatus::STOP) {
       instant.reset();
       iterate();
+      if (debug_instant.elapsed() > DEBUG_INTERVAL) {
+        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str());
+        debug_instant.reset();
+      }
       // I could use the timer from FreeRTOS, but I prefer SystemClock now.
-      if (update_instance.elapsed() > BLUE_TRANSMIT_INTERVAL) {
+      if (update_instant.elapsed() > BLUE_TRANSMIT_INTERVAL) {
         auto task = [](void *param) {
           auto &update_param = *static_cast<UpdateTaskParam *>(param);
           (*update_param.fn)();
@@ -176,18 +184,22 @@ void Lane::loop() {
         };
         auto &l          = *this;
         auto update_task = [&l]() {
+          if (l.ble.ctrl_char == nullptr) {
+            ESP_LOGE("Lane::updateTask", "BLE not initialized");
+            return;
+          }
           l.notifyState(l.state);
         };
         auto param = new UpdateTaskParam{
-            .fn     = new std::function(update_task),
+            .fn     = new std::function<void()>(update_task),
             .handle = nullptr,
         };
-        auto res = xTaskCreate(task, "update_state", 2048, param, 1, &param->handle);
+        auto res = xTaskCreate(task, "update_state", 4096, param, 1, &param->handle);
         if (res != pdPASS) [[unlikely]] {
           ESP_LOGE(TAG, "Failed to create task: %s", esp_err_to_name(res));
           delete param;
         }
-        update_instance.reset();
+        update_instant.reset();
       }
       auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
       auto delay = std::chrono::milliseconds(static_cast<uint16_t>(1000 / cfg.fps)) - diff;
@@ -285,8 +297,13 @@ esp_err_t Lane::begin(int16_t PIN) {
 }
 
 void Lane::notifyState(LaneState s) {
+  const auto TAG = "Lane::notifyState";
+  if (this->ble.ctrl_char == nullptr){
+    ESP_LOGE(TAG, "BLE not initialized");
+    return;
+  }
   auto &notify_char = *this->ble.ctrl_char;
-  auto buf          = std::array<uint8_t, 32>();
+  auto buf          = std::array<uint8_t, LaneState_size>();
   ::LaneState st    = LaneState_init_zero;
   st.head           = s.head.count();
   st.tail           = s.tail.count();
@@ -296,10 +313,13 @@ void Lane::notifyState(LaneState s) {
   auto stream       = pb_ostream_from_buffer(buf.data(), buf.size());
   auto ok           = pb_encode(&stream, LaneState_fields, &st);
   if (!ok) {
-    ESP_LOGE("LANE", "Failed to encode the state");
+    ESP_LOGE(TAG, "Failed to encode the state");
     return;
   }
-  notify_char.setValue(buf.data(), stream.bytes_written);
+  auto h = to_hex(buf.cbegin(), stream.bytes_written);
+  auto current_value = to_hex(notify_char.getValue());
+  ESP_LOGI(TAG, "Notify: %s", h.c_str());
+  notify_char.setValue(buf.cbegin(), stream.bytes_written);
   notify_char.notify();
 }
 
