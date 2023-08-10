@@ -50,7 +50,11 @@ static const auto BLUE_TRANSMIT_INTERVAL = std::chrono::milliseconds(1000);
 static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
 static const auto READY_INTERVAL         = std::chrono::milliseconds(500);
 // mem_block_symbols must be even and at least 64
-static const auto RMT_MEM_BLOCK_NUM = 384;
+// https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/wdts.html
+// https://stackoverflow.com/questions/51750377/how-to-disable-interrupt-watchdog-in-esp32-or-increase-isr-time-limit
+// Increase IWTD (Interrupt Watchdog Timer) timeout is necessary.
+// Make this higher than the FreeRTOS tick rate (wait? the tick rate is 1000Hz i.e. 1ms, so it's not the FreeRTOS blocking)
+static const auto RMT_MEM_BLOCK_NUM = 192;
 constexpr size_t DECODE_BUFFER_SIZE      = 2048;
 
 

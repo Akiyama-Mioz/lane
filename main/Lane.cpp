@@ -357,7 +357,6 @@ void Lane::notifyState(LaneState s) {
   }
   auto h             = to_hex(buf.cbegin(), stream.bytes_written);
   auto current_value = to_hex(notify_char.getValue());
-  ESP_LOGI(TAG, "Notify: %s", h.c_str());
   notify_char.setValue(buf.cbegin(), stream.bytes_written);
   notify_char.notify();
 }
@@ -383,6 +382,10 @@ float Lane::LEDsPerMeter() const {
   return n / l;
 }
 
+// You will need this patch to your ESP-IDF if you meet a segmentation fault in RTM
+// https://github.com/crosstyan/esp-idf/commit/f18e63bef76f9400aa97dfd5f4cd80812c4bfa19
+// I have no idea why `tx_chan->cur_trans->encoder` would cause a segmentation fault. (null pointer dereference obviously)
+// I guess it's because some data race shit. dereference it and save `rmt_tx_channel_t` to stack could solve it.
 void Lane::iterate() {
   auto next_state = nextState(this->state, this->cfg, this->params);
   // meter
