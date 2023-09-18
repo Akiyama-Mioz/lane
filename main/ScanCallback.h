@@ -8,13 +8,23 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include <map>
-#include "ble.pb.h"
+#include <etl/flat_map.h>
+#include <etl/vector.h>
 
+struct DeviceInfo {
+  BLEClient* client;
+  int64_t last_seen;
+  uint8_t last_hr;
+};
 
-class AdCallback : public BLEAdvertisedDeviceCallbacks {
-  NimBLECharacteristic *characteristic = nullptr;
-  // deviceName, payload
-  std::map<std::string, std::string> lastDevices;
+/// Should not touch the info pointer (Read Only)
+using DeviceMap = etl::flat_map<std::string, DeviceInfo*, 10>;
+
+class ScanCallback : public BLEAdvertisedDeviceCallbacks {
+  // the characteristic to send the heart rate data to the client with the format described in
+  // `hr_data.ksy`
+  NimBLECharacteristic *hr_char = nullptr;
+  DeviceMap devices;
 
   /**
    * @brief callback when a device is found
@@ -25,7 +35,8 @@ class AdCallback : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice *advertisedDevice) override;
 
 public:
-  explicit AdCallback(NimBLECharacteristic *c) : characteristic(c) {}
+  explicit ScanCallback(NimBLECharacteristic *c) : hr_char(c) {}
+  DeviceMap& getDevices() { return devices; }
 };
 
 class ServerCallbacks : public NimBLEServerCallbacks {
