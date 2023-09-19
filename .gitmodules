@@ -22,3 +22,6 @@
 [submodule "components/led_strip"]
 	path = components/led_strip
 	url = https://github.com/crosstyan/led_strip
+[submodule "components/Adafruit_NeoPixel"]
+	path = components/Adafruit_NeoPixel
+	url = https://github.com/adafruit/Adafruit_NeoPixel

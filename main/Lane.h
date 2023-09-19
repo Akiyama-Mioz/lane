@@ -11,7 +11,6 @@
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
 #include "Preferences.h"
-#include "led_strip.h"
 #include "map"
 #include "vector"
 #include "lane.pb.h"
@@ -19,7 +18,7 @@
 #include "pb_decode.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "led_strip.h"
+#include "Adafruit_NeoPixel.h"
 
 namespace lane {
 const auto PREF_RECORD_NAME = "rec";
@@ -125,6 +124,10 @@ struct LaneBLE {
   NimBLEService *service = nullptr;
 };
 
+class Strip {
+
+};
+
 //**************************************** Lane *********************************/
 
 /**
@@ -137,11 +140,11 @@ class Lane {
 protected:
   bool is_initialized = false;
   Preferences pref;
-  static const led_pixel_format_t LED_PIXEL_FORMAT = LED_PIXEL_FORMAT_RGB;
+  static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
+  Adafruit_NeoPixel *pixels = nullptr;
   int pin                                          = 23;
 
   /// in meter
-  led_strip_handle_t led_strip                          = nullptr;
   std::array<uint8_t, DECODE_BUFFER_SIZE> decode_buffer = {0};
   LaneBLE ble                                           = {
                                                 .ctrl_char   = nullptr,

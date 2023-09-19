@@ -4,6 +4,7 @@
 
 #include "Lane.h"
 #include <ranges>
+#include "Strip.hpp"
 #include <esp_check.h>
 
 static const auto TAG = "LANE";
@@ -175,7 +176,7 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
 }
 
 void Lane::stop() const {
-  led_strip_clear(led_strip);
+  // TODO
   const auto delay = pdMS_TO_TICKS(HALT_INTERVAL.count());
   vTaskDelay(delay);
 }
@@ -243,17 +244,17 @@ void Lane::loop() {
       }
     } else if (params.status == LaneStatus::STOP) {
       this->state = LaneState::zero();
-      led_strip_clear(led_strip);
-      led_strip_refresh(led_strip);
+      // TODO
       vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
     } else if (params.status == LaneStatus::BLINK) {
       auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
       auto delay                = pdMS_TO_TICKS(BLINK_INTERVAL.count());
-      led_strip_clear(led_strip);
-      vTaskDelay(delay);
-      led_strip_set_many_pixels(led_strip, 0, cfg.line_LEDs_num, cfg.color);
-      led_strip_refresh(led_strip);
-      vTaskDelay(delay);
+      // TODO
+      //      led_strip_clear(led_strip);
+      //      vTaskDelay(delay);
+      //      led_strip_set_many_pixels(led_strip, 0, cfg.line_LEDs_num, cfg.color);
+      //      led_strip_refresh(led_strip);
+      //      vTaskDelay(delay);
     } else {
       // unreachable
     }
@@ -262,33 +263,7 @@ void Lane::loop() {
 
 /// i.e. Circle LEDs
 void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
-  cfg.line_LEDs_num = new_max_LEDs;
-  if (led_strip != nullptr) {
-    led_strip_del(led_strip);
-    led_strip = nullptr;
-  }
-  led_strip_config_t strip_config = {
-      .strip_gpio_num   = pin,              // The GPIO that connected to the LED strip's data line
-      .max_leds         = new_max_LEDs,     // The number of LEDs in the strip,
-      .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
-      .led_model        = LED_MODEL_WS2812, // LED strip model
-      .flags            = {
-                     .invert_out = false // whether to invert the output signal
-      },
-  };
-
-  // LED strip backend configuration: RMT
-  led_strip_rmt_config_t rmt_config = {
-      .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
-      .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
-      .mem_block_symbols = RMT_MEM_BLOCK_NUM,
-      .flags         = {
-                  .with_dma = is_dma // DMA feature is available on ESP target like ESP32-S3
-      },
-  };
-  led_strip_handle_t new_handle;
-  ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &new_handle));
-  led_strip = new_handle;
+  // TODO
 }
 
 /**
@@ -307,38 +282,8 @@ Lane *Lane::get() {
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
 esp_err_t Lane::begin(int16_t PIN) {
-  if (!is_initialized) {
-    pref.begin(PREF_RECORD_NAME, false);
-    this->pin = PIN;
-
-    // LED strip general initialization, according to your led board design
-    led_strip_config_t strip_config = {
-        .strip_gpio_num   = pin,                     // The GPIO that connected to the LED strip's data line
-        .max_leds         = this->cfg.line_LEDs_num, // The number of LEDs in the strip,
-        .led_pixel_format = LED_PIXEL_FORMAT,        // Pixel format of your LED strip
-        .led_model        = LED_MODEL_WS2812,        // LED strip model
-        .flags            = {
-                       .invert_out = false // whether to invert the output signal
-        },
-    };
-
-    // LED strip backend configuration: RMT
-    led_strip_rmt_config_t rmt_config = {
-        .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
-        .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
-        .mem_block_symbols = RMT_MEM_BLOCK_NUM,
-        .flags         = {
-                    .with_dma = is_dma // DMA feature is available on ESP target like ESP32-S3
-        },
-    };
-    led_strip_handle_t handle;
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &handle));
-    led_strip      = handle;
-    is_initialized = true;
-    return ESP_OK;
-  } else {
-    return ESP_ERR_INVALID_STATE;
-  }
+  // TODO
+  return ESP_OK;
 }
 
 void Lane::notifyState(LaneState s) {
@@ -407,17 +352,11 @@ void Lane::iterate() {
   this->state = next_state;
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
-      if (this->my_debug_instant.elapsed() > std::chrono::milliseconds(500)) {
-        ESP_LOGI("Lane::iterate", "head: %d, count: %d", head_index, count);
-        my_debug_instant.reset();
-      }
-      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_forward(led_strip, cfg.line_LEDs_num, tail_index, count, cfg.color));
-      ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
+      // TODO
       break;
     }
     case LaneStatus::BACKWARD: {
-      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_backward(led_strip, cfg.line_LEDs_num, tail_index, count, cfg.color));
-      ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
+      // TODO
       break;
     }
     default:
