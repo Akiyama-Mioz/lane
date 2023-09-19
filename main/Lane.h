@@ -54,7 +54,7 @@ static const auto READY_INTERVAL         = std::chrono::milliseconds(500);
 // https://stackoverflow.com/questions/51750377/how-to-disable-interrupt-watchdog-in-esp32-or-increase-isr-time-limit
 // Increase IWTD (Interrupt Watchdog Timer) timeout is necessary.
 // Make this higher than the FreeRTOS tick rate (wait? the tick rate is 1000Hz i.e. 1ms, so it's not the FreeRTOS blocking)
-static const auto RMT_MEM_BLOCK_NUM = 192;
+static const auto RMT_MEM_BLOCK_NUM = 512;
 constexpr size_t DECODE_BUFFER_SIZE      = 2048;
 
 

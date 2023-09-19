@@ -8,6 +8,12 @@
 
 static const auto TAG = "LANE";
 
+#if SOC_RMT_SUPPORT_DMA
+bool is_dma = true;
+#else
+bool is_dma = false;
+#endif
+
 // the resolution is the clock frequency instead of strip frequency
 const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
 
@@ -28,8 +34,8 @@ static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, int start,
   auto g = (color >> 8) & 0xff;
   auto b = color & 0xff;
   for (std::integral auto i : std::ranges::iota_view(start, start + count)) {
-    // theoretically, i should be unsigned and never be negative.
-    // However I can safely ignore the negative value and continue the iteration.
+    // theoretically, I should be unsigned and never be negative.
+    // However, I can safely ignore the negative value and continue the iteration.
     if (i < 0) {
       ESP_LOGW(TAG, "Invalid index %d", i);
       continue;
@@ -277,7 +283,7 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
       .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
       .mem_block_symbols = RMT_MEM_BLOCK_NUM,
       .flags         = {
-                  .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+                  .with_dma = is_dma // DMA feature is available on ESP target like ESP32-S3
       },
   };
   led_strip_handle_t new_handle;
@@ -322,7 +328,7 @@ esp_err_t Lane::begin(int16_t PIN) {
         .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
         .mem_block_symbols = RMT_MEM_BLOCK_NUM,
         .flags         = {
-                    .with_dma = false // DMA feature is available on ESP target like ESP32-S3
+                    .with_dma = is_dma // DMA feature is available on ESP target like ESP32-S3
         },
     };
     led_strip_handle_t handle;

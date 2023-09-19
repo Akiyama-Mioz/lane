@@ -7,27 +7,18 @@
 [submodule "nanopb_cpp"]
 	path = components/nanopb/nanopb_cpp
 	url = https://github.com/nanopb/nanopb_cpp
-[submodule "components/arduino-libs/NimBLE-Arduino"]
-	path = components/arduino-libs/NimBLE-Arduino
-	url = https://github.com/h2zero/NimBLE-Arduino
 [submodule "components/esp-nimble-cpp"]
 	path = components/esp-nimble-cpp
 	url = https://github.com/h2zero/esp-nimble-cpp
 [submodule "components/etl/etl"]
 	path = components/etl/etl
 	url = https://github.com/ETLCPP/etl
-[submodule "components/arduino-libs/Adafruit_NeoPixel"]
-	path = components/arduino-libs/Adafruit_NeoPixel
-	url = https://github.com/adafruit/Adafruit_NeoPixel
 [submodule "components/arduino"]
 	path = components/arduino
 	url = https://github.com/espressif/arduino-esp32
 [submodule "components/esp-protocols"]
 	path = components/esp-protocols
 	url = https://github.com/espressif/esp-protocols
-[submodule "components/idf-extra-components"]
-	path = components/idf-extra-components
-	url = https://github.com/espressif/idf-extra-components
 [submodule "components/led_strip"]
 	path = components/led_strip
 	url = https://github.com/crosstyan/led_strip
