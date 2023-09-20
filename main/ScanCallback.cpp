@@ -8,7 +8,6 @@
 #include <esp_pthread.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <span>
 #include <etl/optional.h>
 #include <etl/span.h>
 #include <esp_check.h>

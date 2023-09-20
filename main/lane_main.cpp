@@ -8,6 +8,7 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "Lane.h"
+#include <memory.h>
 #include "ScanCallback.h"
 
 static auto BLE_NAME          = "lane-011";
@@ -76,7 +77,7 @@ extern "C" [[noreturn]] void app_main() {
   /** an aux function used to let FreeRTOS do it work.
    * since FreeRTOS is implemented in C where we can't have lambda capture, so pStrip must be
    * passed as parameter.
-   **t /
+   **/
   auto lane_loop = [](void *param) {
     auto &lane = *static_cast<Lane *>(param);
     lane.loop();
@@ -91,7 +92,7 @@ extern "C" [[noreturn]] void app_main() {
   lane.setConfig(default_cfg);
   ESP_ERROR_CHECK(lane.begin());
 
-  //************** HR char initialization ****************
+  /************** HR char initialization ****************/
 
   auto &hr_service = *server.createService(BLE_CHAR_HR_SERVICE_UUID);
   auto &hr_char    = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,

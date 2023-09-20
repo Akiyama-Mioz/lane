@@ -3,7 +3,6 @@
 //
 
 #include "Lane.h"
-#include <ranges>
 #include "Strip.hpp"
 #include <esp_check.h>
 
@@ -28,59 +27,6 @@ static inline float LEDsCountToMeter(uint32_t count, float LEDs_per_meter) {
   } else {
     return static_cast<float>(count - 1) / LEDs_per_meter;
   }
-}
-
-static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, int start, int count, uint32_t color) {
-  auto r = (color >> 16) & 0xff;
-  auto g = (color >> 8) & 0xff;
-  auto b = color & 0xff;
-  for (std::integral auto i : std::ranges::iota_view(start, start + count)) {
-    // theoretically, I should be unsigned and never be negative.
-    // However, I can safely ignore the negative value and continue the iteration.
-    if (i < 0) {
-      ESP_LOGW(TAG, "Invalid index %d", i);
-      continue;
-    }
-    ESP_RETURN_ON_ERROR(led_strip_set_pixel(handle, i, r, g, b), TAG, "Failed to set pixel %d", i);
-  }
-  return ESP_OK;
-}
-
-/**
- *
- * @param handle
- * @param start the distance from the start
- * @param count
- * @param color
- * @return ESP_OK if success
- * @note only fill but not refresh
- */
-static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t count, uint32_t color) {
-  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
-  return led_strip_set_many_pixels(handle, start, count, color);
-}
-
-/// in parallel with fill_and_show_backward. You don't need the total parameter though.
-static esp_err_t fill_forward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
-  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
-  if (start + count > total) {
-    ESP_LOGW(TAG, "Invalid start %d, count %d; %d > %d ", start, count, start + count, total);
-  }
-  return led_strip_set_many_pixels(handle, start, count, color);
-}
-
-/**
- *
- * @param handle
- * @param total
- * @param start the distance from the end
- * @param count
- * @param color
- * @return ESP_OK if success
- */
-static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
-  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
-  return led_strip_set_many_pixels(handle, total - start - count, count, color);
 }
 
 namespace lane {
@@ -212,7 +158,7 @@ void Lane::loop() {
       instant.reset();
       iterate();
       if (debug_instant.elapsed() > DEBUG_INTERVAL) {
-        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0lx06x", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str(), cfg.color);
+        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0x06x", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str(), cfg.color);
         debug_instant.reset();
       }
       // I could use the timer from FreeRTOS, but I prefer SystemClock now.

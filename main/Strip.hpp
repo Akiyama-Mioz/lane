@@ -3,7 +3,6 @@
 #define TRACK_LONG_STRIP_HPP
 #include <esp_check.h>
 #include <Adafruit_NeoPixel.h>
-#include <ranges>
 #ifdef ESP_LED_STRIP
 #include "led_strip.h"
 #endif
