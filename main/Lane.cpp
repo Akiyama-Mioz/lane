@@ -60,7 +60,7 @@ static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t co
   return led_strip_set_many_pixels(handle, start, count, color);
 }
 
-/// in parallel with fill_backward. You don't need the total parameter though.
+/// in parallel with fill_and_show_backward. You don't need the total parameter though.
 static esp_err_t fill_forward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
   ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
   if (start + count > total) {
@@ -176,9 +176,12 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
 }
 
 void Lane::stop() const {
-  // TODO
-  const auto delay = pdMS_TO_TICKS(HALT_INTERVAL.count());
-  vTaskDelay(delay);
+  if (strip == nullptr){
+    ESP_LOGE(TAG, "strip is null");
+    return;
+  }
+  strip->clear();
+  strip->show();
 }
 
 struct UpdateTaskParam {
@@ -200,6 +203,11 @@ void Lane::loop() {
   auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "start loop");
   for (;;) {
+    if (strip == nullptr){
+      ESP_LOGE(TAG, "strip is null");
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
     if (params.status == LaneStatus::FORWARD || params.status == LaneStatus::BACKWARD) {
       instant.reset();
       iterate();
@@ -244,17 +252,15 @@ void Lane::loop() {
       }
     } else if (params.status == LaneStatus::STOP) {
       this->state = LaneState::zero();
-      // TODO
+      stop();
       vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
     } else if (params.status == LaneStatus::BLINK) {
       auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
       auto delay                = pdMS_TO_TICKS(BLINK_INTERVAL.count());
-      // TODO
-      //      led_strip_clear(led_strip);
-      //      vTaskDelay(delay);
-      //      led_strip_set_many_pixels(led_strip, 0, cfg.line_LEDs_num, cfg.color);
-      //      led_strip_refresh(led_strip);
-      //      vTaskDelay(delay);
+      stop();
+      vTaskDelay(delay);
+      strip->fill_and_show_forward(0, cfg.line_LEDs_num, cfg.color);
+      vTaskDelay(delay);
     } else {
       // unreachable
     }
@@ -263,7 +269,11 @@ void Lane::loop() {
 
 /// i.e. Circle LEDs
 void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
-  // TODO
+  if (strip == nullptr){
+    ESP_LOGE(TAG, "strip is null");
+    return;
+  }
+  strip->set_max_LEDs(new_max_LEDs);
 }
 
 /**
@@ -271,18 +281,19 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
  * @return the instance/pointer of the strip.
  */
 Lane *Lane::get() {
-  static auto *strip = new Lane();
-  return strip;
+  static auto *lane = new Lane();
+  return lane;
 }
 
 /**
  * @brief initialize the strip. this function should only be called once.
- * @param PIN the pin of strip, default is 14.
- * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-esp_err_t Lane::begin(int16_t PIN) {
-  // TODO
+esp_err_t Lane::begin() {
+  if (strip == nullptr){
+    return ESP_ERR_INVALID_STATE;
+  }
+  strip->begin();
   return ESP_OK;
 }
 
@@ -338,6 +349,10 @@ float Lane::LEDsPerMeter() const {
 // I have no idea why `tx_chan->cur_trans->encoder` would cause a segmentation fault. (null pointer dereference obviously)
 // I guess it's because some data race shit. dereference it and save `rmt_tx_channel_t` to stack could solve it.
 void Lane::iterate() {
+  if (strip == nullptr){
+    ESP_LOGE(TAG, "strip is null");
+    return;
+  }
   auto next_state = nextState(this->state, this->cfg, this->params);
   // meter
   auto head       = this->state.head.count();
@@ -352,15 +367,14 @@ void Lane::iterate() {
   this->state = next_state;
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
-      // TODO
+      strip->fill_and_show_forward(tail_index, count, cfg.color);
       break;
     }
     case LaneStatus::BACKWARD: {
-      // TODO
+      strip->fill_and_show_backward(tail_index, count, cfg.color);
       break;
     }
     default:
-      // unreachable
       return;
   }
 }

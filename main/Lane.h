@@ -16,6 +16,8 @@
 #include "lane.pb.h"
 #include "pb_common.h"
 #include "pb_decode.h"
+#include "Strip.hpp"
+#include <memory>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "Adafruit_NeoPixel.h"
@@ -124,10 +126,6 @@ struct LaneBLE {
   NimBLEService *service = nullptr;
 };
 
-class Strip {
-
-};
-
 //**************************************** Lane *********************************/
 
 /**
@@ -138,11 +136,14 @@ class Lane {
   friend class ConfigCharCallback;
 
 protected:
+  using strip_ptr_t = std::unique_ptr<strip::IStrip>;
+  strip_ptr_t strip = nullptr;
   bool is_initialized = false;
   Preferences pref;
   static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
   Adafruit_NeoPixel *pixels = nullptr;
   int pin                                          = 23;
+
 
   /// in meter
   std::array<uint8_t, DECODE_BUFFER_SIZE> decode_buffer = {0};
@@ -167,8 +168,6 @@ protected:
 
   Lane() = default;
 
-  Instant my_debug_instant = Instant();
-
   /// iterate the strip
   void iterate();
 
@@ -191,6 +190,10 @@ public:
 
   void setBLE(LaneBLE ble) {
     this->ble = ble;
+  };
+
+  void setStrip(strip_ptr_t strip) {
+    this->strip = std::move(strip);
   };
 
   /**
@@ -221,7 +224,7 @@ public:
   // usually you won't destruct it because it's running in MCU and the resource will not be released
   ~Lane() = delete;
 
-  esp_err_t begin(int16_t PIN);
+  esp_err_t begin();
 
   void setConfig(LaneConfig cfg) {
     this->cfg = cfg;

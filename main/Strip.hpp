@@ -1,5 +1,10 @@
+// include guard
+#ifndef TRACK_LONG_STRIP_HPP
+#define TRACK_LONG_STRIP_HPP
 #include <esp_check.h>
 #include "led_strip.h"
+#include <Adafruit_NeoPixel.h>
+#include <ranges>
 
 namespace strip {
 // Just a declaration
@@ -7,12 +12,47 @@ namespace strip {
 // maybe some day
 class IStrip {
 public:
-  virtual bool fill_forward(size_t start, size_t count, uint32_t color)                = 0;
-  virtual bool fill_backward(size_t total, size_t start, size_t count, uint32_t color) = 0;
-  virtual bool clear()                                                                 = 0;
-  virtual bool show()                                                                  = 0;
-  virtual bool begin()                                                                 = 0;
-  virtual bool set_length(size_t length)                                               = 0;
+  /**
+   * @brief expect to call `show` inside the function
+   * @param start
+   * @param count
+   * @param color
+   * @return if the operation is successful
+   */
+  virtual bool fill_and_show_forward(size_t start, size_t count, uint32_t color) {
+    auto res = fill(start, count, color);
+    if (!res) {
+      return false;
+    }
+    return show();
+  };
+  /**
+   * @note expect to call `show` inside the function
+   * @param total
+   * @param start
+   * @param count
+   * @param color
+   * @return if the operation is successful
+   */
+  virtual bool fill_and_show_backward(size_t start, size_t count, uint32_t color) {
+    auto total = get_max_LEDs();
+    if (total < start + count) {
+      return false;
+    }
+    auto res = fill(total - start - count, count, color);
+    if (!res) {
+      return false;
+    }
+    return show();
+  };
+  virtual bool clear()                                          = 0;
+  virtual bool fill(size_t start, size_t count, uint32_t color) = 0;
+  virtual bool show()                                           = 0;
+  virtual bool begin()                                          = 0;
+  virtual bool set_max_LEDs(size_t new_max_LEDs)                = 0;
+  virtual size_t get_max_LEDs() const                           = 0;
+  // resolve some  complain in destructor
+  virtual ~IStrip() = default;
 };
 
 class LedStripEsp : public IStrip {
@@ -43,6 +83,13 @@ private:
   };
   led_strip_handle_t strip_handle = nullptr;
 
+  /**
+   * @param handle strip handle
+   * @param start
+   * @param count
+   * @param color from MSB first byte is nothing. second byte is red. third byte is green. fourth byte is blue.
+   * @return
+   */
   static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, int start, int count, uint32_t color) {
     const auto TAG = "led_strip";
     auto r         = (color >> 16) & 0xff;
@@ -62,29 +109,31 @@ private:
 
 public:
   LedStripEsp() = default;
+  LedStripEsp(LedStripEsp &&rhs) noexcept {
+    rhs.strip_handle   = strip_handle;
+    rhs.strip_config   = strip_config;
+    rhs.rmt_config     = rmt_config;
+    this->strip_handle = nullptr;
+  };
+  LedStripEsp(const LedStripEsp &rhs)    = delete;
+  void operator=(const LedStripEsp &rhs) = delete;
   LedStripEsp(led_strip_config_t strip_config, led_strip_rmt_config_t rmt_config) : strip_config(strip_config), rmt_config(rmt_config) {}
   ~LedStripEsp() {
     if (strip_handle != nullptr) {
       led_strip_del(strip_handle);
     }
   }
+
   bool begin() override {
     return led_strip_new_rmt_device(&strip_config, &rmt_config, &strip_handle) == ESP_OK;
   }
-  bool fill_forward(size_t start, size_t count, uint32_t color) override {
-    if (strip_handle == nullptr) {
-      return false;
-    }
-    ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(strip_handle));
-    return led_strip_set_many_pixels(strip_handle, start, count, color) == ESP_OK;
-  }
 
-  bool fill_backward(size_t total, size_t start, size_t count, uint32_t color) override {
+  bool fill(size_t start, size_t count, uint32_t color) override {
     if (strip_handle == nullptr) {
       return false;
     }
-    ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(strip_handle));
-    return led_strip_set_many_pixels(strip_handle, total - start - count, count, color) == ESP_OK;
+    auto res = ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_set_many_pixels(strip_handle, start, count, color));
+    return res == ESP_OK;
   }
 
   bool clear() override {
@@ -101,19 +150,90 @@ public:
     return led_strip_refresh(strip_handle) == ESP_OK;
   }
 
-  bool set_length(size_t length) override {
+  bool set_max_LEDs(size_t new_max_LEDs) override {
     if (strip_handle != nullptr) {
       led_strip_del(strip_handle);
       strip_handle = nullptr;
     }
 
-    strip_config.max_leds = length;
+    strip_config.max_leds = new_max_LEDs;
     return led_strip_new_rmt_device(&strip_config, &rmt_config, &strip_handle) == ESP_OK;
   }
+  size_t get_max_LEDs() const override {
+    return strip_config.max_leds;
+  }
 };
-// class AdafruitPixel : public IStrip {
-//
-//
-// };
-}
+class AdafruitPixel : public IStrip {
+private:
+  size_t max_LEDs = 0;
+  uint8_t pin     = GPIO_NUM_NC;
+  neoPixelType pixelType;
+  Adafruit_NeoPixel *pixel = nullptr;
 
+public:
+  static constexpr neoPixelType default_pixel_type = NEO_RGB + NEO_KHZ800;
+  explicit AdafruitPixel(size_t max_LEDs, uint8_t pin, neoPixelType pixel_type) : max_LEDs(max_LEDs), pin(pin), pixelType(pixel_type) {
+    pixel = new Adafruit_NeoPixel(max_LEDs, pin, pixel_type);
+    pixel->setBrightness(255);
+  }
+
+  /// move constructor
+  AdafruitPixel(AdafruitPixel &&rhs) noexcept {
+    this->max_LEDs  = rhs.max_LEDs;
+    this->pin       = rhs.pin;
+    this->pixelType = rhs.pixelType;
+    this->pixel     = rhs.pixel;
+    rhs.pixel       = nullptr;
+  };
+  AdafruitPixel(AdafruitPixel const &rhs)  = delete;
+  void operator=(AdafruitPixel const &rhs) = delete;
+
+  ~AdafruitPixel() noexcept {
+    delete pixel;
+  }
+
+  bool begin() {
+    pixel->begin();
+    return true;
+  }
+
+  bool fill(size_t start, size_t count, uint32_t color) override {
+    if (pixel == nullptr) {
+      return false;
+    }
+    pixel->fill(color, start, count);
+    return true;
+  }
+
+  bool set_max_LEDs(size_t new_max_LEDs) override {
+    if (pixel == nullptr) {
+      return false;
+    }
+    delete pixel;
+    this->max_LEDs = new_max_LEDs;
+    pixel          = new Adafruit_NeoPixel(new_max_LEDs, pin, pixelType);
+    pixel->setBrightness(255);
+    return true;
+  }
+
+  size_t get_max_LEDs() const override {
+    return max_LEDs;
+  }
+
+  bool clear() override {
+    if (pixel == nullptr) {
+      return false;
+    }
+    pixel->clear();
+    return true;
+  }
+  bool show() {
+    if (pixel == nullptr) {
+      return false;
+    }
+    pixel->show();
+    return true;
+  }
+};
+}
+#endif // TRACK_LONG_STRIP_HPP
