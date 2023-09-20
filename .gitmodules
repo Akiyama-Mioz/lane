@@ -16,12 +16,6 @@
 [submodule "components/arduino"]
 	path = components/arduino
 	url = https://github.com/espressif/arduino-esp32
-[submodule "components/esp-protocols"]
-	path = components/esp-protocols
-	url = https://github.com/espressif/esp-protocols
-[submodule "components/led_strip"]
-	path = components/led_strip
-	url = https://github.com/crosstyan/led_strip
 [submodule "components/Adafruit_NeoPixel"]
-	path = components/Adafruit_NeoPixel
+	path = components/NeoPixel/Adafruit_NeoPixel
 	url = https://github.com/adafruit/Adafruit_NeoPixel

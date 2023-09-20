@@ -5,6 +5,6 @@ idf_component_register(SRCS
         ScanCallback.cpp
         utils.cpp
         INCLUDE_DIRS
-        REQUIRES spi_flash esp_partition
-        nanopb esp_timer arduino-libs
-        arduino esp-nimble-cpp led_strip etl pthread)
+        REQUIRES spi_flash
+        nanopb esp_timer NeoPixel
+        arduino esp-nimble-cpp etl pthread)

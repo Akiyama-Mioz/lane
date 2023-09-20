@@ -2,9 +2,11 @@
 #ifndef TRACK_LONG_STRIP_HPP
 #define TRACK_LONG_STRIP_HPP
 #include <esp_check.h>
-#include "led_strip.h"
 #include <Adafruit_NeoPixel.h>
 #include <ranges>
+#ifdef ESP_LED_STRIP
+#include "led_strip.h"
+#endif
 
 namespace strip {
 // Just a declaration
@@ -55,6 +57,7 @@ public:
   virtual ~IStrip() = default;
 };
 
+#ifdef ESP_LED_STRIP
 class LedStripEsp : public IStrip {
 private:
 #if SOC_RMT_SUPPORT_DMA
@@ -163,6 +166,8 @@ public:
     return strip_config.max_leds;
   }
 };
+#endif
+
 class AdafruitPixel : public IStrip {
 private:
   size_t max_LEDs = 0;

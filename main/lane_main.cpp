@@ -76,7 +76,7 @@ extern "C" [[noreturn]] void app_main() {
   /** an aux function used to let FreeRTOS do it work.
    * since FreeRTOS is implemented in C where we can't have lambda capture, so pStrip must be
    * passed as parameter.
-   **/
+   **t /
   auto lane_loop = [](void *param) {
     auto &lane = *static_cast<Lane *>(param);
     lane.loop();
