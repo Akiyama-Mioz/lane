@@ -18,7 +18,7 @@ struct DeviceInfo {
 };
 
 /// Should not touch the info pointer (Read Only)
-using DeviceMap = etl::flat_map<std::string, DeviceInfo*, 10>;
+using DeviceMap = etl::flat_map<std::string, DeviceInfo, 10>;
 
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   // the characteristic to send the heart rate data to the client with the format described in
@@ -33,6 +33,8 @@ class ScanCallback : public BLEAdvertisedDeviceCallbacks {
    * @note This function will use nanopb to encode the payload and then send it to the characteristic
    */
   void onResult(BLEAdvertisedDevice *advertisedDevice) override;
+  void handleWatch(BLEAdvertisedDevice *advertisedDevice);
+  void handleBand(BLEAdvertisedDevice *advertisedDevice);
 
 public:
   explicit ScanCallback(NimBLECharacteristic *c) : hr_char(c) {}

@@ -8,6 +8,7 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "Lane.h"
+#include <memory.h>
 #include "ScanCallback.h"
 
 static auto BLE_NAME          = "lane-011";
@@ -82,14 +83,16 @@ extern "C" [[noreturn]] void app_main() {
     lane.loop();
   };
   // using singleton pattern to avoid memory leak
+  auto s        = strip::AdafruitPixel(default_cfg.line_LEDs_num, LED_PIN, strip::AdafruitPixel::default_pixel_type);
   auto &lane    = *Lane::get();
+  lane.setStrip(std::make_unique<decltype(s)>(std::move(s)));
   auto lane_ble = LaneBLE();
   initBLE(&server, lane_ble, lane);
   lane.setBLE(lane_ble);
   lane.setConfig(default_cfg);
-  ESP_ERROR_CHECK(lane.begin(LED_PIN));
+  ESP_ERROR_CHECK(lane.begin());
 
-  //************** HR char initialization ****************
+  /************** HR char initialization ****************/
 
   auto &hr_service = *server.createService(BLE_CHAR_HR_SERVICE_UUID);
   auto &hr_char    = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,
@@ -103,9 +106,9 @@ extern "C" [[noreturn]] void app_main() {
   // https://github.com/espressif/esp-idf/issues/11651
   // https://lang-ship.com/reference/unofficial/M5StickC/Functions/freertos/task/
   xTaskCreatePinnedToCore(lane_loop,
-              "lane", 5120,
-              &lane, configMAX_PRIORITIES - 3,
-              nullptr, 1);
+                          "lane", 5120,
+                          &lane, configMAX_PRIORITIES - 3,
+                          nullptr, 1);
 
   server.start();
   NimBLEDevice::startAdvertising();

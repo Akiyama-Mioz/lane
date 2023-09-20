@@ -3,10 +3,16 @@
 //
 
 #include "Lane.h"
-#include <ranges>
+#include "Strip.hpp"
 #include <esp_check.h>
 
 static const auto TAG = "LANE";
+
+#if SOC_RMT_SUPPORT_DMA
+bool is_dma = true;
+#else
+bool is_dma = false;
+#endif
 
 // the resolution is the clock frequency instead of strip frequency
 const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
@@ -21,59 +27,6 @@ static inline float LEDsCountToMeter(uint32_t count, float LEDs_per_meter) {
   } else {
     return static_cast<float>(count - 1) / LEDs_per_meter;
   }
-}
-
-static esp_err_t led_strip_set_many_pixels(led_strip_handle_t handle, int start, int count, uint32_t color) {
-  auto r = (color >> 16) & 0xff;
-  auto g = (color >> 8) & 0xff;
-  auto b = color & 0xff;
-  for (std::integral auto i : std::ranges::iota_view(start, start + count)) {
-    // theoretically, i should be unsigned and never be negative.
-    // However I can safely ignore the negative value and continue the iteration.
-    if (i < 0) {
-      ESP_LOGW(TAG, "Invalid index %d", i);
-      continue;
-    }
-    ESP_RETURN_ON_ERROR(led_strip_set_pixel(handle, i, r, g, b), TAG, "Failed to set pixel %d", i);
-  }
-  return ESP_OK;
-}
-
-/**
- *
- * @param handle
- * @param start the distance from the start
- * @param count
- * @param color
- * @return ESP_OK if success
- * @note only fill but not refresh
- */
-static esp_err_t fill_forward(led_strip_handle_t handle, size_t start, size_t count, uint32_t color) {
-  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
-  return led_strip_set_many_pixels(handle, start, count, color);
-}
-
-/// in parallel with fill_backward. You don't need the total parameter though.
-static esp_err_t fill_forward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
-  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
-  if (start + count > total) {
-    ESP_LOGW(TAG, "Invalid start %d, count %d; %d > %d ", start, count, start + count, total);
-  }
-  return led_strip_set_many_pixels(handle, start, count, color);
-}
-
-/**
- *
- * @param handle
- * @param total
- * @param start the distance from the end
- * @param count
- * @param color
- * @return ESP_OK if success
- */
-static esp_err_t fill_backward(led_strip_handle_t handle, size_t total, size_t start, size_t count, uint32_t color) {
-  ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_clean_clear(handle));
-  return led_strip_set_many_pixels(handle, total - start - count, count, color);
 }
 
 namespace lane {
@@ -169,9 +122,12 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
 }
 
 void Lane::stop() const {
-  led_strip_clear(led_strip);
-  const auto delay = pdMS_TO_TICKS(HALT_INTERVAL.count());
-  vTaskDelay(delay);
+  if (strip == nullptr){
+    ESP_LOGE(TAG, "strip is null");
+    return;
+  }
+  strip->clear();
+  strip->show();
 }
 
 struct UpdateTaskParam {
@@ -193,11 +149,16 @@ void Lane::loop() {
   auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "start loop");
   for (;;) {
+    if (strip == nullptr){
+      ESP_LOGE(TAG, "strip is null");
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
     if (params.status == LaneStatus::FORWARD || params.status == LaneStatus::BACKWARD) {
       instant.reset();
       iterate();
       if (debug_instant.elapsed() > DEBUG_INTERVAL) {
-        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0lx06x", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str(), cfg.color);
+        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0x06x", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str(), cfg.color);
         debug_instant.reset();
       }
       // I could use the timer from FreeRTOS, but I prefer SystemClock now.
@@ -237,16 +198,14 @@ void Lane::loop() {
       }
     } else if (params.status == LaneStatus::STOP) {
       this->state = LaneState::zero();
-      led_strip_clear(led_strip);
-      led_strip_refresh(led_strip);
+      stop();
       vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
     } else if (params.status == LaneStatus::BLINK) {
       auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
       auto delay                = pdMS_TO_TICKS(BLINK_INTERVAL.count());
-      led_strip_clear(led_strip);
+      stop();
       vTaskDelay(delay);
-      led_strip_set_many_pixels(led_strip, 0, cfg.line_LEDs_num, cfg.color);
-      led_strip_refresh(led_strip);
+      strip->fill_and_show_forward(0, cfg.line_LEDs_num, cfg.color);
       vTaskDelay(delay);
     } else {
       // unreachable
@@ -256,33 +215,11 @@ void Lane::loop() {
 
 /// i.e. Circle LEDs
 void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
-  cfg.line_LEDs_num = new_max_LEDs;
-  if (led_strip != nullptr) {
-    led_strip_del(led_strip);
-    led_strip = nullptr;
+  if (strip == nullptr){
+    ESP_LOGE(TAG, "strip is null");
+    return;
   }
-  led_strip_config_t strip_config = {
-      .strip_gpio_num   = pin,              // The GPIO that connected to the LED strip's data line
-      .max_leds         = new_max_LEDs,     // The number of LEDs in the strip,
-      .led_pixel_format = LED_PIXEL_FORMAT, // Pixel format of your LED strip
-      .led_model        = LED_MODEL_WS2812, // LED strip model
-      .flags            = {
-                     .invert_out = false // whether to invert the output signal
-      },
-  };
-
-  // LED strip backend configuration: RMT
-  led_strip_rmt_config_t rmt_config = {
-      .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
-      .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
-      .mem_block_symbols = RMT_MEM_BLOCK_NUM,
-      .flags         = {
-                  .with_dma = false // DMA feature is available on ESP target like ESP32-S3
-      },
-  };
-  led_strip_handle_t new_handle;
-  ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &new_handle));
-  led_strip = new_handle;
+  strip->set_max_LEDs(new_max_LEDs);
 }
 
 /**
@@ -290,49 +227,20 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
  * @return the instance/pointer of the strip.
  */
 Lane *Lane::get() {
-  static auto *strip = new Lane();
-  return strip;
+  static auto *lane = new Lane();
+  return lane;
 }
 
 /**
  * @brief initialize the strip. this function should only be called once.
- * @param PIN the pin of strip, default is 14.
- * @param brightness the default brightness of the strip. default is 32.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
-esp_err_t Lane::begin(int16_t PIN) {
-  if (!is_initialized) {
-    pref.begin(PREF_RECORD_NAME, false);
-    this->pin = PIN;
-
-    // LED strip general initialization, according to your led board design
-    led_strip_config_t strip_config = {
-        .strip_gpio_num   = pin,                     // The GPIO that connected to the LED strip's data line
-        .max_leds         = this->cfg.line_LEDs_num, // The number of LEDs in the strip,
-        .led_pixel_format = LED_PIXEL_FORMAT,        // Pixel format of your LED strip
-        .led_model        = LED_MODEL_WS2812,        // LED strip model
-        .flags            = {
-                       .invert_out = false // whether to invert the output signal
-        },
-    };
-
-    // LED strip backend configuration: RMT
-    led_strip_rmt_config_t rmt_config = {
-        .clk_src       = RMT_CLK_SRC_DEFAULT,  // different clock source can lead to different power consumption
-        .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
-        .mem_block_symbols = RMT_MEM_BLOCK_NUM,
-        .flags         = {
-                    .with_dma = false // DMA feature is available on ESP target like ESP32-S3
-        },
-    };
-    led_strip_handle_t handle;
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &handle));
-    led_strip      = handle;
-    is_initialized = true;
-    return ESP_OK;
-  } else {
+esp_err_t Lane::begin() {
+  if (strip == nullptr){
     return ESP_ERR_INVALID_STATE;
   }
+  strip->begin();
+  return ESP_OK;
 }
 
 void Lane::notifyState(LaneState s) {
@@ -387,6 +295,10 @@ float Lane::LEDsPerMeter() const {
 // I have no idea why `tx_chan->cur_trans->encoder` would cause a segmentation fault. (null pointer dereference obviously)
 // I guess it's because some data race shit. dereference it and save `rmt_tx_channel_t` to stack could solve it.
 void Lane::iterate() {
+  if (strip == nullptr){
+    ESP_LOGE(TAG, "strip is null");
+    return;
+  }
   auto next_state = nextState(this->state, this->cfg, this->params);
   // meter
   auto head       = this->state.head.count();
@@ -399,23 +311,27 @@ void Lane::iterate() {
     head_index = this->cfg.line_LEDs_num;
   }
   this->state = next_state;
+  auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
-      if (this->my_debug_instant.elapsed() > std::chrono::milliseconds(500)) {
-        ESP_LOGI("Lane::iterate", "head: %d, count: %d", head_index, count);
-        my_debug_instant.reset();
+      auto instant = Instant();
+      strip->fill_and_show_forward(tail_index, count, cfg.color);
+      auto e = instant.elapsed();
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+        ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
       }
-      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_forward(led_strip, cfg.line_LEDs_num, tail_index, count, cfg.color));
-      ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
       break;
     }
     case LaneStatus::BACKWARD: {
-      ESP_ERROR_CHECK_WITHOUT_ABORT(fill_backward(led_strip, cfg.line_LEDs_num, tail_index, count, cfg.color));
-      ESP_ERROR_CHECK_WITHOUT_ABORT(led_strip_refresh(led_strip));
+      auto instant = Instant();
+      strip->fill_and_show_backward(tail_index, count, cfg.color);
+      auto e = instant.elapsed();
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+        ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
+      }
       break;
     }
     default:
-      // unreachable
       return;
   }
 }

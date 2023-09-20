@@ -11,15 +11,16 @@
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
 #include "Preferences.h"
-#include "led_strip.h"
 #include "map"
 #include "vector"
 #include "lane.pb.h"
 #include "pb_common.h"
 #include "pb_decode.h"
+#include "Strip.hpp"
+#include <memory>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "led_strip.h"
+#include "Adafruit_NeoPixel.h"
 
 namespace lane {
 const auto PREF_RECORD_NAME = "rec";
@@ -54,7 +55,7 @@ static const auto READY_INTERVAL         = std::chrono::milliseconds(500);
 // https://stackoverflow.com/questions/51750377/how-to-disable-interrupt-watchdog-in-esp32-or-increase-isr-time-limit
 // Increase IWTD (Interrupt Watchdog Timer) timeout is necessary.
 // Make this higher than the FreeRTOS tick rate (wait? the tick rate is 1000Hz i.e. 1ms, so it's not the FreeRTOS blocking)
-static const auto RMT_MEM_BLOCK_NUM = 192;
+static const auto RMT_MEM_BLOCK_NUM = 512;
 constexpr size_t DECODE_BUFFER_SIZE      = 2048;
 
 
@@ -135,13 +136,16 @@ class Lane {
   friend class ConfigCharCallback;
 
 protected:
+  using strip_ptr_t = std::unique_ptr<strip::IStrip>;
+  strip_ptr_t strip = nullptr;
   bool is_initialized = false;
   Preferences pref;
-  static const led_pixel_format_t LED_PIXEL_FORMAT = LED_PIXEL_FORMAT_RGB;
+  static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
+  Adafruit_NeoPixel *pixels = nullptr;
   int pin                                          = 23;
 
+
   /// in meter
-  led_strip_handle_t led_strip                          = nullptr;
   std::array<uint8_t, DECODE_BUFFER_SIZE> decode_buffer = {0};
   LaneBLE ble                                           = {
                                                 .ctrl_char   = nullptr,
@@ -163,8 +167,6 @@ protected:
   };
 
   Lane() = default;
-
-  Instant my_debug_instant = Instant();
 
   /// iterate the strip
   void iterate();
@@ -188,6 +190,10 @@ public:
 
   void setBLE(LaneBLE ble) {
     this->ble = ble;
+  };
+
+  void setStrip(strip_ptr_t strip) {
+    this->strip = std::move(strip);
   };
 
   /**
@@ -218,7 +224,7 @@ public:
   // usually you won't destruct it because it's running in MCU and the resource will not be released
   ~Lane() = delete;
 
-  esp_err_t begin(int16_t PIN);
+  esp_err_t begin();
 
   void setConfig(LaneConfig cfg) {
     this->cfg = cfg;
