@@ -222,6 +222,21 @@ concept is_ratio = requires(T t) {
 };
 #endif
 
+///// basic string
+//bool is_start_with(const std::string &str, const std::string &prefix) {
+//  return str.find(prefix, 0) == 0;
+//};
+//
+///// sentinel (zero terminated) string
+//bool is_start_with(const std::string &str, const char *prefix) {
+//  return str.find(prefix, 0) == 0;
+//};
+//
+///// string with length
+//bool is_start_with(const std::string &str, const char *prefix, size_t len) {
+//  return str.find(prefix, 0, len) == 0;
+//};
+
 template <class Rep, class RI = std::ratio<1>>
 #if __cplusplus >= 202002L
   requires is_ratio<RI> && std::is_arithmetic_v<Rep>
