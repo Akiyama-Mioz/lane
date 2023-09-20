@@ -12,3 +12,7 @@ git submodule update --init --recursive
 ./install.sh
 source export.sh
 ```
+
+```
+-DIDF_MAINTAINER=1
+```

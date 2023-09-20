@@ -13,7 +13,10 @@
 #include <pb_encode.h>
 #include <map>
 #include <esp_timer.h>
+
+#if __cplusplus >= 202002L
 #include <concepts>
+#endif
 
 std::string to_hex(const std::basic_string<char> &s);
 std::string to_hex(const char *s, size_t len);
@@ -139,6 +142,7 @@ using tp = decltype(std::chrono::steady_clock::now());
 
 class Instant {
   tp time;
+  using duration_t = std::chrono::steady_clock::duration;
 
 public:
   Instant() {
@@ -146,7 +150,7 @@ public:
   }
 
   /// get the difference between now and the time Instant declared
-  auto elapsed() {
+  duration_t elapsed() {
     auto now      = std::chrono::steady_clock::now();
     auto duration = now - this->time;
     return duration;
@@ -157,7 +161,7 @@ public:
     this->time = now;
   }
 
-  auto elapsed_and_reset() {
+  duration_t elapsed_and_reset() {
     auto now      = std::chrono::steady_clock::now();
     auto duration = now - this->time;
     this->time    = now;
@@ -171,17 +175,19 @@ public:
 };
 
 class ESPInstant {
-  decltype(esp_timer_get_time()) time;
+  using duration_t   = std::chrono::duration<int64_t, std::micro>;
+  using time_point_t = decltype(esp_timer_get_time());
+  time_point_t time;
 
 public:
   ESPInstant() {
     this->time = esp_timer_get_time();
   }
 
-  auto elapsed() {
+  duration_t elapsed() {
     auto now      = esp_timer_get_time();
     auto diff     = now - this->time;
-    auto duration = std::chrono::duration<int64_t, std::micro>(diff);
+    auto duration = duration_t{diff};
     return duration;
   }
 
@@ -190,30 +196,36 @@ public:
     this->time = now;
   }
 
-  auto elapsed_and_reset() {
+  duration_t elapsed_and_reset() {
     auto now      = esp_timer_get_time();
     auto duration = now - this->time;
     this->time    = now;
-    return duration;
+    return duration_t{duration};
   }
 
-  auto getTime() {
+  time_point_t getTime() {
     return time;
   }
 };
 
 namespace utils {
+#if __cplusplus >= 202002L
 template <typename T>
 concept is_intmax_t = std::is_same_v<T, decltype(std::ratio<1>::num) &>;
+#endif
 
+#if __cplusplus >= 202002L
 template <typename T>
 concept is_ratio = requires(T t) {
   { t.num } -> is_intmax_t;
   { t.den } -> is_intmax_t;
 };
+#endif
 
 template <class Rep, class RI = std::ratio<1>>
+#if __cplusplus >= 202002L
   requires is_ratio<RI> && std::is_arithmetic_v<Rep>
+#endif
 class length {
   Rep value;
 
@@ -248,13 +260,17 @@ public:
   // Scalar operations
 
   template <class U>
+#if __cplusplus >= 202002L
     requires std::is_arithmetic_v<U>
+#endif
   Self operator*(U rhs) const {
     return Self(value * rhs);
   }
 
   template <class U>
+#if __cplusplus >= 202002L
     requires std::is_arithmetic_v<U>
+#endif
   Self operator/(U rhs) const {
     return Self(value / rhs);
   }
@@ -297,7 +313,9 @@ struct __length_cast {
 };
 
 template <class ToLength, class Rep, class RI>
+#if __cplusplus >= 202002L
   requires std::is_arithmetic_v<Rep> && is_ratio<RI>
+#endif
 ToLength length_cast(const length<Rep, RI> &fl) {
   return __length_cast<length<Rep, RI>, ToLength>()(fl);
 }
