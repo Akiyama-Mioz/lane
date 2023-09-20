@@ -21,7 +21,11 @@ public:
    * @return if the operation is successful
    */
   virtual bool fill_and_show_forward(size_t start, size_t count, uint32_t color) {
-    auto res = fill(start, count, color);
+    auto res = clear();
+    if (!res){
+      return false;
+    }
+    res = fill(start, count, color);
     if (!res) {
       return false;
     }
@@ -37,10 +41,14 @@ public:
    */
   virtual bool fill_and_show_backward(size_t start, size_t count, uint32_t color) {
     auto total = get_max_LEDs();
+    auto res = clear();
+    if (!res){
+      return false;
+    }
     if (total < start + count) {
       return false;
     }
-    auto res = fill(total - start - count, count, color);
+    res = fill(total - start - count, count, color);
     if (!res) {
       return false;
     }

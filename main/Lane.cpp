@@ -311,13 +311,24 @@ void Lane::iterate() {
     head_index = this->cfg.line_LEDs_num;
   }
   this->state = next_state;
+  auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
+      auto instant = Instant();
       strip->fill_and_show_forward(tail_index, count, cfg.color);
+      auto e = instant.elapsed();
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+        ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
+      }
       break;
     }
     case LaneStatus::BACKWARD: {
+      auto instant = Instant();
       strip->fill_and_show_backward(tail_index, count, cfg.color);
+      auto e = instant.elapsed();
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+        ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
+      }
       break;
     }
     default:
