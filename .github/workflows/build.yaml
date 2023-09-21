@@ -3,8 +3,6 @@ name: ESP-IDF CMake Build
 on:
   pull_request:
     branches: [ "master" ]
-  push:
-    branches: [ "idf-v4.4.5" ]
 
 jobs:
   build:
