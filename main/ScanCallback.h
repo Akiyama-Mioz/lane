@@ -12,13 +12,11 @@
 #include <etl/vector.h>
 
 struct DeviceInfo {
-  BLEClient* client;
-  int64_t last_seen;
-  uint8_t last_hr;
+  BLEClient *client;
 };
 
 /// Should not touch the info pointer (Read Only)
-using DeviceMap = etl::flat_map<std::string, DeviceInfo, 10>;
+using DeviceMap = etl::flat_map<std::string, DeviceInfo, 16>;
 
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   // the characteristic to send the heart rate data to the client with the format described in
@@ -38,16 +36,15 @@ class ScanCallback : public BLEAdvertisedDeviceCallbacks {
 
 public:
   explicit ScanCallback(NimBLECharacteristic *c) : hr_char(c) {}
-  DeviceMap& getDevices() { return devices; }
+  DeviceMap &getDevices() { return devices; }
 };
 
 class ServerCallbacks : public NimBLEServerCallbacks {
-  void onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) override;
+  void onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo) override;
 
-  void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason) override;
+  void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason) override;
 
-  void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) override;
+  void onMTUChange(uint16_t MTU, NimBLEConnInfo &connInfo) override;
 };
 
-
-#endif //HELLO_WORLD_ADCALLBACK_H
+#endif // HELLO_WORLD_ADCALLBACK_H

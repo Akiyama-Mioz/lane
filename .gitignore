@@ -3,4 +3,5 @@ cmake-build-debug
 .DS_Store
 .idea
 .cache
+*.dot
 ~$*

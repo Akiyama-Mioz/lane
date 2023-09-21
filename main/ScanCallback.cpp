@@ -28,55 +28,49 @@ struct ScanCallbackParam {
   }
 };
 
+using hr_pair_t = etl::pair<std::string, uint8_t>;
+
 // see hr_data.ksy. would mutate the output
-etl::optional<size_t> encode(const std::string &updated_id, const DeviceMap &device_map, etl::span<uint8_t> &output) {
-  auto sz = device_map.size();
-  // offset is the offset of next byte to be written
-  size_t offset  = 0;
-  output[offset] = static_cast<uint8_t>(sz);
+etl::optional<size_t> encode(const hr_pair_t &pair, etl::span<uint8_t> &output) {
+  auto &[name, hr] = pair;
+  auto id_len      = name.size();
+  if (id_len > 255) {
+    return etl::nullopt;
+  }
+  auto offset    = 0;
+  output[offset] = id_len;
   offset += 1;
-  auto first_three_byte = std::string_view(updated_id).substr(0, 3);
-  for (auto c : first_three_byte) {
+  for (auto &c : name) {
     output[offset] = c;
     offset += 1;
   }
-  for (auto &[id, info] : device_map) {
-    auto f3bytes = std::string_view(id).substr(0, 3);
-    for (auto c : f3bytes) {
-      output[offset] = c;
-      offset += 1;
-    }
-    output[offset] = info.last_hr;
-    if (offset > output.size()) {
-      ESP_LOGE(NOTIFY_TAG, "expected size: %d, offset: %d", output.size(), offset);
-      return etl::nullopt;
-    }
-    offset += 1;
-  }
+  output[offset] = hr;
+  offset += 1;
   return offset;
 }
 
-size_t sizeNeeded(const DeviceMap &device_map) {
-  return 4 + device_map.size() * 4;
+size_t sizeNeeded(const hr_pair_t &pair) {
+  auto &[name, hr] = pair;
+  return name.size() + 2;
 }
 
 struct WatchInfo {
   static constexpr auto TIME_WIDTH = 5;
-  uint8_t time[TIME_WIDTH] = {0};
-  uint16_t steps = 0;
-  uint16_t kcal = 0;
-  uint8_t hr = 0;
+  uint8_t time[TIME_WIDTH]         = {0};
+  uint16_t steps                   = 0;
+  uint16_t kcal                    = 0;
+  uint8_t hr                       = 0;
   // mm/Hg
   uint8_t SBP = 0;
   // mm/Hg
-  uint8_t DBP = 0;
+  uint8_t DBP     = 0;
   uint8_t battery = 0;
   // uint16_t / 10 in Celsius
   float temperature = 0;
-  uint8_t SpO2 = 0;
+  uint8_t SpO2      = 0;
   static WatchInfo from_bytes(const uint8_t *data, size_t size) {
     WatchInfo info = {};
-    auto offset = 0;
+    auto offset    = 0;
     std::copy(data, data + TIME_WIDTH, info.time);
     offset += TIME_WIDTH;
     std::copy(data + offset, data + offset + 2, reinterpret_cast<uint8_t *>(&info.steps));
@@ -95,8 +89,8 @@ struct WatchInfo {
     offset += 1;
     offset += 2; // ignore
     uint16_t temp;
-    std::copy(data + offset, data + offset + 2, reinterpret_cast<uint8_t*>(&temp));
-    temp = ntohs(temp);
+    std::copy(data + offset, data + offset + 2, reinterpret_cast<uint8_t *>(&temp));
+    temp             = ntohs(temp);
     info.temperature = static_cast<float>(temp) / 10.0f;
     offset += 2;
     offset += 2; // ignore
@@ -107,8 +101,9 @@ struct WatchInfo {
   }
 };
 
-std::string to_string(const WatchInfo& info){
+std::string to_string(const WatchInfo &info) {
   std::stringstream ss;
+  // clang-format off
   ss << "steps=" << info.steps <<
       "; kcal=" << info.kcal <<
       "; HR=" << static_cast<int>(info.hr) <<
@@ -117,9 +112,9 @@ std::string to_string(const WatchInfo& info){
       "; Battery=" << static_cast<int>(info.battery) <<
       "; Temperature=" << info.temperature <<
       "; SpO2=" << static_cast<int>(info.SpO2);
+  // clang-format on
   return ss.str();
 }
-
 
 void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
   auto name    = advertisedDevice->getName();
@@ -145,7 +140,6 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
     return;
   }
 
-  // allocate in heap
   auto cb = [advertisedDevice, name, band_id_str, pHrChar, &device_map]() {
     /// user should check the return value of this function
     auto configClient = [advertisedDevice, &name](BLEClient &client) -> NimBLERemoteCharacteristic * {
@@ -174,36 +168,36 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
       ESP_LOGI(TAG, "Connected to %s", name.c_str());
       return pCharacteristic;
     };
-    /// make a notify callback
-    auto make_notify = [band_id_str, pHrChar, &device_map](DeviceInfo &info) {
-      return [band_id_str, &info, pHrChar, &device_map](
-                 NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
-                 const uint8_t *pData,
-                 size_t length,
-                 bool isNotify) {
-        if (length >= 2) {
-          // the first byte is always 0x04. the second byte is the heart rate.
-          auto hr = pData[1];
-          if (hr != 0) {
-            info.last_hr   = hr;
-            info.last_seen = esp_timer_get_time();
-            ESP_LOGI(NOTIFY_TAG, "%d bpm from %s", hr, band_id_str.c_str());
-            auto buf  = new uint8_t[sizeNeeded(device_map)];
-            auto span = etl::span<uint8_t>(buf, sizeNeeded(device_map));
-            auto sz   = encode(band_id_str, device_map, span);
-            if (sz.has_value()) {
-              if (pHrChar != nullptr) {
-                pHrChar->setValue(span.data(), sz.value());
-                pHrChar->notify();
-              } else {
-                ESP_LOGE(NOTIFY_TAG, "HR characteristic is null");
-              }
+    auto notify = [band_id_str, &device_map, pHrChar](
+                      NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
+                      const uint8_t *pData,
+                      size_t length,
+                      bool isNotify) {
+      if (length >= 2) {
+        // the first byte is always 0x04. the second byte is the heart rate.
+        auto hr    = pData[1];
+        auto &info = device_map.at(band_id_str);
+        if (hr != 0) {
+          ESP_LOGI(NOTIFY_TAG, "%d bpm from %s", hr, band_id_str.c_str());
+          auto pair = hr_pair_t{band_id_str, hr};
+          auto sz   = sizeNeeded(pair);
+          auto buf  = new uint8_t[sz];
+          auto span = etl::span<uint8_t>(buf, sz);
+
+          auto size = encode(pair, span);
+          if (size.has_value()) {
+            if (pHrChar != nullptr) {
+              pHrChar->setValue(span.data(), size.value());
+              pHrChar->notify();
             } else {
-              ESP_LOGE(NOTIFY_TAG, "Failed to encode the data");
+              ESP_LOGE(NOTIFY_TAG, "HR characteristic is null");
             }
+          } else {
+            ESP_LOGE(NOTIFY_TAG, "Failed to encode the data");
           }
+          delete[] buf;
         }
-      };
+      }
     };
     if (device_map.find(band_id_str) == device_map.end()) {
       ESP_LOGI(TAG, "Configure new band %s", band_id_str.c_str());
@@ -211,25 +205,21 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
       /// Note, intended to be allocated in heap
       auto info = DeviceInfo{
           &client,
-          esp_timer_get_time(),
-          0,
       };
       auto pChar = configClient(client);
       if (pChar != nullptr) {
         device_map.insert(etl::pair(band_id_str, std::move(info)));
         auto info_ref = device_map.at(band_id_str);
         /// the ownership of "info" should always be device_map
-        auto notify = make_notify(info_ref);
         pChar->subscribe(true, notify);
       } else {
         ESP_LOGE(TAG, "Failed to configure the band %s", band_id_str.c_str());
       }
     } else {
       ESP_LOGI(TAG, "Reconfigure known band %s", band_id_str.c_str());
-      auto info = device_map.at(band_id_str);
+      auto info    = device_map.at(band_id_str);
       auto &client = *info.client;
       auto pChar   = configClient(client);
-      auto notify  = make_notify(info);
       // What would happen to the old notify callback?
       if (pChar != nullptr) {
         pChar->subscribe(true, notify);
@@ -242,14 +232,14 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
       nullptr};
   // You should run this in a new thread because the callback is blocking.
   // Never block the scanning thread
-  // copilot generated. I don't expect this will work, but somehow it works.
   auto res = xTaskCreate([](void *cb) {
     auto &param = *reinterpret_cast<ScanCallbackParam *>(cb);
     auto f      = param.cb;
     (*f)();
     // handled by the destructor
     delete &param;
-  }, "connect", 4096, param, 1, &param->handle);
+  },
+                         "connect", 4096, param, 1, &param->handle);
   if (res != pdPASS) {
     ESP_LOGE(TAG, "Failed to create task");
     delete param;
@@ -260,21 +250,30 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
 void ScanCallback::handleWatch(BLEAdvertisedDevice *advertisedDevice) {
   // https://bluetoothle.wiki/advertising
   static constexpr auto TAG = "handleWatch";
-  // ESP_LOGI(TAG, "%s", to_hex(advertisedDevice->getPayload(), advertisedDevice->getPayloadLength()).c_str());
-  auto payload = etl::span<uint8_t>(advertisedDevice->getPayload(), advertisedDevice->getPayloadLength());
-  auto name = advertisedDevice->getName();
-  auto pattern = etl::search(payload.begin(), payload.end(), name.begin(), name.end());
+  auto payload              = etl::span<uint8_t>(advertisedDevice->getPayload(), advertisedDevice->getPayloadLength());
+  auto name                 = advertisedDevice->getName();
+  auto pattern              = etl::search(payload.begin(), payload.end(), name.begin(), name.end());
   if (pattern != payload.end()) {
     auto msg = etl::span(pattern + name.size() + 2, payload.end());
     ESP_LOGD(TAG, "(%s) %s", to_hex(msg.data(), msg.size()).c_str(), name.c_str());
     auto info = WatchInfo::from_bytes(msg.data(), msg.size());
     ESP_LOGI(TAG, "%s", to_string(info).c_str());
-    auto dev_info = DeviceInfo{
-        nullptr,
-        esp_timer_get_time(),
-        info.hr,
-    };
-    devices.insert(etl::pair(name, dev_info));
+    auto pair = hr_pair_t{name, info.hr};
+    auto sz   = sizeNeeded(pair);
+    auto buf  = new uint8_t[sz];
+    auto span = etl::span<uint8_t>(buf, sz);
+    auto size = encode(pair, span);
+    if (size.has_value()) {
+      if (hr_char != nullptr) {
+        hr_char->setValue(span.data(), size.value());
+        hr_char->notify();
+      } else {
+        ESP_LOGE(TAG, "HR characteristic is null");
+      }
+    } else {
+      ESP_LOGE(TAG, "Failed to encode the data");
+    }
+    delete[] buf;
   }
 }
 
