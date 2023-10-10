@@ -279,6 +279,7 @@ void ScanCallback::handleWatch(BLEAdvertisedDevice *advertisedDevice) {
 
 void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   auto name = advertisedDevice->getName();
+  auto addr = advertisedDevice->getAddress();
   if (advertisedDevice->getName().find("T03") != std::string::npos) {
     handleBand(advertisedDevice);
     // starts with "Y"

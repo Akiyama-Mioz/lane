@@ -1,11 +1,51 @@
 syntax = "proto3";
 
-// https://gist.github.com/shankarshastri/c1b4d920188da78a0dbc9fc707e82996
-message BLEAdvertisingData {
-  string name = 1;
-  bytes manufactureData = 2;
-  // Uses Variable Length Encoding. They are efficient in encoding for negative numbers.
-  sint32 rssi = 3;
+message WhiteItem {
+  oneof item {
+    // name is a regex
+    string name = 1;
+    bytes mac = 2;
+  }
 }
+
+message WhiteList {
+  repeated WhiteItem items = 1;
+}
+
+enum WhiteListCommand {
+  REMOVE = 0;
+  CLEAR = 1;
+  // response with WhiteListResponse
+  REQUEST = 2;
+}
+
+enum BlueScanErrorCode {
+  OUT_OF_MEMORY = 0;
+  TOO_MANY_DEVICES = 1;
+}
+
+message AddWhiteItem {
+  WhiteItem item = 1;
+}
+
+message SetWhiteList {
+  WhiteList list = 1;
+}
+
+message WhiteListResponse {
+  oneof response {
+    WhiteList list = 1;
+    BlueScanErrorCode code = 2;
+  }
+}
+
+message WhiteListCommandRequest {
+  oneof request {
+    WhiteListCommand command = 1;
+    AddWhiteItem add = 2;
+    SetWhiteList set = 3;
+  }
+}
+
 
 // see `hr_data.ksy`

@@ -35,6 +35,10 @@ const auto PREF_TOTAL_LENGTH_NAME = "to";
 // uint32_t
 const auto PREF_COLOR_NAME = "co";
 
+const auto PREF_WHITE_RULE_NAME = "wh";
+// const auto PREF_WHITE_RULE_SIZE_KEY = "wz";
+const auto PREF_WHITE_RULE_MAX_LENGTH = 128;
+
 using centimeter = utils::length<float, std::centi>;
 using meter      = utils::length<float, std::ratio<1>>;
 

@@ -3,6 +3,7 @@ idf_component_register(SRCS
         Lane.cpp
         LaneCallback.cpp
         ScanCallback.cpp
+        whitelist.cpp
         utils.cpp
         INCLUDE_DIRS
         REQUIRES spi_flash

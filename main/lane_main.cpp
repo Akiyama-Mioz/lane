@@ -50,8 +50,10 @@ void initBLE(NimBLEServer *server, LaneBLE &ble, Lane &lane) {
 }
 
 extern "C" [[noreturn]] void app_main() {
+  const auto TAG = "main";
   initArduino();
 
+  etl::array<uint8_t, PREF_WHITE_RULE_MAX_LENGTH> white_rules_bytes{};
   Preferences pref;
   pref.begin(PREF_RECORD_NAME, true);
   auto line_length   = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
@@ -59,6 +61,12 @@ extern "C" [[noreturn]] void app_main() {
   auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
   auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
   auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
+  auto sz            = pref.getBytes(PREF_WHITE_RULE_NAME, white_rules_bytes.data(), PREF_WHITE_RULE_MAX_LENGTH);
+  if (sz > 0) {
+    // TODO: serialize the white rules
+  } else {
+    ESP_LOGE(TAG, "Failed to read white rules from flash. Skip deserialization.");
+  }
   pref.end();
   auto default_cfg = lane::LaneConfig{
       .color         = color,
@@ -83,8 +91,8 @@ extern "C" [[noreturn]] void app_main() {
     lane.loop();
   };
   // using singleton pattern to avoid memory leak
-  auto s        = strip::AdafruitPixel(default_cfg.line_LEDs_num, LED_PIN, strip::AdafruitPixel::default_pixel_type);
-  auto &lane    = *Lane::get();
+  auto s     = strip::AdafruitPixel(default_cfg.line_LEDs_num, LED_PIN, strip::AdafruitPixel::default_pixel_type);
+  auto &lane = *Lane::get();
   lane.setStrip(std::make_unique<decltype(s)>(std::move(s)));
   auto lane_ble = LaneBLE();
   initBLE(&server, lane_ble, lane);
