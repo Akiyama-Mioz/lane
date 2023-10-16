@@ -100,19 +100,20 @@ bool set_encode_white_item(const item_t &item, ::WhiteItem &pb_item) {
   }
 }
 
-bool encode_white_list(pb_ostream_t *ostream, list_t &list) {
-  ::WhiteListSet set;
+bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &list) {
   set.has_list                = true;
   set.list.items.funcs.encode = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
     const auto &list = *reinterpret_cast<const list_t *>(*arg);
     for (const auto &item : list) {
+      // not very sure of creating a new item here
       ::WhiteItem pb_item;
-      if (!pb_encode_tag_for_field(stream, field)) {
-        LOG_ERR("white_list", "failed to encode tag.");
-        return false;
-      }
+      // Same as pb_encode_tag, except takes the parameters from a pb_field_iter_t structure.
       if (!set_encode_white_item(item, pb_item)) {
         LOG_ERR("white_list", "failed to set encode function.");
+        return false;
+      }
+      if (!pb_encode_tag_for_field(stream, field)) {
+        LOG_ERR("white_list", "failed to encode tag.");
         return false;
       }
       if (!pb_encode_submessage(stream, WhiteItem_fields, &pb_item)) {
@@ -123,11 +124,17 @@ bool encode_white_list(pb_ostream_t *ostream, list_t &list) {
     return true;
   };
   set.list.items.arg = &list;
-  return pb_encode_submessage(ostream, WhiteListSet_fields, &set);
+  // what's the difference between pb_encode and pb_encode_submessage?
+  // The functions with names pb_encode_<datatype> are used when dealing with callback fields.
+  // The typical reason for using callbacks is to have an array of unlimited size.
+  // In that case, pb_encode will call your callback function,
+  // which in turn will call pb_encode_<datatype> functions repeatedly to write out values.
+  // https://jpa.kapsi.fi/nanopb/docs/reference.html#pb_encode
+  return pb_encode(ostream, WhiteListSet_fields, &set);
 }
 
 etl::optional<list_t>
-parse_set_white_list(pb_istream_t *stream, ::WhiteListSet &set) {
+unmarshal_set_white_list(pb_istream_t *stream, ::WhiteListSet &set) {
   list_t result;
   // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/oneof.proto
   auto white_list_decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
