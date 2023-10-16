@@ -11,16 +11,15 @@
 
 /* Enum definitions */
 typedef enum _WhiteListCommand {
-    WhiteListCommand_REMOVE = 0,
-    WhiteListCommand_CLEAR = 1,
-    /* response with WhiteListResponse */
-    WhiteListCommand_REQUEST = 2
+    /* response with list */
+    WhiteListCommand_REQUEST = 0
 } WhiteListCommand;
 
-typedef enum _BlueScanErrorCode {
-    BlueScanErrorCode_OUT_OF_MEMORY = 0,
-    BlueScanErrorCode_TOO_MANY_DEVICES = 1
-} BlueScanErrorCode;
+typedef enum _WhiteListErrorCode {
+    WhiteListErrorCode_OK = 0,
+    WhiteListErrorCode_OUT_OF_MEMORY = 1,
+    WhiteListErrorCode_TOO_MANY_DEVICES = 2
+} WhiteListErrorCode;
 
 /* Struct definitions */
 typedef struct _WhiteItem {
@@ -36,42 +35,36 @@ typedef struct _WhiteList {
     pb_callback_t items;
 } WhiteList;
 
-typedef struct _AddWhiteItem {
-    bool has_item;
-    WhiteItem item;
-} AddWhiteItem;
-
-typedef struct _SetWhiteList {
-    bool has_list;
-    WhiteList list;
-} SetWhiteList;
-
 typedef struct _WhiteListResponse {
     pb_size_t which_response;
     union {
         WhiteList list;
-        BlueScanErrorCode code;
+        WhiteListErrorCode code;
     } response;
 } WhiteListResponse;
+
+typedef struct _WhiteListSet {
+    bool has_list;
+    WhiteList list;
+} WhiteListSet;
 
 typedef struct _WhiteListCommandRequest {
     pb_size_t which_request;
     union {
         WhiteListCommand command;
-        AddWhiteItem add;
-        SetWhiteList set;
+        WhiteListSet set;
     } request;
 } WhiteListCommandRequest;
 
 
 /* Helper constants for enums */
-#define _WhiteListCommand_MIN WhiteListCommand_REMOVE
+#define _WhiteListCommand_MIN WhiteListCommand_REQUEST
 #define _WhiteListCommand_MAX WhiteListCommand_REQUEST
 #define _WhiteListCommand_ARRAYSIZE ((WhiteListCommand)(WhiteListCommand_REQUEST+1))
 
-#define _BlueScanErrorCode_MIN BlueScanErrorCode_OUT_OF_MEMORY
-#define _BlueScanErrorCode_MAX BlueScanErrorCode_TOO_MANY_DEVICES
-#define _BlueScanErrorCode_ARRAYSIZE ((BlueScanErrorCode)(BlueScanErrorCode_TOO_MANY_DEVICES+1))
+#define _WhiteListErrorCode_MIN WhiteListErrorCode_OK
+#define _WhiteListErrorCode_MAX WhiteListErrorCode_TOO_MANY_DEVICES
+#define _WhiteListErrorCode_ARRAYSIZE ((WhiteListErrorCode)(WhiteListErrorCode_TOO_MANY_DEVICES+1))
 
 
 #ifdef __cplusplus
@@ -81,14 +74,12 @@ extern "C" {
 /* Initializer values for message structs */
 #define WhiteItem_init_default                   {0, {{{NULL}, NULL}}}
 #define WhiteList_init_default                   {{{NULL}, NULL}}
-#define AddWhiteItem_init_default                {false, WhiteItem_init_default}
-#define SetWhiteList_init_default                {false, WhiteList_init_default}
+#define WhiteListSet_init_default                {false, WhiteList_init_default}
 #define WhiteListResponse_init_default           {0, {WhiteList_init_default}}
 #define WhiteListCommandRequest_init_default     {0, {_WhiteListCommand_MIN}}
 #define WhiteItem_init_zero                      {0, {{{NULL}, NULL}}}
 #define WhiteList_init_zero                      {{{NULL}, NULL}}
-#define AddWhiteItem_init_zero                   {false, WhiteItem_init_zero}
-#define SetWhiteList_init_zero                   {false, WhiteList_init_zero}
+#define WhiteListSet_init_zero                   {false, WhiteList_init_zero}
 #define WhiteListResponse_init_zero              {0, {WhiteList_init_zero}}
 #define WhiteListCommandRequest_init_zero        {0, {_WhiteListCommand_MIN}}
 
@@ -96,13 +87,11 @@ extern "C" {
 #define WhiteItem_name_tag                       1
 #define WhiteItem_mac_tag                        2
 #define WhiteList_items_tag                      1
-#define AddWhiteItem_item_tag                    1
-#define SetWhiteList_list_tag                    1
 #define WhiteListResponse_list_tag               1
 #define WhiteListResponse_code_tag               2
+#define WhiteListSet_list_tag                    1
 #define WhiteListCommandRequest_command_tag      1
-#define WhiteListCommandRequest_add_tag          2
-#define WhiteListCommandRequest_set_tag          3
+#define WhiteListCommandRequest_set_tag          2
 
 /* Struct field encoding specification for nanopb */
 #define WhiteItem_FIELDLIST(X, a) \
@@ -117,17 +106,11 @@ X(a, CALLBACK, REPEATED, MESSAGE,  items,             1)
 #define WhiteList_DEFAULT NULL
 #define WhiteList_items_MSGTYPE WhiteItem
 
-#define AddWhiteItem_FIELDLIST(X, a) \
-X(a, STATIC,   OPTIONAL, MESSAGE,  item,              1)
-#define AddWhiteItem_CALLBACK NULL
-#define AddWhiteItem_DEFAULT NULL
-#define AddWhiteItem_item_MSGTYPE WhiteItem
-
-#define SetWhiteList_FIELDLIST(X, a) \
+#define WhiteListSet_FIELDLIST(X, a) \
 X(a, STATIC,   OPTIONAL, MESSAGE,  list,              1)
-#define SetWhiteList_CALLBACK NULL
-#define SetWhiteList_DEFAULT NULL
-#define SetWhiteList_list_MSGTYPE WhiteList
+#define WhiteListSet_CALLBACK NULL
+#define WhiteListSet_DEFAULT NULL
+#define WhiteListSet_list_MSGTYPE WhiteList
 
 #define WhiteListResponse_FIELDLIST(X, a) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (response,list,response.list),   1) \
@@ -138,33 +121,28 @@ X(a, STATIC,   ONEOF,    UENUM,    (response,code,response.code),   2)
 
 #define WhiteListCommandRequest_FIELDLIST(X, a) \
 X(a, STATIC,   ONEOF,    UENUM,    (request,command,request.command),   1) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (request,add,request.add),   2) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (request,set,request.set),   3)
+X(a, STATIC,   ONEOF,    MESSAGE,  (request,set,request.set),   2)
 #define WhiteListCommandRequest_CALLBACK NULL
 #define WhiteListCommandRequest_DEFAULT NULL
-#define WhiteListCommandRequest_request_add_MSGTYPE AddWhiteItem
-#define WhiteListCommandRequest_request_set_MSGTYPE SetWhiteList
+#define WhiteListCommandRequest_request_set_MSGTYPE WhiteListSet
 
 extern const pb_msgdesc_t WhiteItem_msg;
 extern const pb_msgdesc_t WhiteList_msg;
-extern const pb_msgdesc_t AddWhiteItem_msg;
-extern const pb_msgdesc_t SetWhiteList_msg;
+extern const pb_msgdesc_t WhiteListSet_msg;
 extern const pb_msgdesc_t WhiteListResponse_msg;
 extern const pb_msgdesc_t WhiteListCommandRequest_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define WhiteItem_fields &WhiteItem_msg
 #define WhiteList_fields &WhiteList_msg
-#define AddWhiteItem_fields &AddWhiteItem_msg
-#define SetWhiteList_fields &SetWhiteList_msg
+#define WhiteListSet_fields &WhiteListSet_msg
 #define WhiteListResponse_fields &WhiteListResponse_msg
 #define WhiteListCommandRequest_fields &WhiteListCommandRequest_msg
 
 /* Maximum encoded size of messages (where known) */
 /* WhiteItem_size depends on runtime parameters */
 /* WhiteList_size depends on runtime parameters */
-/* AddWhiteItem_size depends on runtime parameters */
-/* SetWhiteList_size depends on runtime parameters */
+/* WhiteListSet_size depends on runtime parameters */
 /* WhiteListResponse_size depends on runtime parameters */
 /* WhiteListCommandRequest_size depends on runtime parameters */
 

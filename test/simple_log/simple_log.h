@@ -34,7 +34,6 @@ namespace simple_log {
         Off,
     };
     constexpr auto level_ = Level::Debug;
-// constexpr auto level_ = Level::Debug;
     consteval bool is_enabled(Level level) {
         return level >= level_;
     }

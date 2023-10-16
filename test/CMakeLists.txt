@@ -10,6 +10,7 @@ set(WHITE_LIST_SRC ../main/whitelist.cpp ../main/whitelist.h)
 
 set(BLE_PB_SRC ../components/nanopb/protobuf/ble.pb.c ../components/nanopb/protobuf/ble.pb.h)
 add_executable(test main.cpp ${WHITE_LIST_SRC} ${BLE_PB_SRC})
+target_include_directories(test PUBLIC ../main)
 target_include_directories(test PUBLIC ../components/nanopb/protobuf)
 target_link_libraries(test etl::etl protobuf-nanopb-static simple_log)
 target_compile_definitions(test PUBLIC SIMPLE_LOG)

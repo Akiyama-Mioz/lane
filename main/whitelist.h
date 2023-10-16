@@ -26,7 +26,7 @@ struct Addr {
 
 using item_t = std::variant<Name, Addr>;
 using list_t = std::vector<item_t>;
-using response_t = std::variant<list_t, ::BlueScanErrorCode>;
+using response_t = std::variant<list_t, ::WhiteListErrorCode>;
 }
 
 #ifdef ESP32

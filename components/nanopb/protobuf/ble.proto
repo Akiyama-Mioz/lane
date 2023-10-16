@@ -13,37 +13,31 @@ message WhiteList {
 }
 
 enum WhiteListCommand {
-  REMOVE = 0;
-  CLEAR = 1;
-  // response with WhiteListResponse
-  REQUEST = 2;
+  // response with list
+  REQUEST = 0;
 }
 
-enum BlueScanErrorCode {
-  OUT_OF_MEMORY = 0;
-  TOO_MANY_DEVICES = 1;
+enum WhiteListErrorCode {
+  OK = 0;
+  OUT_OF_MEMORY = 1;
+  TOO_MANY_DEVICES = 2;
 }
 
-message AddWhiteItem {
-  WhiteItem item = 1;
-}
-
-message SetWhiteList {
+message WhiteListSet {
   WhiteList list = 1;
 }
 
 message WhiteListResponse {
   oneof response {
     WhiteList list = 1;
-    BlueScanErrorCode code = 2;
+    WhiteListErrorCode code = 2;
   }
 }
 
 message WhiteListCommandRequest {
   oneof request {
     WhiteListCommand command = 1;
-    AddWhiteItem add = 2;
-    SetWhiteList set = 3;
+    WhiteListSet set = 2;
   }
 }
 

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include "whitelist.h"
 #include "simple_log.h"
 
 int main(){
