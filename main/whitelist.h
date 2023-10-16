@@ -10,6 +10,10 @@
 #include <regex>
 #include <ble.pb.h>
 
+#ifdef SIMPLE_LOG
+#include "simple_log.h"
+#endif
+
 namespace white_list {
 const auto BLE_MAC_ADDR_SIZE = 6;
 struct Name {
