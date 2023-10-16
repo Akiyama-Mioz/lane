@@ -17,13 +17,20 @@
 #define LOG_ERR(tag, fmt, ...) // Define an empty macro if none of the conditions are met
 #endif
 
+#ifdef ESP32
+#define LOG_INFO(tag, fmt, ...) ESP_LOGI(tag, fmt, ##__VA_ARGS__)
+#elif defined(SIMPLE_LOG)
+#define LOG_INFO(tag, fmt, ...) LOG_I(tag, fmt, ##__VA_ARGS__)
+#else
+#define LOG_INFO(tag, fmt, ...) // Define an empty macro if none of the conditions are met
+#endif
+
 namespace white_list {
     // decode one
     using addr_f = std::function<bool(Addr)>;
     using name_f = std::function<bool(Name)>;
 
-    void set_decode_white_item(pb_istream_t *stream,
-                               ::WhiteItem &item,
+    void set_decode_white_item(::WhiteItem &item,
                                const addr_f &write_addr,
                                const name_f &write_name) {
         item.item.mac.funcs.decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
@@ -37,7 +44,7 @@ namespace white_list {
             // https://en.cppreference.com/w/cpp/algorithm/swap
             // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/decode_oneof.c
 
-            auto &w = *reinterpret_cast<addr_f *>(*arg);
+            const auto &w = *reinterpret_cast<addr_f *>(*arg);
             if (!pb_read(stream, addr.addr.data(), BLE_MAC_ADDR_SIZE)) {
                 LOG_ERR("white_list", "failed to read mac");
                 return false;
@@ -50,7 +57,7 @@ namespace white_list {
                 return false;
             }
             auto name = Name{};
-            auto &w = *reinterpret_cast<name_f *>(*arg);
+            const auto &w = *reinterpret_cast<name_f *>(*arg);
             // the 0x00 in the end?
             name.name.resize(stream->bytes_left + 1);
             if (!pb_read(stream, reinterpret_cast<pb_byte_t *>(name.name.data()), stream->bytes_left)) {
@@ -62,7 +69,7 @@ namespace white_list {
         item.item.name.arg = const_cast<name_f *>(&write_name);
     }
 
-    bool set_encode_white_item(pb_ostream_t *ostream, const item_t &item, ::WhiteItem &pb_item) {
+    bool set_encode_white_item(const item_t &item, ::WhiteItem &pb_item) {
         if (holds_alternative<Name>(item)) {
             const auto &item_name = get<Name>(item);
             pb_item.which_item = WhiteItem_name_tag;
@@ -97,17 +104,24 @@ namespace white_list {
     etl::optional<list_t>
     parse_set_white_list(pb_istream_t *stream, ::WhiteListSet &set) {
         list_t result;
+        // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/oneof.proto
         auto white_list_decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
             if (arg == nullptr) {
                 return false;
             }
             // https://stackoverflow.com/questions/73529672/decoding-oneof-nanopb
             auto &result = *reinterpret_cast<std::vector<item_t> *>(*arg);
-            // I'm not use if this the correct way
-            // TODO: find the documentation or source code
-            ::WhiteItem &pb_item = *static_cast<::WhiteItem *>(field->message);
-            auto to_be_swap = item_t{};
-            set_decode_white_item(stream, pb_item, to_be_swap);
+            if (field->tag == WhiteList_items_tag) {
+                LOG_INFO("parse_list", "one item");
+                auto &b = *static_cast<::WhiteItem *>(field->pData);
+                set_decode_white_item(b, [&result](auto addr) {
+                    result.emplace_back(item_t{addr});
+                    return true;
+                }, [&result](auto name) {
+                    result.emplace_back(item_t{name});
+                    return true;
+                });
+            }
             return true;
         };
         set.list.items.funcs.decode = white_list_decode;
