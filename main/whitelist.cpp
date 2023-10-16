@@ -4,6 +4,7 @@
 
 #include "whitelist.h"
 #include "pb_decode.h"
+#include <etl/optional.h>
 
 namespace white_list {
 
@@ -11,19 +12,18 @@ bool is_device_in_whitelist(const WhiteItem &item, BLEAdvertisedDevice &device) 
   return std::visit(IsDeviceVisitor{device}, item);
 }
 
-std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, size_t size) {
+etl::optional<std::vector<WhiteItem>>
+parse_white_list_response(const uint8_t *buffer, size_t size) {
   std::vector<WhiteItem> result;
   pb_istream_t stream        = pb_istream_from_buffer(buffer, size);
   WhiteListResponse response = WhiteListResponse_init_zero;
-  if (!pb_decode(&stream, WhiteListResponse_fields, &response)) {
-    return result;
-  }
-  auto white_list_decode = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
+  auto white_list_decode     = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
     if (arg == nullptr) {
       return false;
     }
-    auto &result = *reinterpret_cast<std::vector<WhiteItem> *>(*arg);
-    ::WhiteItem item;
+    // https://stackoverflow.com/questions/73529672/decoding-oneof-nanopb
+    auto &result      = *reinterpret_cast<std::vector<WhiteItem> *>(*arg);
+    ::WhiteItem &item = *(::WhiteItem *)field->message;
     std::string name{};
     std::array<uint8_t, BLE_MAC_ADDR_SIZE> addr{};
     item.item.mac.funcs.decode = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
@@ -50,8 +50,8 @@ std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, size_t s
         break;
       }
       case WhiteItem_mac_tag: {
-        auto m = Addr{addr};
-        auto i = WhiteItem(m);
+        auto a = Addr{addr};
+        auto i = WhiteItem(a);
         result.emplace_back(i);
         break;
       }
@@ -63,6 +63,18 @@ std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, size_t s
   };
   response.response.list.items.funcs.decode = white_list_decode;
   response.response.list.items.arg          = &result;
-  return result;
+  if (!pb_decode(&stream, WhiteListResponse_fields, &response)) {
+    return etl::nullopt;
+  }
+  switch (response.which_response) {
+    case WhiteListResponse_list_tag: {
+      return result;
+    }
+    case WhiteListResponse_code_tag: {
+      return etl::nullopt;
+    }
+    default:
+      return etl::nullopt;
+  }
 }
 }

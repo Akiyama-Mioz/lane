@@ -38,7 +38,7 @@ struct IsDeviceVisitor {
   bool operator()(const white_list::Addr &addr) const {
     // a pointer to the uint8_t[6] array of the address
     const auto device_addr = device.getAddress().getNative();
-    return std::memcmp(addr.addr, device_addr, BLE_MAC_ADDR_SIZE) == 0;
+    return std::memcmp(addr.addr.data(), device_addr, BLE_MAC_ADDR_SIZE) == 0;
   }
 };
 

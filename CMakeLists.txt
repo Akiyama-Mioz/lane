@@ -14,5 +14,5 @@ add_compile_definitions(ARDUINO_ARCH_ESP32=1)
 add_compile_definitions(FMT_HEADER_ONLY)
 
 # https://cmake.org/cmake/help/latest/envvar/CFLAGS.html
-project(track_long)
+project(track_short)
 
