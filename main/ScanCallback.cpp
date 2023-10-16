@@ -118,10 +118,11 @@ std::string to_string(const WatchInfo &info) {
 
 void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
   auto name    = advertisedDevice->getName();
-  auto payload = std::string(reinterpret_cast<const char *>(advertisedDevice->getPayload()), 31);
+  auto pp      = advertisedDevice->getPayload();
+  auto l       = advertisedDevice->getPayloadLength();
   auto pHrChar = this->hr_char;
   ESP_LOGI(TAG, "Name: %s, Data: %s, RSSI: %d", name.c_str(),
-           to_hex(payload.c_str(), 31).c_str(),
+           to_hex(pp, l).c_str(),
            advertisedDevice->getRSSI());
   auto &device_map = this->devices;
   // return the start of the band id (index)
@@ -145,6 +146,8 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
     auto configClient = [advertisedDevice, &name](BLEClient &client) -> NimBLERemoteCharacteristic * {
       const auto serviceUUID   = "180D";
       const auto heartRateUUID = "2A37";
+      // TODO: handle `device_map` at `onConnect` and `onDisconnect`
+      // with `setClientCallbacks` (which is a client callback)
       client.connect(advertisedDevice);
       auto *pService = client.getService(serviceUUID);
       if (pService == nullptr) {
@@ -201,6 +204,7 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
     };
     if (device_map.find(band_id_str) == device_map.end()) {
       ESP_LOGI(TAG, "Configure new band %s", band_id_str.c_str());
+      // TODO: handle client deletion with `deleteClient` with `deleteClient`
       auto &client = *BLEDevice::createClient();
       /// Note, intended to be allocated in heap
       auto info = DeviceInfo{
