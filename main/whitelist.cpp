@@ -6,6 +6,8 @@
 #include "pb_decode.h"
 #include "pb_encode.h"
 #include <etl/optional.h>
+#include <functional>
+
 
 #ifdef ESP32
 #define LOG_ERR(tag, fmt, ...) ESP_LOGE(tag, fmt, ##__VA_ARGS__)
@@ -17,7 +19,13 @@
 
 namespace white_list {
     // decode one
-    void set_decode_white_item(pb_istream_t *stream, ::WhiteItem &item, item_t &to_be_write) {
+    using addr_f = std::function<bool(Addr)>;
+    using name_f = std::function<bool(Name)>;
+
+    void set_decode_white_item(pb_istream_t *stream,
+                               ::WhiteItem &item,
+                               const addr_f &write_addr,
+                               const name_f &write_name) {
         item.item.mac.funcs.decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
             if (arg == nullptr) {
                 return false;
@@ -26,35 +34,32 @@ namespace white_list {
             // Use pb_read instead, length of the string is available in stream->bytes_left.
             // https://jpa.kapsi.fi/nanopb/docs/concepts.html#decoding-callbacks
             // https://github.com/nanopb/nanopb/blob/09234696e0ef821432a8541b950e8866f0c61f8c/tests/callbacks/decode_callbacks.c#L10
+            // https://en.cppreference.com/w/cpp/algorithm/swap
+            // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/decode_oneof.c
 
-            auto &item = *reinterpret_cast<item_t *>(*arg);
+            auto &w = *reinterpret_cast<addr_f *>(*arg);
             if (!pb_read(stream, addr.addr.data(), BLE_MAC_ADDR_SIZE)) {
                 LOG_ERR("white_list", "failed to read mac");
                 return false;
             }
-            auto new_item = item_t(addr);
-            // https://en.cppreference.com/w/cpp/algorithm/swap
-            std::swap(item, new_item);
-            return true;
+            return w(std::move(addr));
         };
-        item.item.mac.arg = &to_be_write;
+        item.item.mac.arg = const_cast<addr_f *>(&write_addr);
         item.item.name.funcs.decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
             if (arg == nullptr) {
                 return false;
             }
             auto name = Name{};
-            auto &item = *reinterpret_cast<item_t *>(*arg);
+            auto &w = *reinterpret_cast<name_f *>(*arg);
             // the 0x00 in the end?
             name.name.resize(stream->bytes_left + 1);
             if (!pb_read(stream, reinterpret_cast<pb_byte_t *>(name.name.data()), stream->bytes_left)) {
                 LOG_ERR("white_list", "failed to read name");
                 return false;
             }
-            auto new_item = item_t{name};
-            std::swap(item, new_item);
-            return true;
+            return w(std::move(name));
         };
-        item.item.name.arg = &to_be_write;
+        item.item.name.arg = const_cast<name_f *>(&write_name);
     }
 
     bool set_encode_white_item(pb_ostream_t *ostream, const item_t &item, ::WhiteItem &pb_item) {
