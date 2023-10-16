@@ -8,70 +8,92 @@
 
 namespace white_list {
 
-bool is_device_in_whitelist(const WhiteItem &item, BLEAdvertisedDevice &device) {
+bool is_device_in_whitelist(const item_t &item, BLEAdvertisedDevice &device) {
   return std::visit(IsDeviceVisitor{device}, item);
 }
 
-etl::optional<std::vector<WhiteItem>>
-parse_white_list_response(const uint8_t *buffer, size_t size) {
-  std::vector<WhiteItem> result;
-  pb_istream_t stream        = pb_istream_from_buffer(buffer, size);
-  WhiteListResponse response = WhiteListResponse_init_zero;
-  auto white_list_decode     = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
+etl::optional<item_t>
+parse_white_item(pb_istream_t *stream, ::WhiteItem &item) {
+  std::string name{};
+  std::array<uint8_t, BLE_MAC_ADDR_SIZE> addr{};
+  item.item.mac.funcs.decode = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
+    if (arg == nullptr) {
+      return false;
+    }
+    // Use pb_read instead, length of the string is available in stream->bytes_left.
+    // https://github.com/nanopb/nanopb/blob/09234696e0ef821432a8541b950e8866f0c61f8c/tests/callbacks/decode_callbacks.c#L10
+    auto &addr = *reinterpret_cast<std::array<uint8_t, BLE_MAC_ADDR_SIZE> *>(*arg);
+    if (!pb_read(stream, addr.data(), BLE_MAC_ADDR_SIZE)) {
+      ESP_LOGE("white_list", "failed to read mac");
+      return false;
+    }
+    return true;
+  };
+  item.item.mac.arg           = &addr;
+  item.item.name.funcs.decode = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
+    if (arg == nullptr) {
+      return false;
+    }
+    auto &name = *reinterpret_cast<std::string *>(*arg);
+    // the 0x00 in the end?
+    name.resize(stream->bytes_left + 1);
+    if (!pb_read(stream, reinterpret_cast<pb_byte_t *>(name.data()), stream->bytes_left)) {
+      ESP_LOGE("white_list", "failed to read name");
+      return false;
+    }
+    return true;
+  };
+  item.item.name.arg = &name;
+  if (!pb_decode(stream, WhiteItem_fields, &item)) {
+    ESP_LOGE("white_list", "failed to decode item");
+    return etl::nullopt;
+  }
+  switch (item.which_item) {
+    case WhiteItem_name_tag: {
+      auto n = Name{name};
+      auto i = item_t(n);
+      return i;
+    }
+    case WhiteItem_mac_tag: {
+      auto a = Addr{addr};
+      auto i = item_t(a);
+      return i;
+    }
+    default:
+      return etl::nullopt;
+  }
+}
+
+etl::optional<response_t>
+parse_white_list_response(pb_istream_t *stream, ::WhiteListResponse &response) {
+  list_t result;
+  auto white_list_decode = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
     if (arg == nullptr) {
       return false;
     }
     // https://stackoverflow.com/questions/73529672/decoding-oneof-nanopb
-    auto &result      = *reinterpret_cast<std::vector<WhiteItem> *>(*arg);
+    auto &result      = *reinterpret_cast<std::vector<item_t> *>(*arg);
     ::WhiteItem &item = *(::WhiteItem *)field->message;
-    std::string name{};
-    std::array<uint8_t, BLE_MAC_ADDR_SIZE> addr{};
-    item.item.mac.funcs.decode = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
-      if (arg == nullptr) {
-        return false;
-      }
-      auto &addr = *reinterpret_cast<std::array<uint8_t, BLE_MAC_ADDR_SIZE> *>(*arg);
+    auto item_opt     = parse_white_item(stream, item);
+    if (!item_opt.has_value()) {
       return false;
-    };
-    item.item.mac.arg           = &addr;
-    item.item.name.funcs.decode = [](pb_istream_t *stream, const pb_field_t *field, void **arg) {
-      if (arg == nullptr) {
-        return false;
-      }
-      auto &name = *reinterpret_cast<std::string *>(*arg);
-      return false;
-    };
-    item.item.name.arg = &name;
-    switch (item.which_item) {
-      case WhiteItem_name_tag: {
-        auto n = Name{name};
-        auto i = WhiteItem(n);
-        result.emplace_back(i);
-        break;
-      }
-      case WhiteItem_mac_tag: {
-        auto a = Addr{addr};
-        auto i = WhiteItem(a);
-        result.emplace_back(i);
-        break;
-      }
-      default:
-        return false;
+    } else {
+      result.push_back(item_opt.value());
     }
-
-    return false;
+    return true;
   };
   response.response.list.items.funcs.decode = white_list_decode;
   response.response.list.items.arg          = &result;
-  if (!pb_decode(&stream, WhiteListResponse_fields, &response)) {
+  if (!pb_decode(stream, WhiteListResponse_fields, &response)) {
+    ESP_LOGE("white_list", "failed to decode response");
     return etl::nullopt;
   }
   switch (response.which_response) {
     case WhiteListResponse_list_tag: {
-      return result;
+      return response_t(result);
     }
     case WhiteListResponse_code_tag: {
-      return etl::nullopt;
+      return response_t(response.response.code);
     }
     default:
       return etl::nullopt;

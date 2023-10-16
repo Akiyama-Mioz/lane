@@ -21,7 +21,9 @@ struct Addr {
   std::array<uint8_t, BLE_MAC_ADDR_SIZE> addr;
 };
 
-using WhiteItem = std::variant<Name, Addr>;
+using item_t = std::variant<Name, Addr>;
+using list_t = std::vector<item_t>;
+using response_t = std::variant<list_t, ::BlueScanErrorCode>;
 
 // https://stackoverflow.com/questions/75278137/correct-use-of-stdvariant-and-stdvisit-when-functor-requires-multiple-argume
 struct IsDeviceVisitor {
@@ -42,8 +44,7 @@ struct IsDeviceVisitor {
   }
 };
 
-bool is_device_in_whitelist(const WhiteItem &item, BLEAdvertisedDevice &device);
-
+bool is_device_in_whitelist(const item_t &item, BLEAdvertisedDevice &device);
 }
 
 #endif // TRACK_LONG_WHITELIST_H
