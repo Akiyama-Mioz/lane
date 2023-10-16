@@ -55,6 +55,10 @@ void set_decode_white_item(::WhiteItem &item,
     if (arg == nullptr) {
       return false;
     }
+    if (stream->bytes_left < BLE_MAC_ADDR_SIZE) {
+      LOG_ERR("white_list", "field length is not enough. expected: %d, actual: %d", BLE_MAC_ADDR_SIZE, static_cast<int>(stream->bytes_left));
+      return false;
+    }
     auto name     = Name{};
     const auto &w = *reinterpret_cast<name_f *>(*arg);
     // the 0x00 in the end?
