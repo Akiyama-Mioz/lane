@@ -8,10 +8,6 @@
 
 namespace white_list {
 
-bool is_device_in_whitelist(const item_t &item, BLEAdvertisedDevice &device) {
-  return std::visit(IsDeviceVisitor{device}, item);
-}
-
 etl::optional<item_t>
 parse_white_item(pb_istream_t *stream, ::WhiteItem &item) {
   std::string name{};
@@ -24,7 +20,9 @@ parse_white_item(pb_istream_t *stream, ::WhiteItem &item) {
     // https://github.com/nanopb/nanopb/blob/09234696e0ef821432a8541b950e8866f0c61f8c/tests/callbacks/decode_callbacks.c#L10
     auto &addr = *reinterpret_cast<std::array<uint8_t, BLE_MAC_ADDR_SIZE> *>(*arg);
     if (!pb_read(stream, addr.data(), BLE_MAC_ADDR_SIZE)) {
+#ifdef ESP32
       ESP_LOGE("white_list", "failed to read mac");
+#endif
       return false;
     }
     return true;
@@ -38,7 +36,9 @@ parse_white_item(pb_istream_t *stream, ::WhiteItem &item) {
     // the 0x00 in the end?
     name.resize(stream->bytes_left + 1);
     if (!pb_read(stream, reinterpret_cast<pb_byte_t *>(name.data()), stream->bytes_left)) {
+#ifdef ESP32
       ESP_LOGE("white_list", "failed to read name");
+#endif
       return false;
     }
     return true;
@@ -85,7 +85,9 @@ parse_white_list_response(pb_istream_t *stream, ::WhiteListResponse &response) {
   response.response.list.items.funcs.decode = white_list_decode;
   response.response.list.items.arg          = &result;
   if (!pb_decode(stream, WhiteListResponse_fields, &response)) {
+#ifdef ESP32
     ESP_LOGE("white_list", "failed to decode response");
+#endif
     return etl::nullopt;
   }
   switch (response.which_response) {
