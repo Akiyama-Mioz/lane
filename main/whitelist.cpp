@@ -253,7 +253,7 @@ unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request)
         LOG_ERR("white_list", "failed to decode set");
         return etl::nullopt;
       }
-      return request_t{result};
+      return request_t{std::move(result)};
     }
     case WhiteListRequest_command_tag: {
       request.which_request = tag;
