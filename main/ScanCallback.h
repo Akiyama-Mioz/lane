@@ -27,6 +27,7 @@ class ScanCallback : public NimBLEScanCallbacks {
   // the characteristic to send the heart rate data to the client with the format described in
   // `hr_data.ksy`
 public:
+  static const int MAX_OSTREAM_SIZE = 256;
   white_list::list_t white_list;
 
 private:

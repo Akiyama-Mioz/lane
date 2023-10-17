@@ -64,8 +64,15 @@ extern "C" [[noreturn]] void app_main() {
   auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
   auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
   auto sz            = pref.getBytes(PREF_WHITE_LIST_NAME, white_rules_bytes.data(), PREF_WHITE_LIST_MAX_LENGTH);
+  white_list::list_t white_list{};
   if (sz > 0) {
-    // TODO: serialize the white rules
+    auto istream              = pb_istream_from_buffer(white_rules_bytes.data(), sz);
+    ::WhiteList pb_white_list = WhiteList_init_zero;
+    auto list                 = white_list::unmarshal_white_list(&istream, pb_white_list);
+    if (!list.has_value()) {
+      ESP_LOGE(TAG, "Failed to unmarshal white list");
+    }
+    white_list = list.value();
   } else {
     ESP_LOGE(TAG, "Failed to read white rules from flash. Skip deserialization.");
   }
@@ -107,10 +114,30 @@ extern "C" [[noreturn]] void app_main() {
   auto &hr_service      = *server.createService(BLE_CHAR_HR_SERVICE_UUID);
   auto &hr_char         = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,
                                                            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  auto pScanCb          = new ScanCallback(&hr_char);
   auto &white_list_char = *hr_service.createCharacteristic(BLE_CHAR_WHITE_LIST_UUID,
                                                            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
-  auto pWhiteListCb = new WhiteListCallback();
+  auto pWhiteListCb     = new WhiteListCallback();
   white_list_char.setCallbacks(pWhiteListCb);
+  pWhiteListCb->setList = [pScanCb](white_list::list_t list) {
+    const auto TAG      = "setList";
+    pScanCb->white_list = list;
+    uint8_t buf[ScanCallback::MAX_OSTREAM_SIZE]{0};
+    auto ostream           = pb_ostream_from_buffer(buf, sizeof(buf));
+    ::WhiteList white_list = WhiteList_init_zero;
+    auto ok                = white_list::marshal_white_list(&ostream, white_list, list);
+    if (!ok) {
+      ESP_LOGE(TAG, "Failed to marshal white list");
+      return;
+    }
+    Preferences pref;
+    pref.begin(PREF_RECORD_NAME, false);
+    pref.putBytes(PREF_WHITE_LIST_NAME, buf, ostream.bytes_written);
+    pref.end();
+  };
+  pWhiteListCb->getList = [pScanCb]() {
+    return pScanCb->white_list;
+  };
   hr_service.start();
 
   auto &ad = *NimBLEDevice::getAdvertising();
@@ -126,8 +153,7 @@ extern "C" [[noreturn]] void app_main() {
 
   server.start();
   NimBLEDevice::startAdvertising();
-  auto &scan   = *BLEDevice::getScan();
-  auto pScanCb = new ScanCallback(&hr_char);
+  auto &scan = *NimBLEDevice::getScan();
   scan.setScanCallbacks(pScanCb);
   scan.setInterval(1349);
   scan.setWindow(449);
@@ -136,10 +162,13 @@ extern "C" [[noreturn]] void app_main() {
   // scan time + sleep time
   constexpr auto scanTotalTime = std::chrono::milliseconds(1000);
   static_assert(scanTotalTime > scanTime);
-  ESP_LOGI("MAIN", "Initiated");
+  ESP_LOGI(TAG, "Initiated");
   pref.end();
   for (;;) {
-    scan.start(scanTime.count(), false);
+    bool ok = scan.start(scanTime.count(), false);
+    if (!ok) {
+      ESP_LOGE(TAG, "Failed to start scan");
+    }
     vTaskDelay(scanTotalTime.count() / portTICK_PERIOD_MS);
   }
 }

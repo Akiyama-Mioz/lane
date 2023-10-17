@@ -354,9 +354,8 @@ void WhiteListCallback::onWrite(NimBLECharacteristic *pCharacteristic, NimBLECon
           ESP_LOGE(TAG, "callback getList is nullptr");
           resp = white_list::response_t{WhiteListErrorCode_NULL};
         }
-        const int MAX_OSTREAM_SIZE = 256;
-        uint8_t buf[MAX_OSTREAM_SIZE];
-        auto ostream                = pb_ostream_from_buffer(raw, MAX_OSTREAM_SIZE);
+        uint8_t buf[ScanCallback::MAX_OSTREAM_SIZE];
+        auto ostream                = pb_ostream_from_buffer(raw, sizeof(buf));
         ::WhiteListResponse pb_resp = WhiteListResponse_init_zero;
         auto ok                     = white_list::marshal_white_list_response(&ostream, pb_resp, resp);
         if (!ok) {

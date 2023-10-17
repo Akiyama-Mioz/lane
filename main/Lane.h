@@ -36,7 +36,7 @@ const auto PREF_TOTAL_LENGTH_NAME = "to";
 const auto PREF_COLOR_NAME = "co";
 
 const auto PREF_WHITE_LIST_NAME = "wh";
-const auto PREF_WHITE_LIST_MAX_LENGTH = 216;
+const auto PREF_WHITE_LIST_MAX_LENGTH = 256;
 
 using centimeter = utils::length<float, std::centi>;
 using meter      = utils::length<float, std::ratio<1>>;
