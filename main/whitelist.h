@@ -28,11 +28,17 @@ struct Addr {
 using item_t = std::variant<Name, Addr>;
 using list_t = std::vector<item_t>;
 using response_t = std::variant<list_t, ::WhiteListErrorCode>;
+using request_t = std::variant<list_t, ::WhiteListCommand>;
 
 bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &list);
 
+bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &response, response_t &list);
+
 etl::optional<list_t>
-unmarshal_set_white_list(pb_istream_t *stream, ::WhiteListSet &set);
+unmarshal_set_white_list(pb_istream_t *istream, ::WhiteListSet &set);
+
+etl::optional<request_t>
+unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request);
 }
 
 #ifdef ESP32

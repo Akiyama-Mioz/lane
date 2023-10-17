@@ -34,7 +34,7 @@ message WhiteListResponse {
   }
 }
 
-message WhiteListCommandRequest {
+message WhiteListRequest {
   oneof request {
     WhiteListCommand command = 1;
     WhiteListSet set = 2;

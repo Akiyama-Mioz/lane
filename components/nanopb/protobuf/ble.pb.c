@@ -18,7 +18,7 @@ PB_BIND(WhiteListSet, WhiteListSet, AUTO)
 PB_BIND(WhiteListResponse, WhiteListResponse, AUTO)
 
 
-PB_BIND(WhiteListCommandRequest, WhiteListCommandRequest, AUTO)
+PB_BIND(WhiteListRequest, WhiteListRequest, AUTO)
 
 
 
