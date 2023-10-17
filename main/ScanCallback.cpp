@@ -116,7 +116,7 @@ std::string to_string(const WatchInfo &info) {
   return ss.str();
 }
 
-void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
+void ScanCallback::handleHrWhiteListConnection(BLEAdvertisedDevice *advertisedDevice) {
   auto name    = advertisedDevice->getName();
   auto pp      = advertisedDevice->getPayload();
   auto l       = advertisedDevice->getPayloadLength();
@@ -125,25 +125,14 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
            to_hex(pp, l).c_str(),
            advertisedDevice->getRSSI());
   auto &device_map = this->devices;
-  // return the start of the band id (index)
-  // add with additional space
-  auto brand_pos    = name.find("T03") + 4;
-  auto band_id_str  = name.substr(brand_pos, name.length() - brand_pos);
-  bool is_scanned   = device_map.find(band_id_str) != device_map.end();
-  bool is_connected = [is_scanned, band_id_str, &device_map]() {
-    if (is_scanned) {
-      auto &client = *device_map.at(band_id_str).client;
-      return client.isConnected();
-    }
-    return false;
-  }();
-  if (is_connected) {
-    return;
-  }
+  auto native_addr = advertisedDevice->getAddress().getNative();
+  auto addr        = DeviceAddr{};
+  std::copy(native_addr, native_addr + BLE_MAC_ADDR_SIZE, addr.begin());
 
-  auto cb = [advertisedDevice, name, band_id_str, pHrChar, &device_map]() {
+  auto connect_task = [advertisedDevice, pHrChar, &device_map, addr]() {
     /// user should check the return value of this function
-    auto configClient = [advertisedDevice, &name](BLEClient &client) -> NimBLERemoteCharacteristic * {
+    auto configClient = [advertisedDevice](BLEClient &client) -> NimBLERemoteCharacteristic * {
+      auto name                = advertisedDevice->getName();
       const auto serviceUUID   = "180D";
       const auto heartRateUUID = "2A37";
       // TODO: handle `device_map` at `onConnect` and `onDisconnect`
@@ -171,18 +160,18 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
       ESP_LOGI(TAG, "Connected to %s", name.c_str());
       return pCharacteristic;
     };
-    auto notify = [band_id_str, &device_map, pHrChar](
+    auto name   = advertisedDevice->getName();
+    auto notify = [name, pHrChar](
                       NimBLERemoteCharacteristic *pBLERemoteCharacteristic,
                       const uint8_t *pData,
                       size_t length,
                       bool isNotify) {
       if (length >= 2) {
         // the first byte is always 0x04. the second byte is the heart rate.
-        auto hr    = pData[1];
-        auto &info = device_map.at(band_id_str);
+        auto hr = pData[1];
         if (hr != 0) {
-          ESP_LOGI(NOTIFY_TAG, "%d bpm from %s", hr, band_id_str.c_str());
-          auto pair = hr_pair_t{band_id_str, hr};
+          ESP_LOGI(NOTIFY_TAG, "%d bpm from %s", hr, name.c_str());
+          auto pair = hr_pair_t{name, hr};
           auto sz   = sizeNeeded(pair);
           auto buf  = new uint8_t[sz];
           auto span = etl::span<uint8_t>(buf, sz);
@@ -202,26 +191,32 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
         }
       }
     };
-    if (device_map.find(band_id_str) == device_map.end()) {
-      ESP_LOGI(TAG, "Configure new band %s", band_id_str.c_str());
+
+    auto pInfo = etl::find_if(device_map.begin(), device_map.end(), [&addr](const DeviceInfo &info) {
+      return std::equal(addr.begin(), addr.end(), info.address.begin());
+    });
+    if (pInfo == device_map.end()) {
+      ESP_LOGI(TAG, "Configure new band %s", name.c_str());
       // TODO: handle client deletion with `deleteClient` with `deleteClient`
-      auto &client = *BLEDevice::createClient();
+      auto &client = *NimBLEDevice::createClient();
       /// Note, intended to be allocated in heap
       auto info = DeviceInfo{
+          addr,
           &client,
       };
       auto pChar = configClient(client);
       if (pChar != nullptr) {
-        device_map.insert(etl::pair(band_id_str, std::move(info)));
-        auto info_ref = device_map.at(band_id_str);
-        /// the ownership of "info" should always be device_map
+        device_map.emplace_back(info);
         pChar->subscribe(true, notify);
+        // it's a valid device. we could configure disconnect callback
+        auto cb = new HRClientCallbacks(&device_map, addr);
+        client.setClientCallbacks(cb);
       } else {
-        ESP_LOGE(TAG, "Failed to configure the band %s", band_id_str.c_str());
+        ESP_LOGE(TAG, "Failed to configure the band %s", name.c_str());
       }
     } else {
-      ESP_LOGI(TAG, "Reconfigure known band %s", band_id_str.c_str());
-      auto info    = device_map.at(band_id_str);
+      ESP_LOGI(TAG, "Reconfigure known band %s", name.c_str());
+      auto &info   = *pInfo;
       auto &client = *info.client;
       auto pChar   = configClient(client);
       // What would happen to the old notify callback?
@@ -232,7 +227,7 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
   };
 
   auto param = new ScanCallbackParam{
-      new std::function<void()>(cb),
+      new std::function<void()>(connect_task),
       nullptr};
   // You should run this in a new thread because the callback is blocking.
   // Never block the scanning thread
@@ -251,9 +246,9 @@ void ScanCallback::handleBand(BLEAdvertisedDevice *advertisedDevice) {
   }
 }
 
-void ScanCallback::handleWatch(BLEAdvertisedDevice *advertisedDevice) {
+void ScanCallback::handleHrAdvertised(BLEAdvertisedDevice *advertisedDevice) {
   // https://bluetoothle.wiki/advertising
-  static constexpr auto TAG = "handleWatch";
+  static constexpr auto TAG = "handleHrAdvertised";
   auto payload              = etl::span<uint8_t>(advertisedDevice->getPayload(), advertisedDevice->getPayloadLength());
   auto name                 = advertisedDevice->getName();
   auto pattern              = etl::search(payload.begin(), payload.end(), name.begin(), name.end());
@@ -283,12 +278,15 @@ void ScanCallback::handleWatch(BLEAdvertisedDevice *advertisedDevice) {
 
 void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   auto name = advertisedDevice->getName();
-  auto addr = advertisedDevice->getAddress();
-  if (advertisedDevice->getName().find("T03") != std::string::npos) {
-    handleBand(advertisedDevice);
-    // starts with "Y"
-  } else if (advertisedDevice->getName().find('Y') == 0) {
-    handleWatch(advertisedDevice);
+  for (auto &item : white_list) {
+    bool is_white = white_list::is_device_in_whitelist(item, *advertisedDevice);
+    if (is_white) {
+      handleHrWhiteListConnection(advertisedDevice);
+    }
+  }
+  // starts with "Y"
+  if (advertisedDevice->getName().find('Y') == 0) {
+    handleHrAdvertised(advertisedDevice);
   }
 }
 
@@ -309,4 +307,24 @@ void ServerCallbacks::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connIn
 
 void ServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo &connInfo) {
   ESP_LOGI("onMTUChange", "MTU updated: %u for connection ID: %s", MTU, connInfo.getIdAddress().toString().c_str());
+}
+void HRClientCallbacks::onDisconnect(NimBLEClient *pClient, int reason) {
+  const auto TAG = "HRClientCallbacks::onDisconnect";
+  ESP_LOGI(TAG, "Disconnected from %s", to_hex(addr.data(), addr.size()).c_str());
+  auto &addr = this->addr;
+  auto pInfo = etl::find_if(devices->begin(), devices->end(), [&addr](const DeviceInfo &info) {
+    return std::equal(addr.begin(), addr.end(), info.address.begin());
+  });
+  if (pInfo != devices->end()) {
+    devices->erase(pInfo);
+  } else {
+    ESP_LOGE(TAG, "Failed to find the device");
+  }
+  bool ok = NimBLEDevice::deleteClient(pClient);
+  if (!ok) {
+    ESP_LOGE(TAG, "Failed to delete client");
+    return;
+  }
+  // delete self since it's most likely allocated in heap
+  delete this;
 }

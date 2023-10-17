@@ -25,20 +25,25 @@ struct Addr {
   std::array<uint8_t, BLE_MAC_ADDR_SIZE> addr;
 };
 
-using item_t = std::variant<Name, Addr>;
-using list_t = std::vector<item_t>;
+using item_t     = std::variant<Name, Addr>;
+using list_t     = std::vector<item_t>;
 using response_t = std::variant<list_t, ::WhiteListErrorCode>;
-using request_t = std::variant<list_t, ::WhiteListCommand>;
+using request_t  = std::variant<list_t, ::WhiteListCommand>;
 
 bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &list);
-
-bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &response, response_t &list);
 
 etl::optional<list_t>
 unmarshal_set_white_list(pb_istream_t *istream, ::WhiteListSet &set);
 
+bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &response, response_t &list);
+
 etl::optional<request_t>
 unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request);
+
+bool marshal_white_list(pb_ostream_t *ostream, ::WhiteList &pb_list, list_t &list);
+
+etl::optional<list_t>
+unmarshal_white_list(pb_istream_t *istream, ::WhiteList &pb_list);
 }
 
 #ifdef ESP32

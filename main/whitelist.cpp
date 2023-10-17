@@ -153,6 +153,10 @@ bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &
   return pb_encode(ostream, WhiteListSet_fields, &set);
 }
 
+/**
+ * @brief Get the tag from istream without mutating it. Useful for oneof.
+ * @param istream the stream to get tag from (usually is a parameter from a decode callback)
+ */
 uint32_t pb_get_tag(pb_istream_t *istream) {
   pb_wire_type_t wire_type;
   uint32_t tag;
@@ -200,7 +204,6 @@ void set_decode_white_list(::WhiteList &list, DecodeWhiteListCallbacks &callback
         }
         return false;
       }
-      return true;
     }
     return true;
   };
@@ -268,5 +271,34 @@ unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request)
     default:
       return etl::nullopt;
   }
+}
+
+bool marshal_white_list(pb_ostream_t *ostream, ::WhiteList &pb_list, list_t &list) {
+  set_encode_white_list(pb_list, list);
+  return pb_encode(ostream, WhiteList_fields, &pb_list);
+}
+
+etl::optional<list_t>
+unmarshal_white_list(pb_istream_t *istream, ::WhiteList &pb_list) {
+  list_t result;
+  // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/oneof.proto
+  auto cbs = DecodeWhiteListCallbacks{
+      .name = [&result](auto name) {
+        result.emplace_back(item_t{name});
+        return true; },
+      .addr = [&result](auto addr) {
+        result.emplace_back(item_t{addr});
+        return true; },
+  };
+  set_decode_white_list(pb_list, cbs);
+  auto ok = pb_decode(istream, WhiteList_fields, &pb_list);
+  if (istream->errmsg != nullptr) {
+    LOG_ERR("white_list", "stream->errmsg %s", istream->errmsg);
+  }
+  if (!ok) {
+    LOG_ERR("white_list", "failed to decode response");
+    return etl::nullopt;
+  }
+  return result;
 }
 }
