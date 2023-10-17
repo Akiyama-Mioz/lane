@@ -17,8 +17,8 @@ typedef enum _WhiteListCommand {
 
 typedef enum _WhiteListErrorCode {
     WhiteListErrorCode_OK = 0,
-    WhiteListErrorCode_OUT_OF_MEMORY = 1,
-    WhiteListErrorCode_TOO_MANY_DEVICES = 2
+    WhiteListErrorCode_NULL = 1,
+    WhiteListErrorCode_OUT_OF_MEMORY = 2
 } WhiteListErrorCode;
 
 /* Struct definitions */
@@ -63,8 +63,8 @@ typedef struct _WhiteListRequest {
 #define _WhiteListCommand_ARRAYSIZE ((WhiteListCommand)(WhiteListCommand_REQUEST+1))
 
 #define _WhiteListErrorCode_MIN WhiteListErrorCode_OK
-#define _WhiteListErrorCode_MAX WhiteListErrorCode_TOO_MANY_DEVICES
-#define _WhiteListErrorCode_ARRAYSIZE ((WhiteListErrorCode)(WhiteListErrorCode_TOO_MANY_DEVICES+1))
+#define _WhiteListErrorCode_MAX WhiteListErrorCode_OUT_OF_MEMORY
+#define _WhiteListErrorCode_ARRAYSIZE ((WhiteListErrorCode)(WhiteListErrorCode_OUT_OF_MEMORY+1))
 
 
 #ifdef __cplusplus

@@ -19,8 +19,8 @@ enum WhiteListCommand {
 
 enum WhiteListErrorCode {
   OK = 0;
-  OUT_OF_MEMORY = 1;
-  TOO_MANY_DEVICES = 2;
+  NULL = 1;
+  OUT_OF_MEMORY = 2;
 }
 
 message WhiteListSet {

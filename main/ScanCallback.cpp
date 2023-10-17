@@ -13,6 +13,8 @@
 #include <etl/algorithm.h>
 #include <esp_check.h>
 #include <lwip/def.h>
+#include "whitelist.h"
+#include <pb_decode.h>
 
 static auto TAG        = "AdCallback";
 static auto NOTIFY_TAG = "NotifyCallback";
@@ -327,4 +329,57 @@ void HRClientCallbacks::onDisconnect(NimBLEClient *pClient, int reason) {
   }
   // delete self since it's most likely allocated in heap
   delete this;
+}
+
+void WhiteListCallback::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
+  auto value                = pCharacteristic->getValue();
+  auto raw                  = const_cast<uint8_t *>(value.data());
+  auto istream              = pb_istream_from_buffer(raw, value.size());
+  ::WhiteListRequest pb_req = WhiteListRequest_init_zero;
+  auto req_opt              = white_list::unmarshal_while_list_request(&istream, pb_req);
+  if (!req_opt.has_value()) {
+    ESP_LOGE(TAG, "Failed to decode the request");
+    pCharacteristic->setValue(0);
+    return;
+  }
+  auto &req = req_opt.value();
+  if (std::holds_alternative<white_list::command_t>(req)) {
+    auto command = std::get<white_list::command_t>(req);
+    switch (command) {
+      case WhiteListCommand_REQUEST: {
+        white_list::response_t resp{};
+        if (getList != nullptr) {
+          resp = white_list::response_t{getList()};
+        } else {
+          ESP_LOGE(TAG, "callback getList is nullptr");
+          resp = white_list::response_t{WhiteListErrorCode_NULL};
+        }
+        const int MAX_OSTREAM_SIZE = 256;
+        uint8_t buf[MAX_OSTREAM_SIZE];
+        auto ostream                = pb_ostream_from_buffer(raw, MAX_OSTREAM_SIZE);
+        ::WhiteListResponse pb_resp = WhiteListResponse_init_zero;
+        auto ok                     = white_list::marshal_white_list_response(&ostream, pb_resp, resp);
+        if (!ok) {
+          ESP_LOGE(TAG, "Failed to encode the response");
+          pCharacteristic->setValue(0);
+          return;
+        }
+        pCharacteristic->setValue(buf, ostream.bytes_written);
+        pCharacteristic->notify();
+        break;
+      }
+      default: {
+        ESP_LOGE(TAG, "Unknown command: %d", command);
+        break;
+      }
+    }
+  } else if (std::holds_alternative<white_list::list_t>(req)) {
+    auto list = std::get<white_list::list_t>(req);
+    if (setList != nullptr) {
+      ESP_LOGI(TAG, "set list");
+      setList(list);
+    } else {
+      ESP_LOGE(TAG, "callback setList is nullptr");
+    }
+  }
 }

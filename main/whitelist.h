@@ -27,15 +27,17 @@ struct Addr {
 
 using item_t     = std::variant<Name, Addr>;
 using list_t     = std::vector<item_t>;
-using response_t = std::variant<list_t, ::WhiteListErrorCode>;
-using request_t  = std::variant<list_t, ::WhiteListCommand>;
+using error_code_t = ::WhiteListErrorCode;
+using command_t = ::WhiteListCommand;
+using response_t = std::variant<list_t, error_code_t>;
+using request_t  = std::variant<list_t, command_t>;
 
 bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &list);
 
 etl::optional<list_t>
 unmarshal_set_white_list(pb_istream_t *istream, ::WhiteListSet &set);
 
-bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &response, response_t &list);
+bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &pb_response, response_t &response);
 
 etl::optional<request_t>
 unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request);

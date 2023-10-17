@@ -23,12 +23,15 @@ struct DeviceInfo {
 /// Should not touch the info pointer (Read Only)
 using DeviceMap = etl::vector<DeviceInfo, 24>;
 
-class ScanCallback : public BLEAdvertisedDeviceCallbacks {
+class ScanCallback : public NimBLEScanCallbacks {
   // the characteristic to send the heart rate data to the client with the format described in
   // `hr_data.ksy`
-  NimBLECharacteristic *hr_char = nullptr;
-  DeviceMap devices{};
+public:
   white_list::list_t white_list;
+
+private:
+  DeviceMap devices{};
+  NimBLECharacteristic *hr_char = nullptr;
 
   /**
    * @brief callback when a device is found
@@ -62,6 +65,15 @@ class ServerCallbacks : public NimBLEServerCallbacks {
   void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason) override;
 
   void onMTUChange(uint16_t MTU, NimBLEConnInfo &connInfo) override;
+};
+
+class WhiteListCallback : public NimBLECharacteristicCallbacks {
+public:
+  using set_list_fn           = std::function<void(white_list::list_t)>;
+  using get_list_fn          = std::function<const white_list::list_t &(void)>;
+  set_list_fn setList         = nullptr;
+  get_list_fn getList = nullptr;
+  void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override;
 };
 
 #endif // HELLO_WORLD_ADCALLBACK_H

@@ -26,11 +26,11 @@
 
 namespace white_list {
 // decode one
-using addr_f = std::function<bool(Addr)>;
-using name_f = std::function<bool(Name)>;
+using addr_fn = std::function<bool(Addr)>;
+using name_fn = std::function<bool(Name)>;
 
 // well. field item is a union, so you just only have one field set
-void set_decode_white_item_addr(::WhiteItem &item, const addr_f &write_addr) {
+void set_decode_white_item_addr(::WhiteItem &item, const addr_fn &write_addr) {
   item.item.mac.funcs.decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
     if (arg == nullptr) {
       return false;
@@ -46,23 +46,23 @@ void set_decode_white_item_addr(::WhiteItem &item, const addr_f &write_addr) {
       return false;
     }
 
-    const auto &w = *reinterpret_cast<addr_f *>(*arg);
+    const auto &w = *reinterpret_cast<addr_fn *>(*arg);
     if (!pb_read(stream, addr.addr.data(), BLE_MAC_ADDR_SIZE)) {
       LOG_ERR("white_list", "failed to read mac");
       return false;
     }
     return w(std::move(addr));
   };
-  item.item.mac.arg = const_cast<addr_f *>(&write_addr);
+  item.item.mac.arg = const_cast<addr_fn *>(&write_addr);
 }
 
-void set_decode_white_item_name(::WhiteItem &item, const name_f &write_name) {
+void set_decode_white_item_name(::WhiteItem &item, const name_fn &write_name) {
   item.item.name.funcs.decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
     if (arg == nullptr) {
       return false;
     }
     auto name     = Name{};
-    const auto &w = *reinterpret_cast<name_f *>(*arg);
+    const auto &w = *reinterpret_cast<name_fn *>(*arg);
     // the 0x00 in the end?
     name.name.resize(stream->bytes_left + 1);
     if (!pb_read(stream, reinterpret_cast<pb_byte_t *>(name.name.data()), stream->bytes_left)) {
@@ -71,7 +71,7 @@ void set_decode_white_item_name(::WhiteItem &item, const name_f &write_name) {
     }
     return w(std::move(name));
   };
-  item.item.name.arg = const_cast<name_f *>(&write_name);
+  item.item.name.arg = const_cast<name_fn *>(&write_name);
 }
 
 bool set_encode_white_item(const item_t &item, ::WhiteItem &pb_item) {
@@ -131,17 +131,17 @@ void set_encode_white_list(::WhiteList &pb_list, list_t &list) {
   pb_list.items.arg = &list;
 }
 
-bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &response, response_t &list) {
-  if (std::holds_alternative<list_t>(list)) {
-    response.which_response = WhiteListResponse_list_tag;
-    auto &l                 = std::get<list_t>(list);
-    set_encode_white_list(response.response.list, l);
-    return pb_encode(ostream, WhiteListResponse_fields, &response);
-  } else if (std::holds_alternative<::WhiteListErrorCode>(list)) {
-    auto &e                 = std::get<::WhiteListErrorCode>(list);
-    response.which_response = WhiteListResponse_code_tag;
-    response.response.code  = e;
-    return pb_encode(ostream, WhiteListResponse_fields, &response);
+bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &pb_response, response_t &response) {
+  if (std::holds_alternative<list_t>(response)) {
+    pb_response.which_response = WhiteListResponse_list_tag;
+    auto &l                 = std::get<list_t>(response);
+    set_encode_white_list(pb_response.response.list, l);
+    return pb_encode(ostream, WhiteListResponse_fields, &pb_response);
+  } else if (std::holds_alternative<::WhiteListErrorCode>(response)) {
+    auto &e                 = std::get<::WhiteListErrorCode>(response);
+    pb_response.which_response = WhiteListResponse_code_tag;
+    pb_response.response.code  = e;
+    return pb_encode(ostream, WhiteListResponse_fields, &pb_response);
   } else {
     return false;
   }
@@ -168,8 +168,8 @@ uint32_t pb_get_tag(pb_istream_t *istream) {
 }
 
 struct DecodeWhiteListCallbacks {
-  name_f name;
-  addr_f addr;
+  name_fn name;
+  addr_fn addr;
 };
 
 void set_decode_white_list(::WhiteList &list, DecodeWhiteListCallbacks &callbacks) {

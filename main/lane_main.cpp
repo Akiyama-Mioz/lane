@@ -8,6 +8,7 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "Lane.h"
+#include "whitelist.h"
 #include <memory.h>
 #include "ScanCallback.h"
 
@@ -20,6 +21,7 @@ static const char *BLE_CHAR_HR_SERVICE_UUID = "180d";
 static const char *BLE_CHAR_CONTROL_UUID    = "24207642-0d98-40cd-84bb-910008579114";
 static const char *BLE_CHAR_CONFIG_UUID     = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
 static const char *BLE_CHAR_HEARTBEAT_UUID  = "048b8928-d0a5-43e2-ada9-b925ec62ba27";
+static const char *BLE_CHAR_WHITE_LIST_UUID = "12a481f0-9384-413d-b002-f8660566d3b0";
 
 using namespace lane;
 /**
@@ -53,7 +55,7 @@ extern "C" [[noreturn]] void app_main() {
   const auto TAG = "main";
   initArduino();
 
-  etl::array<uint8_t, PREF_WHITE_RULE_MAX_LENGTH> white_rules_bytes{};
+  etl::array<uint8_t, PREF_WHITE_LIST_MAX_LENGTH> white_rules_bytes{};
   Preferences pref;
   pref.begin(PREF_RECORD_NAME, true);
   auto line_length   = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
@@ -61,7 +63,7 @@ extern "C" [[noreturn]] void app_main() {
   auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
   auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
   auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
-  auto sz            = pref.getBytes(PREF_WHITE_RULE_NAME, white_rules_bytes.data(), PREF_WHITE_RULE_MAX_LENGTH);
+  auto sz            = pref.getBytes(PREF_WHITE_LIST_NAME, white_rules_bytes.data(), PREF_WHITE_LIST_MAX_LENGTH);
   if (sz > 0) {
     // TODO: serialize the white rules
   } else {
@@ -102,9 +104,13 @@ extern "C" [[noreturn]] void app_main() {
 
   /************** HR char initialization ****************/
 
-  auto &hr_service = *server.createService(BLE_CHAR_HR_SERVICE_UUID);
-  auto &hr_char    = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,
-                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  auto &hr_service      = *server.createService(BLE_CHAR_HR_SERVICE_UUID);
+  auto &hr_char         = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,
+                                                           NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  auto &white_list_char = *hr_service.createCharacteristic(BLE_CHAR_WHITE_LIST_UUID,
+                                                           NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+  auto pWhiteListCb = new WhiteListCallback();
+  white_list_char.setCallbacks(pWhiteListCb);
   hr_service.start();
 
   auto &ad = *NimBLEDevice::getAdvertising();
