@@ -8,6 +8,7 @@
 #include <variant>
 #include <string>
 #include <regex>
+#include <etl/optional.h>
 #include <ble.pb.h>
 
 #ifdef SIMPLE_LOG
@@ -27,6 +28,11 @@ struct Addr {
 using item_t = std::variant<Name, Addr>;
 using list_t = std::vector<item_t>;
 using response_t = std::variant<list_t, ::WhiteListErrorCode>;
+
+bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &list);
+
+etl::optional<list_t>
+unmarshal_set_white_list(pb_istream_t *stream, ::WhiteListSet &set);
 }
 
 #ifdef ESP32

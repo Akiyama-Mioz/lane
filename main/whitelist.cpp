@@ -5,8 +5,8 @@
 #include "whitelist.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
-#include <etl/optional.h>
 #include <functional>
+#include <iostream>
 
 #ifdef ESP32
 #define LOG_ERR(tag, fmt, ...) ESP_LOGE(tag, fmt, ##__VA_ARGS__)
@@ -29,9 +29,8 @@ namespace white_list {
 using addr_f = std::function<bool(Addr)>;
 using name_f = std::function<bool(Name)>;
 
-void set_decode_white_item(::WhiteItem &item,
-                           const addr_f &write_addr,
-                           const name_f &write_name) {
+// well. field item is a union, so you just only have one field set
+void set_decode_white_item_addr(::WhiteItem &item, const addr_f &write_addr) {
   item.item.mac.funcs.decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
     if (arg == nullptr) {
       return false;
@@ -42,6 +41,10 @@ void set_decode_white_item(::WhiteItem &item,
     // https://github.com/nanopb/nanopb/blob/09234696e0ef821432a8541b950e8866f0c61f8c/tests/callbacks/decode_callbacks.c#L10
     // https://en.cppreference.com/w/cpp/algorithm/swap
     // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/decode_oneof.c
+    if (stream->bytes_left < BLE_MAC_ADDR_SIZE) {
+      LOG_ERR("white_list", "field length is not enough for bluetooth address. expected: %d, actual: %d", BLE_MAC_ADDR_SIZE, static_cast<int>(stream->bytes_left));
+      return false;
+    }
 
     const auto &w = *reinterpret_cast<addr_f *>(*arg);
     if (!pb_read(stream, addr.addr.data(), BLE_MAC_ADDR_SIZE)) {
@@ -50,13 +53,12 @@ void set_decode_white_item(::WhiteItem &item,
     }
     return w(std::move(addr));
   };
-  item.item.mac.arg           = const_cast<addr_f *>(&write_addr);
+  item.item.mac.arg = const_cast<addr_f *>(&write_addr);
+}
+
+void set_decode_white_item_name(::WhiteItem &item, const name_f &write_name) {
   item.item.name.funcs.decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
     if (arg == nullptr) {
-      return false;
-    }
-    if (stream->bytes_left < BLE_MAC_ADDR_SIZE) {
-      LOG_ERR("white_list", "field length is not enough. expected: %d, actual: %d", BLE_MAC_ADDR_SIZE, static_cast<int>(stream->bytes_left));
       return false;
     }
     auto name     = Name{};
@@ -139,29 +141,67 @@ bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &
 
 etl::optional<list_t>
 unmarshal_set_white_list(pb_istream_t *stream, ::WhiteListSet &set) {
+  const auto TAG = "unmarshal_set_white_list";
   list_t result;
   // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/oneof.proto
   auto white_list_decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
-    if (arg == nullptr) {
-      return false;
-    }
+    const auto TAG = "white_list_decode";
     // https://stackoverflow.com/questions/73529672/decoding-oneof-nanopb
-    auto &result = *reinterpret_cast<std::vector<item_t> *>(*arg);
+    auto &result = *reinterpret_cast<list_t *>(*arg);
+    LOG_INFO(TAG, "length: %zu", result.size());
     if (field->tag == WhiteList_items_tag) {
       LOG_INFO("parse_list", "one item");
-      auto &b = *static_cast<::WhiteItem *>(field->pData);
-      set_decode_white_item(
-          b, [&result](auto addr) {
-                    result.emplace_back(item_t{addr});
-                    return true; }, [&result](auto name) {
-                    result.emplace_back(item_t{name});
-                    return true; });
+      ::WhiteItem item = WhiteItem_init_zero;
+      pb_wire_type_t wire_type;
+      uint32_t tag;
+      // don't mutate the original stream
+      pb_istream_t s_copy = *stream;
+      bool eof;
+      pb_decode_tag(&s_copy, &wire_type, &tag, &eof);
+
+      auto w_a = [&result](auto addr) {
+        LOG_I("w_a", "here");
+        std::cout << utils::toHex(addr.addr.data(), addr.addr.size()) << std::endl;
+        result.emplace_back(item_t{addr});
+        return true;
+      };
+      auto w_n = [&result](auto name) {
+        LOG_I("w_n", "here");
+        result.emplace_back(item_t{name});
+        return true;
+      };
+      // https://github.com/nanopb/nanopb/blob/09234696e0ef821432a8541b950e8866f0c61f8c/examples/using_union_messages/decode.c#L24
+      switch (tag) {
+        case WhiteItem_name_tag:
+          LOG_INFO("tag", "name %d", tag);
+          item.which_item = tag;
+          set_decode_white_item_name(item, w_n);
+          break;
+        case WhiteItem_mac_tag:
+          LOG_INFO("tag", "mac %d", tag);
+          item.which_item = tag;
+          set_decode_white_item_addr(item, w_a);
+          break;
+        default:
+          LOG_ERR("tag", "bad tag %d", tag);
+          return false;
+      }
+      auto ok = pb_decode(stream, WhiteItem_fields, &item);
+      if (!ok) {
+        LOG_ERR("pl", "bad decode %s", stream->errmsg);
+        return false;
+      }
+      return true;
     }
     return true;
   };
   set.list.items.funcs.decode = white_list_decode;
   set.list.items.arg          = &result;
-  if (!pb_decode(stream, WhiteListSet_fields, &set)) {
+  auto ok                     = pb_decode(stream, WhiteListSet_fields, &set);
+  if (stream->errmsg != nullptr){
+    LOG_ERR("white_list", "stream->errmsg %s", stream->errmsg);
+  }
+  if (!ok) {
     LOG_ERR("white_list", "failed to decode response");
     return etl::nullopt;
   }

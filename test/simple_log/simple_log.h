@@ -165,4 +165,6 @@ namespace simple_log {
 /// log trace with line break but without file info
 #define LOGT(tag, fmt, ...) LOG_ME(simple_log::Level::Trace, 'T', tag, nullptr, 0, fmt, ##__VA_ARGS__)
 
+#include "simple_log_utils.h"
+
 #endif //NANOPB_TEST_SIMPLE_LOG_H
