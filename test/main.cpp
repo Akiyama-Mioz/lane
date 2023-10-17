@@ -7,6 +7,15 @@
 #include "whitelist.h"
 #include "simple_log.h"
 
+template<typename T>
+etl::optional<T> from_pointer(T* ptr){
+  if (ptr == nullptr){
+    return etl::nullopt;
+  } else {
+    return etl::make_optional(*ptr);
+  }
+}
+
 int main() {
   simple_log::init();
   const auto TAG = "main";
@@ -38,6 +47,18 @@ int main() {
   if (!out_list.has_value()){
     LOG_E(TAG, "bad unmarshal");
     return 1;
+  }
+  auto& ol = out_list.value();
+  for (auto &i:ol){
+    auto addr = from_pointer(std::get_if<Addr>(&i));
+    auto name = from_pointer(std::get_if<Name>(&i));
+    if (addr.has_value()){
+      LOG_I(TAG, "addr: %s", utils::toHex(addr.value().addr.data(), addr.value().addr.size()).c_str());
+    } else if (name.has_value()){
+      LOG_I(TAG, "name: %s", name.value().name.c_str());
+    } else {
+      LOG_E(TAG, "bad item");
+    }
   }
 
   return 0;

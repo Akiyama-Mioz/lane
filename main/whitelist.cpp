@@ -145,50 +145,47 @@ unmarshal_set_white_list(pb_istream_t *stream, ::WhiteListSet &set) {
   list_t result;
   // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/oneof.proto
   auto white_list_decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
-    const auto TAG = "white_list_decode";
+    const auto TAG = "unmarshal_set_white_list_callback";
     // https://stackoverflow.com/questions/73529672/decoding-oneof-nanopb
     auto &result = *reinterpret_cast<list_t *>(*arg);
-    LOG_INFO(TAG, "length: %zu", result.size());
     if (field->tag == WhiteList_items_tag) {
-      LOG_INFO("parse_list", "one item");
       ::WhiteItem item = WhiteItem_init_zero;
+
+      // https://github.com/nanopb/nanopb/blob/09234696e0ef821432a8541b950e8866f0c61f8c/examples/using_union_messages/decode.c#L24
       pb_wire_type_t wire_type;
       uint32_t tag;
-      // don't mutate the original stream
+      // `pb_decode_tag` will mutate the original stream, create a copy
       pb_istream_t s_copy = *stream;
       bool eof;
       pb_decode_tag(&s_copy, &wire_type, &tag, &eof);
 
       auto w_a = [&result](auto addr) {
-        LOG_I("w_a", "here");
-        std::cout << utils::toHex(addr.addr.data(), addr.addr.size()) << std::endl;
         result.emplace_back(item_t{addr});
         return true;
       };
       auto w_n = [&result](auto name) {
-        LOG_I("w_n", "here");
         result.emplace_back(item_t{name});
         return true;
       };
-      // https://github.com/nanopb/nanopb/blob/09234696e0ef821432a8541b950e8866f0c61f8c/examples/using_union_messages/decode.c#L24
       switch (tag) {
         case WhiteItem_name_tag:
-          LOG_INFO("tag", "name %d", tag);
           item.which_item = tag;
           set_decode_white_item_name(item, w_n);
           break;
         case WhiteItem_mac_tag:
-          LOG_INFO("tag", "mac %d", tag);
           item.which_item = tag;
           set_decode_white_item_addr(item, w_a);
           break;
         default:
-          LOG_ERR("tag", "bad tag %d", tag);
           return false;
       }
       auto ok = pb_decode(stream, WhiteItem_fields, &item);
       if (!ok) {
-        LOG_ERR("pl", "bad decode %s", stream->errmsg);
+        if (stream->errmsg != nullptr) {
+          LOG_ERR(TAG, "decode error: %s", stream->errmsg);
+        } else {
+          LOG_ERR(TAG, "decode error");
+        }
         return false;
       }
       return true;
@@ -198,7 +195,7 @@ unmarshal_set_white_list(pb_istream_t *stream, ::WhiteListSet &set) {
   set.list.items.funcs.decode = white_list_decode;
   set.list.items.arg          = &result;
   auto ok                     = pb_decode(stream, WhiteListSet_fields, &set);
-  if (stream->errmsg != nullptr){
+  if (stream->errmsg != nullptr) {
     LOG_ERR("white_list", "stream->errmsg %s", stream->errmsg);
   }
   if (!ok) {
