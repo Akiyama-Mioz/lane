@@ -147,12 +147,6 @@ bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &pb_
   }
 }
 
-bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &list) {
-  set.has_list = true;
-  set_encode_white_list(set.list, list);
-  return pb_encode(ostream, WhiteListSet_fields, &set);
-}
-
 /**
  * @brief Get the tag from istream without mutating it. Useful for oneof.
  * @param istream the stream to get tag from (usually is a parameter from a decode callback)
@@ -211,30 +205,6 @@ void set_decode_white_list(::WhiteList &list, DecodeWhiteListCallbacks &callback
   list.items.arg          = &callbacks;
 }
 
-etl::optional<list_t>
-unmarshal_set_white_list(pb_istream_t *istream, ::WhiteListSet &set) {
-  list_t result;
-  // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/oneof.proto
-  auto cbs = DecodeWhiteListCallbacks{
-      .name = [&result](auto name) {
-        result.emplace_back(item_t{name});
-        return true; },
-      .addr = [&result](auto addr) {
-        result.emplace_back(item_t{addr});
-        return true; },
-  };
-  set_decode_white_list(set.list, cbs);
-  auto ok = pb_decode(istream, WhiteListSet_fields, &set);
-  if (istream->errmsg != nullptr) {
-    LOG_ERR("white_list", "stream->errmsg %s", istream->errmsg);
-  }
-  if (!ok) {
-    LOG_ERR("white_list", "failed to decode response");
-    return etl::nullopt;
-  }
-  return result;
-}
-
 etl::optional<request_t>
 unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request) {
   auto tag = pb_get_tag(istream);
@@ -250,8 +220,8 @@ unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request)
             result.emplace_back(item_t{addr});
             return true; },
       };
-      set_decode_white_list(request.request.set.list, cbs);
-      auto ok = pb_decode(istream, WhiteListRequest_fields, &request);
+      set_decode_white_list(request.request.set, cbs);
+      auto ok = pb_decode(istream, WhiteList_fields, &request);
       if (!ok) {
         LOG_ERR("white_list", "failed to decode set");
         return etl::nullopt;

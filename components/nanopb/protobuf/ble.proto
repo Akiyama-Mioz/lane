@@ -23,10 +23,6 @@ enum WhiteListErrorCode {
   OUT_OF_MEMORY = 2;
 }
 
-message WhiteListSet {
-  WhiteList list = 1;
-}
-
 message WhiteListResponse {
   oneof response {
     WhiteList list = 1;
@@ -37,7 +33,7 @@ message WhiteListResponse {
 message WhiteListRequest {
   oneof request {
     WhiteListCommand command = 1;
-    WhiteListSet set = 2;
+    WhiteList set = 2;
   }
 }
 

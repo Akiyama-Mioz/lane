@@ -30,8 +30,8 @@ int main() {
   const auto BUF_SIZE = 256;
   uint8_t buf[BUF_SIZE];
   auto ostream   = pb_ostream_from_buffer(buf, BUF_SIZE);
-  WhiteListSet S = WhiteListSet_init_zero;
-  bool ok        = marshal_set_white_list(&ostream, S, list);
+  WhiteList S = WhiteList_init_zero;
+  bool ok        = marshal_white_list(&ostream, S, list);
   if (!ok) {
     LOG_E(TAG, "bad marshal");
   }
@@ -42,8 +42,8 @@ int main() {
 
   // don't use the whole stream, cuz the pb don't know when it ends
   auto istream = pb_istream_from_buffer(buf, ostream.bytes_written);
-  WhiteListSet OS = WhiteListSet_init_zero;
-  auto out_list = unmarshal_set_white_list(&istream, OS);
+  WhiteList OS = WhiteList_init_zero;
+  auto out_list = unmarshal_white_list(&istream, OS);
   if (!out_list.has_value()){
     LOG_E(TAG, "bad unmarshal");
     return 1;

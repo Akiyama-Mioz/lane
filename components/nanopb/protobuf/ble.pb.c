@@ -12,9 +12,6 @@ PB_BIND(WhiteItem, WhiteItem, AUTO)
 PB_BIND(WhiteList, WhiteList, AUTO)
 
 
-PB_BIND(WhiteListSet, WhiteListSet, AUTO)
-
-
 PB_BIND(WhiteListResponse, WhiteListResponse, AUTO)
 
 

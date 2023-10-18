@@ -35,6 +35,14 @@ typedef struct _WhiteList {
     pb_callback_t items;
 } WhiteList;
 
+typedef struct _WhiteListRequest {
+    pb_size_t which_request;
+    union {
+        WhiteListCommand command;
+        WhiteList set;
+    } request;
+} WhiteListRequest;
+
 typedef struct _WhiteListResponse {
     pb_size_t which_response;
     union {
@@ -42,19 +50,6 @@ typedef struct _WhiteListResponse {
         WhiteListErrorCode code;
     } response;
 } WhiteListResponse;
-
-typedef struct _WhiteListSet {
-    bool has_list;
-    WhiteList list;
-} WhiteListSet;
-
-typedef struct _WhiteListRequest {
-    pb_size_t which_request;
-    union {
-        WhiteListCommand command;
-        WhiteListSet set;
-    } request;
-} WhiteListRequest;
 
 
 /* Helper constants for enums */
@@ -74,12 +69,10 @@ extern "C" {
 /* Initializer values for message structs */
 #define WhiteItem_init_default                   {0, {{{NULL}, NULL}}}
 #define WhiteList_init_default                   {{{NULL}, NULL}}
-#define WhiteListSet_init_default                {false, WhiteList_init_default}
 #define WhiteListResponse_init_default           {0, {WhiteList_init_default}}
 #define WhiteListRequest_init_default            {0, {_WhiteListCommand_MIN}}
 #define WhiteItem_init_zero                      {0, {{{NULL}, NULL}}}
 #define WhiteList_init_zero                      {{{NULL}, NULL}}
-#define WhiteListSet_init_zero                   {false, WhiteList_init_zero}
 #define WhiteListResponse_init_zero              {0, {WhiteList_init_zero}}
 #define WhiteListRequest_init_zero               {0, {_WhiteListCommand_MIN}}
 
@@ -87,11 +80,10 @@ extern "C" {
 #define WhiteItem_name_tag                       1
 #define WhiteItem_mac_tag                        2
 #define WhiteList_items_tag                      1
-#define WhiteListResponse_list_tag               1
-#define WhiteListResponse_code_tag               2
-#define WhiteListSet_list_tag                    1
 #define WhiteListRequest_command_tag             1
 #define WhiteListRequest_set_tag                 2
+#define WhiteListResponse_list_tag               1
+#define WhiteListResponse_code_tag               2
 
 /* Struct field encoding specification for nanopb */
 #define WhiteItem_FIELDLIST(X, a) \
@@ -106,12 +98,6 @@ X(a, CALLBACK, REPEATED, MESSAGE,  items,             1)
 #define WhiteList_DEFAULT NULL
 #define WhiteList_items_MSGTYPE WhiteItem
 
-#define WhiteListSet_FIELDLIST(X, a) \
-X(a, STATIC,   OPTIONAL, MESSAGE,  list,              1)
-#define WhiteListSet_CALLBACK NULL
-#define WhiteListSet_DEFAULT NULL
-#define WhiteListSet_list_MSGTYPE WhiteList
-
 #define WhiteListResponse_FIELDLIST(X, a) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (response,list,response.list),   1) \
 X(a, STATIC,   ONEOF,    UENUM,    (response,code,response.code),   2)
@@ -124,25 +110,22 @@ X(a, STATIC,   ONEOF,    UENUM,    (request,command,request.command),   1) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (request,set,request.set),   2)
 #define WhiteListRequest_CALLBACK NULL
 #define WhiteListRequest_DEFAULT NULL
-#define WhiteListRequest_request_set_MSGTYPE WhiteListSet
+#define WhiteListRequest_request_set_MSGTYPE WhiteList
 
 extern const pb_msgdesc_t WhiteItem_msg;
 extern const pb_msgdesc_t WhiteList_msg;
-extern const pb_msgdesc_t WhiteListSet_msg;
 extern const pb_msgdesc_t WhiteListResponse_msg;
 extern const pb_msgdesc_t WhiteListRequest_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define WhiteItem_fields &WhiteItem_msg
 #define WhiteList_fields &WhiteList_msg
-#define WhiteListSet_fields &WhiteListSet_msg
 #define WhiteListResponse_fields &WhiteListResponse_msg
 #define WhiteListRequest_fields &WhiteListRequest_msg
 
 /* Maximum encoded size of messages (where known) */
 /* WhiteItem_size depends on runtime parameters */
 /* WhiteList_size depends on runtime parameters */
-/* WhiteListSet_size depends on runtime parameters */
 /* WhiteListResponse_size depends on runtime parameters */
 /* WhiteListRequest_size depends on runtime parameters */
 

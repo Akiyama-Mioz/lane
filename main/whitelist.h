@@ -25,17 +25,12 @@ struct Addr {
   std::array<uint8_t, BLE_MAC_ADDR_SIZE> addr;
 };
 
-using item_t     = std::variant<Name, Addr>;
-using list_t     = std::vector<item_t>;
+using item_t       = std::variant<Name, Addr>;
+using list_t       = std::vector<item_t>;
 using error_code_t = ::WhiteListErrorCode;
-using command_t = ::WhiteListCommand;
-using response_t = std::variant<list_t, error_code_t>;
-using request_t  = std::variant<list_t, command_t>;
-
-bool marshal_set_white_list(pb_ostream_t *ostream, ::WhiteListSet &set, list_t &list);
-
-etl::optional<list_t>
-unmarshal_set_white_list(pb_istream_t *istream, ::WhiteListSet &set);
+using command_t    = ::WhiteListCommand;
+using response_t   = std::variant<list_t, error_code_t>;
+using request_t    = std::variant<list_t, command_t>;
 
 bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &pb_response, response_t &response);
 
