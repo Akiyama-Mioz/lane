@@ -74,7 +74,7 @@ void set_decode_white_item_name(::WhiteItem &item, const name_fn &write_name) {
   item.item.name.arg = const_cast<name_fn *>(&write_name);
 }
 
-bool set_encode_white_item(const item_t &item, ::WhiteItem &pb_item) {
+bool set_encode_white_item(::WhiteItem &pb_item, const item_t &item) {
   if (std::holds_alternative<Name>(item)) {
     const auto &item_name = std::get<Name>(item);
     pb_item.which_item    = WhiteItem_name_tag;
@@ -113,7 +113,7 @@ void set_encode_white_list(::WhiteList &pb_list, list_t &list) {
       // not very sure of creating a new item here
       ::WhiteItem pb_item;
       // Same as pb_encode_tag, except takes the parameters from a pb_field_iter_t structure.
-      if (!set_encode_white_item(item, pb_item)) {
+      if (!set_encode_white_item(pb_item, item)) {
         LOG_ERR("white_list", "failed to set encode function.");
         return false;
       }
