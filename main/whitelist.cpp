@@ -133,14 +133,13 @@ void set_encode_white_list(::WhiteList &pb_list, list_t &list) {
 
 bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &pb_response, response_t &response) {
   if (std::holds_alternative<list_t>(response)) {
-    pb_response.which_response = WhiteListResponse_list_tag;
-    auto &l                 = std::get<list_t>(response);
-    set_encode_white_list(pb_response.response.list, l);
+    pb_response.has_list = true;
+    auto &l              = std::get<list_t>(response);
+    set_encode_white_list(pb_response.list, l);
     return pb_encode(ostream, WhiteListResponse_fields, &pb_response);
   } else if (std::holds_alternative<::WhiteListErrorCode>(response)) {
-    auto &e                 = std::get<::WhiteListErrorCode>(response);
-    pb_response.which_response = WhiteListResponse_code_tag;
-    pb_response.response.code  = e;
+    auto &e          = std::get<::WhiteListErrorCode>(response);
+    pb_response.code = e;
     return pb_encode(ostream, WhiteListResponse_fields, &pb_response);
   } else {
     return false;
@@ -210,7 +209,6 @@ unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request)
   auto tag = pb_get_tag(istream);
   switch (tag) {
     case WhiteListRequest_set_tag: {
-      request.which_request = tag;
       list_t result{};
       auto cbs = DecodeWhiteListCallbacks{
           .name = [&result](auto name) {
@@ -220,7 +218,7 @@ unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request)
             result.emplace_back(item_t{addr});
             return true; },
       };
-      set_decode_white_list(request.request.set, cbs);
+      set_decode_white_list(request.set, cbs);
       auto ok = pb_decode(istream, WhiteList_fields, &request);
       if (!ok) {
         LOG_ERR("white_list", "failed to decode set");
@@ -229,9 +227,8 @@ unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request)
       return request_t{std::move(result)};
     }
     case WhiteListRequest_command_tag: {
-      request.which_request = tag;
-      auto ok               = pb_decode(istream, WhiteListRequest_fields, &request);
-      auto command          = request.request.command;
+      auto ok      = pb_decode(istream, WhiteListRequest_fields, &request);
+      auto command = request.command;
       if (!ok) {
         LOG_ERR("white_list", "failed to decode command");
         return etl::nullopt;

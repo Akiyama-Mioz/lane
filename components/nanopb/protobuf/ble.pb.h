@@ -36,19 +36,15 @@ typedef struct _WhiteList {
 } WhiteList;
 
 typedef struct _WhiteListRequest {
-    pb_size_t which_request;
-    union {
-        WhiteListCommand command;
-        WhiteList set;
-    } request;
+    WhiteListCommand command;
+    bool has_set;
+    WhiteList set;
 } WhiteListRequest;
 
 typedef struct _WhiteListResponse {
-    pb_size_t which_response;
-    union {
-        WhiteList list;
-        WhiteListErrorCode code;
-    } response;
+    bool has_list;
+    WhiteList list;
+    WhiteListErrorCode code;
 } WhiteListResponse;
 
 
@@ -69,12 +65,12 @@ extern "C" {
 /* Initializer values for message structs */
 #define WhiteItem_init_default                   {0, {{{NULL}, NULL}}}
 #define WhiteList_init_default                   {{{NULL}, NULL}}
-#define WhiteListResponse_init_default           {0, {WhiteList_init_default}}
-#define WhiteListRequest_init_default            {0, {_WhiteListCommand_MIN}}
+#define WhiteListResponse_init_default           {false, WhiteList_init_default, _WhiteListErrorCode_MIN}
+#define WhiteListRequest_init_default            {_WhiteListCommand_MIN, false, WhiteList_init_default}
 #define WhiteItem_init_zero                      {0, {{{NULL}, NULL}}}
 #define WhiteList_init_zero                      {{{NULL}, NULL}}
-#define WhiteListResponse_init_zero              {0, {WhiteList_init_zero}}
-#define WhiteListRequest_init_zero               {0, {_WhiteListCommand_MIN}}
+#define WhiteListResponse_init_zero              {false, WhiteList_init_zero, _WhiteListErrorCode_MIN}
+#define WhiteListRequest_init_zero               {_WhiteListCommand_MIN, false, WhiteList_init_zero}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define WhiteItem_name_tag                       1
@@ -99,18 +95,18 @@ X(a, CALLBACK, REPEATED, MESSAGE,  items,             1)
 #define WhiteList_items_MSGTYPE WhiteItem
 
 #define WhiteListResponse_FIELDLIST(X, a) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (response,list,response.list),   1) \
-X(a, STATIC,   ONEOF,    UENUM,    (response,code,response.code),   2)
+X(a, STATIC,   OPTIONAL, MESSAGE,  list,              1) \
+X(a, STATIC,   SINGULAR, UENUM,    code,              2)
 #define WhiteListResponse_CALLBACK NULL
 #define WhiteListResponse_DEFAULT NULL
-#define WhiteListResponse_response_list_MSGTYPE WhiteList
+#define WhiteListResponse_list_MSGTYPE WhiteList
 
 #define WhiteListRequest_FIELDLIST(X, a) \
-X(a, STATIC,   ONEOF,    UENUM,    (request,command,request.command),   1) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (request,set,request.set),   2)
+X(a, STATIC,   SINGULAR, UENUM,    command,           1) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  set,               2)
 #define WhiteListRequest_CALLBACK NULL
 #define WhiteListRequest_DEFAULT NULL
-#define WhiteListRequest_request_set_MSGTYPE WhiteList
+#define WhiteListRequest_set_MSGTYPE WhiteList
 
 extern const pb_msgdesc_t WhiteItem_msg;
 extern const pb_msgdesc_t WhiteList_msg;
