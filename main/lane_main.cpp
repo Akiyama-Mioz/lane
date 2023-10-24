@@ -131,7 +131,7 @@ extern "C" [[noreturn]] void app_main() {
   auto pScanCb          = new ScanCallback(&hr_char);
   auto &white_list_char = *hr_service.createCharacteristic(BLE_CHAR_WHITE_LIST_UUID,
                                                            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
-  auto &device_char     = *hr_service.createCharacteristic(BLE_CHAR_WHITE_LIST_UUID,
+  auto &device_char     = *hr_service.createCharacteristic(BLE_CHAR_DEVICE_UUID,
                                                            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   auto pWhiteListCb     = new WhiteListCallback();
   white_list_char.setCallbacks(pWhiteListCb);
