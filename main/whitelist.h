@@ -13,6 +13,8 @@
 
 #ifdef SIMPLE_LOG
 #include "simple_log.h"
+#elif defined(ESP32)
+#include "esp_log.h"
 #endif
 
 namespace white_list {

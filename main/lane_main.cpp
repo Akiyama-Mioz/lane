@@ -134,8 +134,8 @@ extern "C" [[noreturn]] void app_main() {
   auto pWhiteListCb     = new WhiteListCallback();
   white_list_char.setCallbacks(pWhiteListCb);
   pWhiteListCb->setList = [pScanCb](white_list::list_t list) {
-    const auto TAG      = "setList";
-    pScanCb->white_list = list;
+    const auto TAG = "setList";
+    pScanCb->set_white_list(list);
     uint8_t buf[ScanCallback::MAX_OSTREAM_SIZE]{0};
     auto ostream           = pb_ostream_from_buffer(buf, sizeof(buf));
     ::WhiteList white_list = WhiteList_init_zero;
@@ -150,7 +150,8 @@ extern "C" [[noreturn]] void app_main() {
     pref.end();
   };
   pWhiteListCb->getList = [pScanCb]() {
-    return pScanCb->white_list;
+    auto list = pScanCb->white_list();
+    return list;
   };
   hr_service.start();
 

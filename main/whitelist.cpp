@@ -6,7 +6,6 @@
 #include "pb_decode.h"
 #include "pb_encode.h"
 #include <functional>
-#include <iostream>
 
 #ifdef ESP32
 #define LOG_ERR(tag, fmt, ...) ESP_LOGE(tag, fmt, ##__VA_ARGS__)
@@ -51,7 +50,7 @@ void set_decode_white_item_addr(::WhiteItem &item, const addr_fn &write_addr) {
       LOG_ERR("white_list", "failed to read mac");
       return false;
     }
-    return w(std::move(addr));
+    return w(addr);
   };
   item.item.mac.arg = const_cast<addr_fn *>(&write_addr);
 }

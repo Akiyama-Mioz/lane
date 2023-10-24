@@ -158,7 +158,6 @@ void ScanCallback::handleHrWhiteListConnection(BLEAdvertisedDevice *advertisedDe
         client.disconnect();
         return nullptr;
       }
-      // pCharacteristic->subscribe(true, notify);
       ESP_LOGI(TAG, "Connected to %s", name.c_str());
       return pCharacteristic;
     };
@@ -280,7 +279,8 @@ void ScanCallback::handleHrAdvertised(BLEAdvertisedDevice *advertisedDevice) {
 
 void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   auto name = advertisedDevice->getName();
-  for (auto &item : white_list) {
+  ESP_LOGI("onResult", "[%s] %s", name.c_str(), advertisedDevice->getAddress().toString().c_str());
+  for (auto &item : _white_list) {
     bool is_white = white_list::is_device_in_whitelist(item, *advertisedDevice);
     if (is_white) {
       handleHrWhiteListConnection(advertisedDevice);
@@ -349,7 +349,8 @@ void WhiteListCallback::onWrite(NimBLECharacteristic *pCharacteristic, NimBLECon
       case WhiteListCommand_REQUEST: {
         white_list::response_t resp{};
         if (getList != nullptr) {
-          resp = white_list::response_t{getList()};
+          auto list = getList();
+          resp      = white_list::response_t{std::move(list)};
         } else {
           ESP_LOGE(TAG, "callback getList is nullptr");
           resp = white_list::response_t{WhiteListErrorCode_NULL};

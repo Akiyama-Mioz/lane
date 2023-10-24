@@ -28,9 +28,9 @@ class ScanCallback : public NimBLEScanCallbacks {
   // `hr_data.ksy`
 public:
   static const int MAX_OSTREAM_SIZE = 256;
-  white_list::list_t white_list;
 
 private:
+  white_list::list_t _white_list{};
   DeviceMap devices{};
   NimBLECharacteristic *hr_char = nullptr;
 
@@ -47,6 +47,8 @@ private:
 public:
   explicit ScanCallback(NimBLECharacteristic *c) : hr_char(c) {}
   DeviceMap &getDevices() { return devices; }
+  [[nodiscard]] const white_list::list_t &white_list() const { return _white_list; }
+  void set_white_list(white_list::list_t list) { _white_list = std::move(list); }
 };
 
 class HRClientCallbacks : public NimBLEClientCallbacks {
@@ -70,9 +72,9 @@ class ServerCallbacks : public NimBLEServerCallbacks {
 
 class WhiteListCallback : public NimBLECharacteristicCallbacks {
 public:
-  using set_list_fn           = std::function<void(white_list::list_t)>;
-  using get_list_fn          = std::function<const white_list::list_t &(void)>;
-  set_list_fn setList         = nullptr;
+  using set_list_fn   = std::function<void(white_list::list_t)>;
+  using get_list_fn   = std::function<white_list::list_t(void)>;
+  set_list_fn setList = nullptr;
   get_list_fn getList = nullptr;
   void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override;
 };
