@@ -279,7 +279,10 @@ void ScanCallback::handleHrAdvertised(BLEAdvertisedDevice *advertisedDevice) {
 
 void ScanCallback::onResult(BLEAdvertisedDevice *advertisedDevice) {
   auto name = advertisedDevice->getName();
-  ESP_LOGI("onResult", "[%s] %s", name.c_str(), advertisedDevice->getAddress().toString().c_str());
+  // ESP_LOGI("onResult", "[%s] %s", name.c_str(), advertisedDevice->getAddress().toString().c_str());
+  if (onResultCb != nullptr) {
+    onResultCb(advertisedDevice->getName(), advertisedDevice->getAddress().getNative());
+  }
   for (auto &item : _white_list) {
     bool is_white = white_list::is_device_in_whitelist(item, *advertisedDevice);
     if (is_white) {

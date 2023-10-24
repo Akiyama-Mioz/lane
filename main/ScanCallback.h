@@ -29,6 +29,13 @@ class ScanCallback : public NimBLEScanCallbacks {
 public:
   static const int MAX_OSTREAM_SIZE = 256;
 
+  /**
+   * @brief callback when we have scan result
+   * @param device name
+   * @param 6 bytes (48 bits) of mac address
+   */
+  std::function<void(std::string, const uint8_t *)> onResultCb = nullptr;
+
 private:
   white_list::list_t _white_list{};
   DeviceMap devices{};

@@ -47,6 +47,11 @@ typedef struct _WhiteListResponse {
     WhiteListErrorCode code;
 } WhiteListResponse;
 
+typedef struct _bluetooth_device_pb {
+    pb_callback_t mac;
+    char name[21];
+} bluetooth_device_pb;
+
 
 /* Helper constants for enums */
 #define _WhiteListCommand_MIN WhiteListCommand_REQUEST
@@ -65,10 +70,12 @@ extern "C" {
 /* Initializer values for message structs */
 #define WhiteItem_init_default                   {0, {{{NULL}, NULL}}}
 #define WhiteList_init_default                   {{{NULL}, NULL}}
+#define bluetooth_device_pb_init_default         {{{NULL}, NULL}, ""}
 #define WhiteListResponse_init_default           {false, WhiteList_init_default, _WhiteListErrorCode_MIN}
 #define WhiteListRequest_init_default            {_WhiteListCommand_MIN, false, WhiteList_init_default}
 #define WhiteItem_init_zero                      {0, {{{NULL}, NULL}}}
 #define WhiteList_init_zero                      {{{NULL}, NULL}}
+#define bluetooth_device_pb_init_zero            {{{NULL}, NULL}, ""}
 #define WhiteListResponse_init_zero              {false, WhiteList_init_zero, _WhiteListErrorCode_MIN}
 #define WhiteListRequest_init_zero               {_WhiteListCommand_MIN, false, WhiteList_init_zero}
 
@@ -80,6 +87,8 @@ extern "C" {
 #define WhiteListRequest_set_tag                 2
 #define WhiteListResponse_list_tag               1
 #define WhiteListResponse_code_tag               2
+#define bluetooth_device_pb_mac_tag              1
+#define bluetooth_device_pb_name_tag             2
 
 /* Struct field encoding specification for nanopb */
 #define WhiteItem_FIELDLIST(X, a) \
@@ -93,6 +102,12 @@ X(a, CALLBACK, REPEATED, MESSAGE,  items,             1)
 #define WhiteList_CALLBACK pb_default_field_callback
 #define WhiteList_DEFAULT NULL
 #define WhiteList_items_MSGTYPE WhiteItem
+
+#define bluetooth_device_pb_FIELDLIST(X, a) \
+X(a, CALLBACK, SINGULAR, BYTES,    mac,               1) \
+X(a, STATIC,   SINGULAR, STRING,   name,              2)
+#define bluetooth_device_pb_CALLBACK pb_default_field_callback
+#define bluetooth_device_pb_DEFAULT NULL
 
 #define WhiteListResponse_FIELDLIST(X, a) \
 X(a, STATIC,   OPTIONAL, MESSAGE,  list,              1) \
@@ -110,18 +125,21 @@ X(a, STATIC,   OPTIONAL, MESSAGE,  set,               2)
 
 extern const pb_msgdesc_t WhiteItem_msg;
 extern const pb_msgdesc_t WhiteList_msg;
+extern const pb_msgdesc_t bluetooth_device_pb_msg;
 extern const pb_msgdesc_t WhiteListResponse_msg;
 extern const pb_msgdesc_t WhiteListRequest_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define WhiteItem_fields &WhiteItem_msg
 #define WhiteList_fields &WhiteList_msg
+#define bluetooth_device_pb_fields &bluetooth_device_pb_msg
 #define WhiteListResponse_fields &WhiteListResponse_msg
 #define WhiteListRequest_fields &WhiteListRequest_msg
 
 /* Maximum encoded size of messages (where known) */
 /* WhiteItem_size depends on runtime parameters */
 /* WhiteList_size depends on runtime parameters */
+/* bluetooth_device_pb_size depends on runtime parameters */
 /* WhiteListResponse_size depends on runtime parameters */
 /* WhiteListRequest_size depends on runtime parameters */
 

@@ -1,4 +1,3 @@
-// fmt library should be included first
 #include "utils.h"
 #include <vector>
 #include <cstdio>
@@ -22,6 +21,7 @@ static const char *BLE_CHAR_CONTROL_UUID    = "24207642-0d98-40cd-84bb-910008579
 static const char *BLE_CHAR_CONFIG_UUID     = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
 static const char *BLE_CHAR_HEARTBEAT_UUID  = "048b8928-d0a5-43e2-ada9-b925ec62ba27";
 static const char *BLE_CHAR_WHITE_LIST_UUID = "12a481f0-9384-413d-b002-f8660566d3b0";
+static const char *BLE_CHAR_DEVICE_UUID     = "a2f05114-fdb6-4549-ae2a-845b4be1ac48";
 
 using namespace lane;
 /**
@@ -131,8 +131,38 @@ extern "C" [[noreturn]] void app_main() {
   auto pScanCb          = new ScanCallback(&hr_char);
   auto &white_list_char = *hr_service.createCharacteristic(BLE_CHAR_WHITE_LIST_UUID,
                                                            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+  auto &device_char     = *hr_service.createCharacteristic(BLE_CHAR_WHITE_LIST_UUID,
+                                                           NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   auto pWhiteListCb     = new WhiteListCallback();
   white_list_char.setCallbacks(pWhiteListCb);
+  pScanCb->onResultCb = [&device_char](std::string device_name, const uint8_t *addr) {
+    uint8_t buf[32]                 = {0};
+    auto TAG                        = "onResultCb";
+    auto ostream                    = pb_ostream_from_buffer(buf, sizeof(buf));
+    ::bluetooth_device_pb device_pb = bluetooth_device_pb_init_zero;
+    device_pb.mac.funcs.encode      = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
+      const auto addr_ptr = reinterpret_cast<const uint8_t *>(*arg);
+      if (!pb_encode_tag_for_field(stream, field)) {
+        return false;
+      }
+      return pb_encode_string(stream, addr_ptr, BLE_MAC_ADDR_SIZE);
+    };
+    device_pb.mac.arg           = const_cast<uint8_t *>(addr);
+    const auto target_name_size = sizeof(device_pb.name) - 1;
+    if (device_name.size() > target_name_size) {
+      device_name.resize(target_name_size);
+      ESP_LOGW(TAG, "Truncated device name to %s", device_name.c_str());
+    }
+    std::memcpy(device_pb.name, device_name.c_str(), device_name.size());
+    auto ok = pb_encode(&ostream, bluetooth_device_pb_fields, &device_pb);
+    if (!ok) {
+      ESP_LOGE(TAG, "Failed to encode the device");
+      return;
+    }
+    auto sz = ostream.bytes_written;
+    device_char.setValue(buf, sz);
+    device_char.notify();
+  };
   pWhiteListCb->setList = [pScanCb](white_list::list_t list) {
     const auto TAG = "setList";
     pScanCb->set_white_list(list);
