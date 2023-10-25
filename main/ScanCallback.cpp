@@ -211,6 +211,9 @@ void ScanCallback::handleHrWhiteListConnection(BLEAdvertisedDevice *advertisedDe
         pChar->subscribe(true, notify);
         // it's a valid device. we could configure disconnect callback
         auto cb = new HRClientCallbacks(&device_map, addr);
+        // Manually delete cb would cause a crash
+        // My guess is that the callback is deleted by the NimBLE library
+        // so deleting it again would cause a crash
         client.setClientCallbacks(cb);
       } else {
         ESP_LOGE(TAG, "Failed to configure the band %s", name.c_str());
@@ -330,8 +333,6 @@ void HRClientCallbacks::onDisconnect(NimBLEClient *pClient, int reason) {
     ESP_LOGE(TAG, "Failed to delete client");
     return;
   }
-  // delete self since it's most likely allocated in heap
-  delete this;
 }
 
 void WhiteListCallback::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
