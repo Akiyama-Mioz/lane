@@ -378,11 +378,23 @@ void WhiteListCallback::onWrite(NimBLECharacteristic *pCharacteristic, NimBLECon
     }
   } else if (std::holds_alternative<white_list::list_t>(req)) {
     auto list = std::get<white_list::list_t>(req);
-    if (setList != nullptr) {
-      ESP_LOGI(TAG, "set list");
-      setList(list);
+    if (list.empty()) {
+      ESP_LOGW(TAG, "Empty list");
     } else {
-      ESP_LOGE(TAG, "callback setList is nullptr");
+      for (auto &item : list) {
+        if (std::holds_alternative<white_list::Name>(item)) {
+          auto &name = std::get<white_list::Name>(item);
+          ESP_LOGI(TAG, "Name: %s", name.name.c_str());
+        } else if (std::holds_alternative<white_list::Addr>(item)) {
+          auto &addr = std::get<white_list::Addr>(item);
+          ESP_LOGI(TAG, "Addr: %s", to_hex(addr.addr.data(), addr.addr.size()).c_str());
+        };
+      }
+      if (setList != nullptr) {
+        setList(list);
+      } else {
+        ESP_LOGE(TAG, "callback setList is nullptr");
+      }
     }
   }
 }

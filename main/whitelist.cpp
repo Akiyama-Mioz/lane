@@ -218,7 +218,7 @@ unmarshal_while_list_request(pb_istream_t *istream, ::WhiteListRequest &request)
             return true; },
       };
       set_decode_white_list(request.set, cbs);
-      auto ok = pb_decode(istream, WhiteList_fields, &request);
+      auto ok = pb_decode(istream, WhiteListRequest_fields, &request);
       if (!ok) {
         LOG_ERR("white_list", "failed to decode set");
         return etl::nullopt;
