@@ -70,7 +70,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
 }
 void ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
   const auto TAG        = "config::read";
-  constexpr size_t size = LaneConfigRO_size;
+  constexpr size_t size = LaneConfigRO_size + 16;
   uint8_t data[size];
   ::LaneConfigRO config_msg = LaneConfigRO_init_zero;
   auto ostream              = pb_ostream_from_buffer(data, size);
@@ -91,8 +91,8 @@ void ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLECon
     ESP_LOGE(TAG, "encode: %s", PB_GET_ERROR(&ostream));
     return;
   }
-  auto h = to_hex(data, ostream.bytes_written);
-  ESP_LOGD(TAG, "Encoded data(%d): %s", ostream.bytes_written, h.c_str());
+
+  ESP_LOGD(TAG, "Encoded(%d): %s", ostream.bytes_written, to_hex(data, ostream.bytes_written).c_str());
 
   pCharacteristic->setValue(data, ostream.bytes_written);
 }
