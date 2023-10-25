@@ -7,10 +7,9 @@
 
 //****************************** Callback ************************************/
 
-static auto TAG = "LaneCallback";
-
 namespace lane {
 void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
+  auto TAG                  = "control";
   auto data                 = characteristic->getValue();
   ::LaneControl control_msg = LaneControl_init_zero;
   auto ostream              = pb_istream_from_buffer(data.data(), data.size());
@@ -32,6 +31,7 @@ void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECo
 }
 
 void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
+  const auto TAG          = "config::write";
   auto data               = characteristic->getValue();
   ::LaneConfig config_msg = LaneConfig_init_zero;
   auto ostream            = pb_istream_from_buffer(data.data(), data.size());
@@ -44,15 +44,17 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
   switch (config_msg.which_msg) {
     case LaneConfig_color_cfg_tag:
       lane.pref.putULong(PREF_COLOR_NAME, config_msg.msg.color_cfg.rgb);
-      ESP_LOGI((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Set color to 0x%06lx", config_msg.msg.color_cfg.rgb);
+      ESP_LOGI(TAG, "Set color to 0x%06lx", config_msg.msg.color_cfg.rgb);
       lane.setColor(config_msg.msg.color_cfg.rgb);
       break;
     case LaneConfig_length_cfg_tag: {
       if (lane.state.status != LaneStatus::STOP) {
-        ESP_LOGE((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Can't change the length while the lane is running");
+        ESP_LOGE(TAG, "Can't change the length while the lane is running");
         return;
       }
-      ESP_LOGI((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Set line length to %.2f; active length %.2f; total length %.2f; line LEDs: %ld;", config_msg.msg.length_cfg.line_length_m, config_msg.msg.length_cfg.active_length_m, config_msg.msg.length_cfg.total_length_m, config_msg.msg.length_cfg.line_leds_num);
+      ESP_LOGI(TAG, "line length=%.2f; active length=%.2f; total length=%.2f; line LEDs=%ld;",
+               config_msg.msg.length_cfg.line_length_m, config_msg.msg.length_cfg.active_length_m,
+               config_msg.msg.length_cfg.total_length_m, config_msg.msg.length_cfg.line_leds_num);
       lane.pref.putFloat(PREF_LINE_LENGTH_NAME, config_msg.msg.length_cfg.line_length_m);
       lane.pref.putFloat(PREF_ACTIVE_LENGTH_NAME, config_msg.msg.length_cfg.active_length_m);
       lane.pref.putFloat(PREF_TOTAL_LENGTH_NAME, config_msg.msg.length_cfg.total_length_m);
@@ -67,10 +69,11 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
   lane.pref.end();
 }
 void ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
+  const auto TAG        = "config::read";
   constexpr size_t size = LaneConfigRO_size;
   uint8_t data[size];
-  ::LaneConfigRO config_msg             = LaneConfigRO_init_zero;
-  auto ostream                          = pb_ostream_from_buffer(data, size);
+  ::LaneConfigRO config_msg = LaneConfigRO_init_zero;
+  auto ostream              = pb_ostream_from_buffer(data, size);
   // https://stackoverflow.com/questions/56661663/nanopb-encode-always-size-0-but-no-encode-failure
   config_msg.has_color_cfg              = true;
   config_msg.has_length_cfg             = true;
@@ -79,7 +82,10 @@ void ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLECon
   config_msg.length_cfg.total_length_m  = lane.cfg.total_length.count();
   config_msg.length_cfg.line_leds_num   = lane.cfg.line_LEDs_num;
   config_msg.color_cfg.rgb              = lane.cfg.color;
-  ESP_LOGI((std::string(TAG) + "::configCharCallback::onRead").c_str(), "Read line length to %.2f; active length %.2f; total length %.2f; line LEDs: %ld; Color: 0x%06lx", config_msg.length_cfg.line_length_m, config_msg.length_cfg.active_length_m, config_msg.length_cfg.total_length_m, config_msg.length_cfg.line_leds_num, config_msg.color_cfg.rgb);
+  ESP_LOGI(TAG, "line length=%.2f; active length=%.2f; total length=%.2f; line LEDs=%ld; Color=0x%06lx",
+           config_msg.length_cfg.line_length_m, config_msg.length_cfg.active_length_m,
+           config_msg.length_cfg.total_length_m, config_msg.length_cfg.line_leds_num,
+           config_msg.color_cfg.rgb);
   auto ok = pb_encode(&ostream, LaneConfigRO_fields, &config_msg);
   if (!ok) {
     ESP_LOGE(TAG, "encode: %s", PB_GET_ERROR(&ostream));
