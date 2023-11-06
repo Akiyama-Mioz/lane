@@ -19,3 +19,6 @@
 [submodule "components/Adafruit_NeoPixel"]
 	path = components/NeoPixel/Adafruit_NeoPixel
 	url = https://github.com/adafruit/Adafruit_NeoPixel
+[submodule "components/RadioLib"]
+	path = components/RadioLib
+	url = https://github.com/crosstyan/RadioLib

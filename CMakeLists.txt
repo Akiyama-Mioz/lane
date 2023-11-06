@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # personal settings
 # set(IDF_MAINTAINER crosstyan)
@@ -11,7 +11,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 add_compile_definitions(ARDUINO_ARCH_ESP32=1)
-add_compile_definitions(FMT_HEADER_ONLY)
 
 # https://cmake.org/cmake/help/latest/envvar/CFLAGS.html
 project(track_short)

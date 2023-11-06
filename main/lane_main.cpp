@@ -11,6 +11,14 @@
 #include <memory.h>
 #include "common.h"
 #include "inc/ScanCallback.h"
+#include <RadioLib.h>
+#include "EspHal.h"
+
+extern void *rf_receive_data;
+struct rf_receive_data_t {
+  EventGroupHandle_t evt_grp = nullptr;
+};
+constexpr auto RecvBit = BIT0;
 
 using namespace common;
 using namespace lane;
@@ -41,7 +49,9 @@ void initBLE(NimBLEServer *server, LaneBLE &ble, Lane &lane) {
   ble.service->start();
 }
 
-extern "C" void app_main() {
+extern "C" void app_main();
+
+void app_main() {
   const auto TAG = "main";
   initArduino();
 
@@ -62,6 +72,29 @@ extern "C" void app_main() {
   };
   pref.end();
 
+  static auto hal    = EspHal(pin::SCK, pin::MISO, pin::MOSI);
+  static auto module = Module(&hal, pin::NSS, pin::DIO1, pin::LoRa_RST, pin::BUSY);
+  static auto rf     = LLCC68(&module);
+  auto st            = rf.begin(434, 500.0, 7, 7,
+                                RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 8, 1.6);
+  if (st != RADIOLIB_ERR_NONE) {
+    ESP_LOGE("rf", "failed, code %d", st);
+    esp_restart();
+  }
+  auto evt_grp    = xEventGroupCreate();
+  auto *data      = new rf_receive_data_t{.evt_grp = evt_grp};
+  rf_receive_data = data;
+  rf.setPacketReceivedAction([]() {
+    auto *data            = static_cast<rf_receive_data_t *>(rf_receive_data);
+    BaseType_t task_woken = pdFALSE;
+    if (data->evt_grp != nullptr) {
+      // https://github.com/espressif/esp-idf/issues/5897
+      // https://github.com/espressif/esp-idf/pull/6692
+      xEventGroupSetBits(data->evt_grp, RecvBit);
+    }
+  });
+  ESP_LOGI("rf", "RF init success!");
+
   NimBLEDevice::init(BLE_NAME);
   auto &server = *NimBLEDevice::createServer();
   server.setCallbacks(new ServerCallbacks());
@@ -70,8 +103,8 @@ extern "C" void app_main() {
     auto &lane = *static_cast<Lane *>(param);
     lane.loop();
   };
-  static auto s = strip::AdafruitPixel(default_cfg.line_LEDs_num, LED_PIN, strip::AdafruitPixel::default_pixel_type);
-  auto &lane    = *Lane::get();
+  auto s     = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
+  auto &lane = *Lane::get();
   lane.setStrip(std::make_unique<decltype(s)>(std::move(s)));
   auto lane_ble = LaneBLE();
   initBLE(&server, lane_ble, lane);

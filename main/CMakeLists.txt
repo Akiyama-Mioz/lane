@@ -7,6 +7,7 @@ idf_component_register(
         whitelist.cpp
         whitelist_esp.cpp
         utils.cpp
+        EspHal.cpp
 
         INCLUDE_DIRS
         inc
@@ -16,6 +17,7 @@ idf_component_register(
         nanopb
         esp_timer
         NeoPixel
+        RadioLib
         arduino
         esp-nimble-cpp
         etl
