@@ -147,9 +147,8 @@ protected:
   static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
   Adafruit_NeoPixel *pixels            = nullptr;
   int pin                              = 23;
-  /** @note heap allocated */
-  notify_timer_param *timer_param = nullptr;
-  TimerHandle_t timer_handle      = nullptr;
+  notify_timer_param timer_param{[]() {}};
+  TimerHandle_t timer_handle = nullptr;
   std::array<uint8_t, DECODE_BUFFER_SIZE>
       decode_buffer = {0};
 

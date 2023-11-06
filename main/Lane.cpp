@@ -147,8 +147,6 @@ void Lane::loop() {
       if (this->timer_handle != nullptr) {
         xTimerDelete(this->timer_handle, portMAX_DELAY);
         this->timer_handle = nullptr;
-        delete this->timer_param;
-        this->timer_param = nullptr;
       }
     };
     /**
@@ -170,14 +168,12 @@ void Lane::loop() {
 
       // otherwise a timer is running
       if (this->timer_handle == nullptr) {
-        this->timer_param = new notify_timer_param{
-            .fn = notify_fn,
-        };
-        this->timer_handle = xTimerCreate("notify_timer",
-                                          pdMS_TO_TICKS(BLUE_TRANSMIT_INTERVAL.count()),
-                                          pdTRUE,
-                                          this->timer_param,
-                                          run_notify_fn);
+        this->timer_param.fn = notify_fn;
+        this->timer_handle   = xTimerCreate("notify_timer",
+                                            pdMS_TO_TICKS(BLUE_TRANSMIT_INTERVAL.count()),
+                                            pdTRUE,
+                                            &this->timer_param,
+                                            run_notify_fn);
         [[unlikely]] if (this->timer_handle == nullptr) {
           ESP_LOGE(TAG, "Failed to create timer");
           abort();
@@ -271,7 +267,7 @@ void Lane::notifyState(LaneState st) {
     ESP_LOGE(TAG, "Failed to encode the state");
     return;
   }
-  auto h             = utils::toHex(buf.cbegin(), stream.bytes_written);
+  auto h = utils::toHex(buf.cbegin(), stream.bytes_written);
   notify_char.setValue(buf.cbegin(), stream.bytes_written);
   notify_char.notify();
 }
