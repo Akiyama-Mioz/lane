@@ -23,4 +23,4 @@ idf_component_register(
         etl
         pthread)
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -std=c++17 -Wformat=0)
+target_compile_options(${COMPONENT_LIB} PRIVATE -std=c++2a -Wformat=0)
