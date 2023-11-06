@@ -143,9 +143,6 @@ struct UpdateTaskParam {
 };
 
 void Lane::loop() {
-  auto instant                  = Instant();
-  auto update_instant           = Instant();
-  auto debug_instant            = Instant();
   auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "start loop");
   for (;;) {
@@ -154,61 +151,81 @@ void Lane::loop() {
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
-    if (params.status == LaneStatus::FORWARD || params.status == LaneStatus::BACKWARD) {
-      instant.reset();
-      iterate();
-      if (debug_instant.elapsed() > DEBUG_INTERVAL) {
-        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0x06x", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str(), cfg.color);
-        debug_instant.reset();
+    auto delete_timer = [this]() {
+      if (this->timer_handle != nullptr) {
+        xTimerDelete(this->timer_handle, portMAX_DELAY);
+        this->timer_handle = nullptr;
+        delete this->timer_param;
+        this->timer_param = nullptr;
       }
-      // I could use the timer from FreeRTOS, but I prefer SystemClock now.
-      if (update_instant.elapsed() > BLUE_TRANSMIT_INTERVAL) {
-        auto task = [](void *param) {
-          auto &update_param = *static_cast<UpdateTaskParam *>(param);
-          (*update_param.fn)();
-          // handled in the destructor
-          delete &update_param;
+    };
+    /**
+     * @brief try to create a timer if there is no timer running.
+     */
+    auto try_create_timer = [this]() {
+      // https://www.nextptr.com/tutorial/ta1430524603/capture-this-in-lambda-expression-timeline-of-change
+      auto notify_fn = [this]() {
+        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0x06x",
+                 state.head.count(), state.tail.count(), state.shift.count(), state.speed,
+                 statusToStr(state.status).c_str(), cfg.color);
+        this->notifyState(this->state);
+      };
+
+      auto run_notify_fn = [](TimerHandle_t pvParameter) {
+        auto &param = *static_cast<notify_timer_param *>(pvParameter);
+        param.fn();
+      };
+
+      // otherwise a timer is running
+      if (this->timer_handle == nullptr) {
+        delete this->timer_param;
+
+        this->timer_param = new notify_timer_param{
+            .fn = notify_fn,
         };
-        auto &l          = *this;
-        auto update_task = [&l]() {
-          if (l.ble.ctrl_char == nullptr) {
-            ESP_LOGE("Lane::updateTask", "BLE not initialized");
-            return;
-          }
-          l.notifyState(l.state);
-        };
-        auto param = new UpdateTaskParam{
-            .fn     = new std::function<void()>(update_task),
-            .handle = nullptr,
-        };
-        auto res = xTaskCreate(task, "update_state", 4096, param, 1, &param->handle);
-        if (res != pdPASS) [[unlikely]] {
-          ESP_LOGE(TAG, "Failed to create task: %s", esp_err_to_name(res));
-          delete param;
+        this->timer_handle = xTimerCreate("notify_timer",
+                                          pdMS_TO_TICKS(BLUE_TRANSMIT_INTERVAL.count()),
+                                          pdTRUE,
+                                          this->timer_param,
+                                          run_notify_fn);
+        [[unlikely]] if (this->timer_handle == nullptr) {
+          ESP_LOGE(TAG, "Failed to create timer");
+          abort();
         }
-        update_instant.reset();
       }
-      auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
-      auto delay = std::chrono::milliseconds(static_cast<uint16_t>(1000 / cfg.fps)) - diff;
-      if (delay < std::chrono::milliseconds(0)) [[unlikely]] {
-        ESP_LOGW(TAG, "delay timeout %lld", delay.count());
-      } else {
-        auto ticks = pdMS_TO_TICKS(delay.count());
-        vTaskDelay(ticks);
+    };
+    switch (params.status) {
+      case LaneStatus::FORWARD:
+      case LaneStatus::BACKWARD: {
+        auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
+        auto instant     = Instant();
+        iterate();
+        try_create_timer();
+
+        auto e = instant.elapsed();
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
+          ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
+        } else {
+          auto delay = interval_ms - e;
+          vTaskDelay(pdMS_TO_TICKS(delay.count()));
+        }
       }
-    } else if (params.status == LaneStatus::STOP) {
-      this->state = LaneState::zero();
-      stop();
-      vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
-    } else if (params.status == LaneStatus::BLINK) {
-      auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
-      auto delay                = pdMS_TO_TICKS(BLINK_INTERVAL.count());
-      stop();
-      vTaskDelay(delay);
-      strip->fill_and_show_forward(0, cfg.line_LEDs_num, cfg.color);
-      vTaskDelay(delay);
-    } else {
-      // unreachable
+      case LaneStatus::STOP: {
+        this->state = LaneState::zero();
+        delete_timer();
+        vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
+      }
+      case LaneStatus::BLINK: {
+        auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
+        auto delay                = pdMS_TO_TICKS(BLINK_INTERVAL.count());
+        delete_timer();
+        stop();
+        vTaskDelay(delay);
+        strip->fill_and_show_forward(0, cfg.line_LEDs_num, cfg.color);
+        vTaskDelay(delay);
+      }
+      default:
+        break;
     }
   }
 }
@@ -290,10 +307,12 @@ float Lane::LEDsPerMeter() const {
   return n / l;
 }
 
-// You will need this patch to your ESP-IDF if you meet a segmentation fault in RTM
-// https://github.com/crosstyan/esp-idf/commit/f18e63bef76f9400aa97dfd5f4cd80812c4bfa19
-// I have no idea why `tx_chan->cur_trans->encoder` would cause a segmentation fault. (null pointer dereference obviously)
-// I guess it's because some data race shit. dereference it and save `rmt_tx_channel_t` to stack could solve it.
+/**
+ * @brief iterate the strip to the next state and set the corresponding LEDs.
+ * @note this function will block the current task for a short time (for the strip to show the LEDs).
+ *       To make the strip to run with certain FPS, please add a delay outside this function
+ *       (minus the time used in this function).
+ */
 void Lane::iterate() {
   if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
@@ -310,25 +329,14 @@ void Lane::iterate() {
   if (head_index > this->cfg.line_LEDs_num) {
     head_index = this->cfg.line_LEDs_num;
   }
-  this->state      = next_state;
-  auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
+  this->state = next_state;
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
-      auto instant = Instant();
       strip->fill_and_show_forward(tail_index, count, cfg.color);
-      auto e = instant.elapsed();
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
-        ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
-      }
       break;
     }
     case LaneStatus::BACKWARD: {
-      auto instant = Instant();
       strip->fill_and_show_backward(tail_index, count, cfg.color);
-      auto e = instant.elapsed();
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
-        ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
-      }
       break;
     }
     default:

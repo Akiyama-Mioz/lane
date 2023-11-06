@@ -22,7 +22,7 @@ public:
    */
   virtual bool fill_and_show_forward(size_t start, size_t count, uint32_t color) {
     auto res = clear();
-    if (!res){
+    if (!res) {
       return false;
     }
     res = fill(start, count, color);
@@ -41,8 +41,8 @@ public:
    */
   virtual bool fill_and_show_backward(size_t start, size_t count, uint32_t color) {
     auto total = get_max_LEDs();
-    auto res = clear();
-    if (!res){
+    auto res   = clear();
+    if (!res) {
       return false;
     }
     if (total < start + count) {
@@ -59,7 +59,7 @@ public:
   virtual bool show()                                           = 0;
   virtual bool begin()                                          = 0;
   virtual bool set_max_LEDs(size_t new_max_LEDs)                = 0;
-  virtual size_t get_max_LEDs() const                           = 0;
+  [[nodiscard]] virtual size_t get_max_LEDs() const             = 0;
   // resolve some  complain in destructor
   virtual ~IStrip() = default;
 };
@@ -200,11 +200,11 @@ public:
   AdafruitPixel(AdafruitPixel const &rhs)  = delete;
   void operator=(AdafruitPixel const &rhs) = delete;
 
-  ~AdafruitPixel() noexcept {
+  ~AdafruitPixel() noexcept override {
     delete pixel;
   }
 
-  bool begin() {
+  bool begin() override {
     pixel->begin();
     return true;
   }
@@ -228,7 +228,7 @@ public:
     return true;
   }
 
-  size_t get_max_LEDs() const override {
+  [[nodiscard]] size_t get_max_LEDs() const override {
     return max_LEDs;
   }
 
@@ -239,7 +239,7 @@ public:
     pixel->clear();
     return true;
   }
-  bool show() {
+  bool show() override {
     if (pixel == nullptr) {
       return false;
     }

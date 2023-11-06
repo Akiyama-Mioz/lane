@@ -35,7 +35,7 @@ const auto PREF_TOTAL_LENGTH_NAME = "to";
 // uint32_t
 const auto PREF_COLOR_NAME = "co";
 
-const auto PREF_WHITE_LIST_NAME = "wh";
+const auto PREF_WHITE_LIST_NAME       = "wh";
 const auto PREF_WHITE_LIST_MAX_LENGTH = 256;
 
 using centimeter = utils::length<float, std::centi>;
@@ -52,21 +52,23 @@ const auto DEFAULT_FPS           = 10;
 
 static const auto BLUE_TRANSMIT_INTERVAL = std::chrono::milliseconds(1000);
 static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
-static const auto READY_INTERVAL         = std::chrono::milliseconds(500);
 // mem_block_symbols must be even and at least 64
 // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/wdts.html
 // https://stackoverflow.com/questions/51750377/how-to-disable-interrupt-watchdog-in-esp32-or-increase-isr-time-limit
 // Increase IWTD (Interrupt Watchdog Timer) timeout is necessary.
 // Make this higher than the FreeRTOS tick rate (wait? the tick rate is 1000Hz i.e. 1ms, so it's not the FreeRTOS blocking)
 static const auto RMT_MEM_BLOCK_NUM = 512;
-constexpr size_t DECODE_BUFFER_SIZE      = 2048;
+constexpr size_t DECODE_BUFFER_SIZE = 2048;
 
+struct notify_timer_param {
+  std::function<void()> fn;
+};
 
 enum class LaneStatus {
   FORWARD  = ::LaneStatus_FORWARD,
   BACKWARD = ::LaneStatus_BACKWARD,
   STOP     = ::LaneStatus_STOP,
-  BLINK   = ::LaneStatus_BLINK,
+  BLINK    = ::LaneStatus_BLINK,
 };
 
 std::string statusToStr(LaneStatus status);
@@ -83,7 +85,7 @@ struct LaneState {
   // m/s
   float speed = 0;
   // head should be always larger than tail
-  meter head        = meter(0);
+  meter head = meter(0);
   /// hidden head for calculation
   meter _head       = meter(0);
   meter tail        = meter(0);
@@ -139,21 +141,22 @@ class Lane {
   friend class ConfigCharCallback;
 
 protected:
-  using strip_ptr_t = std::unique_ptr<strip::IStrip>;
-  strip_ptr_t strip = nullptr;
-  bool is_initialized = false;
   Preferences pref;
+  using strip_ptr_t                    = std::unique_ptr<strip::IStrip>;
+  strip_ptr_t strip                    = nullptr;
   static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
-  Adafruit_NeoPixel *pixels = nullptr;
-  int pin                                          = 23;
+  Adafruit_NeoPixel *pixels            = nullptr;
+  int pin                              = 23;
+  /** @note heap allocated */
+  notify_timer_param *timer_param = nullptr;
+  TimerHandle_t timer_handle      = nullptr;
+  std::array<uint8_t, DECODE_BUFFER_SIZE>
+      decode_buffer = {0};
 
-
-  /// in meter
-  std::array<uint8_t, DECODE_BUFFER_SIZE> decode_buffer = {0};
-  LaneBLE ble                                           = {
-                                                .ctrl_char   = nullptr,
-                                                .config_char = nullptr,
-                                                .service     = nullptr,
+  LaneBLE ble = {
+      .ctrl_char   = nullptr,
+      .config_char = nullptr,
+      .service     = nullptr,
   };
   LaneConfig cfg = {
       .color         = utils::Colors::Red,
@@ -170,9 +173,8 @@ protected:
   };
 
   ~Lane() = default;
-  Lane() = default;
+  Lane()  = default;
 
-  /// iterate the strip
   void iterate();
 
   void stop() const;
