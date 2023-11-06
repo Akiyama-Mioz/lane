@@ -62,7 +62,7 @@ void app_main() {
   auto line_LEDs_num      = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
   auto total_length       = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
   auto color              = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
-  static auto default_cfg = lane::LaneConfig{
+  auto default_cfg = lane::LaneConfig{
       .color         = color,
       .line_length   = lane::meter(line_length),
       .active_length = lane::meter(active_length),
@@ -106,7 +106,7 @@ void app_main() {
   auto s     = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
   auto &lane = Lane::get();
   lane.setStrip(std::make_unique<decltype(s)>(std::move(s)));
-  static auto lane_ble = LaneBLE{};
+  auto lane_ble = LaneBLE{};
   initBLE(&server, lane_ble, lane);
   lane.setBLE(lane_ble);
   lane.setConfig(default_cfg);
