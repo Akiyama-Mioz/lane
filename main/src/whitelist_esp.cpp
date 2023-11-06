@@ -2,7 +2,7 @@
 // Created by Kurosu Chan on 2023/10/16.
 //
 
-#include "inc/whitelist.h"
+#include "whitelist.h"
 
 namespace white_list {
 bool is_device_in_whitelist(const item_t &item, BLEAdvertisedDevice &device) {

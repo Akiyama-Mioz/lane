@@ -6,7 +6,7 @@ add_subdirectory(../components/etl/etl ${CMAKE_BINARY_DIR}/etl)
 add_subdirectory(../components/nanopb/nanopb ${CMAKE_BINARY_DIR}/nanopb)
 add_subdirectory(simple_log)
 
-set(WHITE_LIST_SRC ../main/whitelist.cpp ../main/inc/whitelist.h)
+set(WHITE_LIST_SRC ../main/src/whitelist.cpp ../main/inc/whitelist.h)
 
 set(BLE_PB_SRC ../components/nanopb/protobuf/ble.pb.c ../components/nanopb/protobuf/ble.pb.h)
 add_executable(test main.cpp ${WHITE_LIST_SRC} ${BLE_PB_SRC})

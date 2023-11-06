@@ -2,8 +2,8 @@
 // Created by Kurosu Chan on 2022/7/13.
 //
 
-#include "inc/Lane.h"
-#include "inc/Strip.hpp"
+#include "Lane.h"
+#include "Strip.hpp"
 #include <esp_check.h>
 
 static const auto TAG = "LANE";

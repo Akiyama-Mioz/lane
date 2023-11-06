@@ -1,15 +1,16 @@
 idf_component_register(
         SRCS
-        lane_main.cpp
-        Lane.cpp
-        LaneCallback.cpp
-        ScanCallback.cpp
-        whitelist.cpp
-        whitelist_esp.cpp
-        utils.cpp
+        src/lane_main.cpp
+        src/Lane.cpp
+        src/LaneCallback.cpp
+        src/ScanCallback.cpp
+        src/whitelist.cpp
+        src/whitelist_esp.cpp
+        src/utils.cpp
 
         INCLUDE_DIRS
         inc
+        protocol/inc
 
         REQUIRES
         spi_flash

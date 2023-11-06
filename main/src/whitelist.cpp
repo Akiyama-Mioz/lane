@@ -2,7 +2,7 @@
 // Created by Kurosu Chan on 2023/10/10.
 //
 
-#include "inc/whitelist.h"
+#include "whitelist.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
 #include <functional>

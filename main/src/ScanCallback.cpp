@@ -2,19 +2,19 @@
 // Created by Kurosu Chan on 2022/8/4.
 //
 
-#include "inc/ScanCallback.h"
+#include "ScanCallback.h"
 #include <string_view>
 #include <charconv>
 #include <esp_pthread.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <etl/optional.h>
-#include <etl/span.h>
-#include <etl/algorithm.h>
+#include "etl/optional.h"
+#include "etl/span.h"
+#include "etl/algorithm.h"
 #include <esp_check.h>
 #include <lwip/def.h>
-#include "inc/whitelist.h"
-#include <pb_decode.h>
+#include "whitelist.h"
+#include "pb_decode.h"
 
 static auto TAG        = "AdCallback";
 static auto NOTIFY_TAG = "NotifyCallback";

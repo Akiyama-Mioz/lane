@@ -46,7 +46,7 @@ unmarshal_white_list(pb_istream_t *istream, ::WhiteList &pb_list);
 }
 
 #ifdef ESP32
-#include "../whitelist_esp.tpp"
+#include "whitelist_esp.tpp"
 #endif
 
 #endif // TRACK_LONG_WHITELIST_H
