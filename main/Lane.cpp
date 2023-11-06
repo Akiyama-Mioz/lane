@@ -122,7 +122,7 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
 }
 
 void Lane::stop() const {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
     return;
   }
@@ -149,7 +149,7 @@ void Lane::loop() {
   auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "start loop");
   for (;;) {
-    if (strip == nullptr){
+    if (strip == nullptr) {
       ESP_LOGE(TAG, "strip is null");
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
@@ -215,7 +215,7 @@ void Lane::loop() {
 
 /// i.e. Circle LEDs
 void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
     return;
   }
@@ -226,8 +226,8 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
  * @brief Get the instance/pointer of the strip.
  * @return the instance/pointer of the strip.
  */
-Lane *Lane::get() {
-  static auto *lane = new Lane();
+Lane &Lane::get() {
+  static auto lane = Lane{};
   return lane;
 }
 
@@ -236,7 +236,7 @@ Lane *Lane::get() {
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
 esp_err_t Lane::begin() {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     return ESP_ERR_INVALID_STATE;
   }
   strip->begin();
@@ -295,7 +295,7 @@ float Lane::LEDsPerMeter() const {
 // I have no idea why `tx_chan->cur_trans->encoder` would cause a segmentation fault. (null pointer dereference obviously)
 // I guess it's because some data race shit. dereference it and save `rmt_tx_channel_t` to stack could solve it.
 void Lane::iterate() {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
     return;
   }
@@ -310,14 +310,14 @@ void Lane::iterate() {
   if (head_index > this->cfg.line_LEDs_num) {
     head_index = this->cfg.line_LEDs_num;
   }
-  this->state = next_state;
+  this->state      = next_state;
   auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
       auto instant = Instant();
       strip->fill_and_show_forward(tail_index, count, cfg.color);
       auto e = instant.elapsed();
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
         ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
       }
       break;
@@ -326,7 +326,7 @@ void Lane::iterate() {
       auto instant = Instant();
       strip->fill_and_show_backward(tail_index, count, cfg.color);
       auto e = instant.elapsed();
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
         ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
       }
       break;

@@ -57,18 +57,18 @@ void app_main() {
 
   Preferences pref;
   pref.begin(PREF_RECORD_NAME, true);
-  auto line_length   = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
-  auto active_length = pref.getFloat(PREF_ACTIVE_LENGTH_NAME, DEFAULT_ACTIVE_LENGTH.count());
-  auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
-  auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
-  auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
-  auto default_cfg   = lane::LaneConfig{
-        .color         = color,
-        .line_length   = lane::meter(line_length),
-        .active_length = lane::meter(active_length),
-        .total_length  = lane::meter(total_length),
-        .line_LEDs_num = line_LEDs_num,
-        .fps           = DEFAULT_FPS,
+  auto line_length        = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
+  auto active_length      = pref.getFloat(PREF_ACTIVE_LENGTH_NAME, DEFAULT_ACTIVE_LENGTH.count());
+  auto line_LEDs_num      = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
+  auto total_length       = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
+  auto color              = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
+  static auto default_cfg = lane::LaneConfig{
+      .color         = color,
+      .line_length   = lane::meter(line_length),
+      .active_length = lane::meter(active_length),
+      .total_length  = lane::meter(total_length),
+      .line_LEDs_num = line_LEDs_num,
+      .fps           = DEFAULT_FPS,
   };
   pref.end();
 
@@ -104,9 +104,9 @@ void app_main() {
     lane.loop();
   };
   auto s     = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
-  auto &lane = *Lane::get();
+  auto &lane = Lane::get();
   lane.setStrip(std::make_unique<decltype(s)>(std::move(s)));
-  auto lane_ble = LaneBLE();
+  static auto lane_ble = LaneBLE{};
   initBLE(&server, lane_ble, lane);
   lane.setBLE(lane_ble);
   lane.setConfig(default_cfg);

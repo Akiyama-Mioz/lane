@@ -169,6 +169,7 @@ protected:
       .status = LaneStatus::STOP,
   };
 
+  ~Lane() = default;
   Lane() = default;
 
   /// iterate the strip
@@ -177,6 +178,14 @@ protected:
   void stop() const;
 
 public:
+  Lane(Lane const &) = delete;
+
+  Lane &operator=(Lane const &) = delete;
+
+  Lane(Lane &&) = delete;
+
+  Lane &operator=(Lane &&) = delete;
+
   [[nodiscard]] meter lengthPerLED() const;
   [[nodiscard]] auto getLaneLEDsNum() const {
     return this->cfg.line_LEDs_num;
@@ -214,18 +223,7 @@ public:
    */
   void notifyState(LaneState s);
 
-  static Lane *get();
-
-  Lane(Lane const &) = delete;
-
-  Lane &operator=(Lane const &) = delete;
-
-  Lane(Lane &&) = delete;
-
-  Lane &operator=(Lane &&) = delete;
-
-  // usually you won't destruct it because it's running in MCU and the resource will not be released
-  ~Lane() = delete;
+  static Lane &get();
 
   esp_err_t begin();
 
