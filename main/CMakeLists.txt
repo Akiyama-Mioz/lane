@@ -7,7 +7,6 @@ idf_component_register(
         whitelist.cpp
         whitelist_esp.cpp
         utils.cpp
-        EspHal.cpp
 
         INCLUDE_DIRS
         inc
@@ -23,4 +22,5 @@ idf_component_register(
         etl
         pthread)
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -std=c++2a -Wformat=0)
+# https://github.com/sheredom/utest.h/issues/19
+target_compile_options(${COMPONENT_LIB} PRIVATE -std=gnu++2a -Wformat=0)

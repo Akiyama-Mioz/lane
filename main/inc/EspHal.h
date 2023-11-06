@@ -40,10 +40,6 @@ typedef union {
   };
 } spiClk_t;
 
-
-
-
-
 // create a new ESP-IDF hardware abstraction layer
 // the HAL must inherit from the base RadioLibHal class
 // and implement all of its virtual methods

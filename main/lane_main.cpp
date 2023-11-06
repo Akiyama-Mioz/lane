@@ -14,7 +14,7 @@
 #include <RadioLib.h>
 #include "EspHal.h"
 
-extern void *rf_receive_data;
+void *rf_receive_data = nullptr;
 struct rf_receive_data_t {
   EventGroupHandle_t evt_grp = nullptr;
 };
