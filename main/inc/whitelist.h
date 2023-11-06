@@ -8,8 +8,8 @@
 #include <variant>
 #include <string>
 #include <regex>
-#include <etl/optional.h>
-#include <ble.pb.h>
+#include "etl/optional.h"
+#include "ble.pb.h"
 
 #ifdef SIMPLE_LOG
 #include "simple_log.h"
@@ -46,7 +46,7 @@ unmarshal_white_list(pb_istream_t *istream, ::WhiteList &pb_list);
 }
 
 #ifdef ESP32
-#include "whitelist_esp.tpp"
+#include "../whitelist_esp.tpp"
 #endif
 
 #endif // TRACK_LONG_WHITELIST_H

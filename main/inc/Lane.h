@@ -11,13 +11,13 @@
 #include "freertos/task.h"
 #include "NimBLEDevice.h"
 #include "Preferences.h"
-#include "map"
-#include "vector"
+#include "c++/8.4.0/map"
+#include "c++/8.4.0/vector"
 #include "lane.pb.h"
 #include "pb_common.h"
 #include "pb_decode.h"
 #include "Strip.hpp"
-#include <memory>
+#include <c++/8.4.0/memory>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "Adafruit_NeoPixel.h"

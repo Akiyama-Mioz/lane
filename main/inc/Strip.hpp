@@ -1,8 +1,8 @@
 // include guard
 #ifndef TRACK_LONG_STRIP_HPP
 #define TRACK_LONG_STRIP_HPP
-#include <esp_check.h>
-#include <Adafruit_NeoPixel.h>
+#include "../../../../esp-idf/components/esp_common/include/esp_check.h"
+#include "../../components/NeoPixel/Adafruit_NeoPixel/Adafruit_NeoPixel.h"
 #ifdef ESP_LED_STRIP
 #include "led_strip.h"
 #endif

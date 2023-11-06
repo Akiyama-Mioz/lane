@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "inc/utils.h"
 #include <vector>
 #include <cstdio>
 #include "sdkconfig.h"
@@ -6,10 +6,10 @@
 #include "freertos/task.h"
 #include "Arduino.h"
 #include "NimBLEDevice.h"
-#include "Lane.h"
-#include "whitelist.h"
+#include "inc/Lane.h"
+#include "inc/whitelist.h"
 #include <memory.h>
-#include "ScanCallback.h"
+#include "inc/ScanCallback.h"
 
 static auto BLE_NAME          = "lane-011";
 static const uint16_t LED_PIN = 23;
