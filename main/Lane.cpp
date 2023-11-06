@@ -145,6 +145,7 @@ void Lane::loop() {
     }
     auto delete_timer = [this]() {
       if (this->timer_handle != nullptr) {
+        xTimerStop(this->timer_handle, portMAX_DELAY);
         xTimerDelete(this->timer_handle, portMAX_DELAY);
         this->timer_handle = nullptr;
       }
@@ -178,6 +179,7 @@ void Lane::loop() {
           ESP_LOGE(TAG, "Failed to create timer");
           abort();
         }
+        xTimerStart(this->timer_handle, portMAX_DELAY);
       }
     };
 

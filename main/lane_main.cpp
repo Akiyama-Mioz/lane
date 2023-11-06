@@ -146,6 +146,7 @@ void app_main() {
         ESP_LOGW(TAG, "empty data");
       }
       ESP_LOGI(TAG, "recv=%s", utils::toHex(data, size).c_str());
+      // TODO: handle message stuff
       // handle_message(data, size, handle_message_callbacks);
     }
   };
