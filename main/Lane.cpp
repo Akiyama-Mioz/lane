@@ -163,8 +163,8 @@ void Lane::loop() {
         this->notifyState(this->state);
       };
 
-      auto run_notify_fn = [](TimerHandle_t pvParameter) {
-        auto &param = *static_cast<notify_timer_param *>(pvParameter);
+      auto run_notify_fn = [](TimerHandle_t handle) {
+        auto &param = *static_cast<notify_timer_param *>(pvTimerGetTimerID(handle));
         param.fn();
       };
 
@@ -271,8 +271,7 @@ void Lane::notifyState(LaneState st) {
     ESP_LOGE(TAG, "Failed to encode the state");
     return;
   }
-  auto h             = to_hex(buf.cbegin(), stream.bytes_written);
-  auto current_value = to_hex(notify_char.getValue());
+  auto h             = utils::toHex(buf.cbegin(), stream.bytes_written);
   notify_char.setValue(buf.cbegin(), stream.bytes_written);
   notify_char.notify();
 }
