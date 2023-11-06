@@ -221,9 +221,9 @@ public:
   /**
    * @brief set the status of the strip.
    * @warning This function WILL set the corresponding bluetooth characteristic value and notify.
-   * @param s
+   * @param st
    */
-  void notifyState(LaneState s);
+  void notifyState(LaneState st);
 
   static Lane &get();
 

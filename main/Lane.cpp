@@ -8,12 +8,6 @@
 
 static const auto TAG = "LANE";
 
-#if SOC_RMT_SUPPORT_DMA
-bool is_dma = true;
-#else
-bool is_dma = false;
-#endif
-
 // the resolution is the clock frequency instead of strip frequency
 const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
 
@@ -77,7 +71,6 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
       default:
         return zero_state;
     }
-    return zero_state;
   };
   switch (last_state.status) {
     case LaneStatus::STOP: {
@@ -143,11 +136,10 @@ struct UpdateTaskParam {
 };
 
 void Lane::loop() {
-  auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
-  ESP_LOGI(TAG, "start loop");
+  ESP_LOGI(TAG, "loop");
   for (;;) {
     if (strip == nullptr) {
-      ESP_LOGE(TAG, "strip is null");
+      ESP_LOGE(TAG, "null strip");
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
@@ -165,7 +157,7 @@ void Lane::loop() {
     auto try_create_timer = [this]() {
       // https://www.nextptr.com/tutorial/ta1430524603/capture-this-in-lambda-expression-timeline-of-change
       auto notify_fn = [this]() {
-        ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0x06x",
+        ESP_LOGI(TAG, "head=%.2f; tail=%.2f; shift=%.2f; speed=%.2f; status=%s; color=%0x06x;",
                  state.head.count(), state.tail.count(), state.shift.count(), state.speed,
                  statusToStr(state.status).c_str(), cfg.color);
         this->notifyState(this->state);
@@ -178,8 +170,6 @@ void Lane::loop() {
 
       // otherwise a timer is running
       if (this->timer_handle == nullptr) {
-        delete this->timer_param;
-
         this->timer_param = new notify_timer_param{
             .fn = notify_fn,
         };
@@ -194,6 +184,7 @@ void Lane::loop() {
         }
       }
     };
+
     switch (params.status) {
       case LaneStatus::FORWARD:
       case LaneStatus::BACKWARD: {
@@ -260,7 +251,7 @@ esp_err_t Lane::begin() {
   return ESP_OK;
 }
 
-void Lane::notifyState(LaneState s) {
+void Lane::notifyState(LaneState st) {
   const auto TAG = "Lane::notifyState";
   if (this->ble.ctrl_char == nullptr) {
     ESP_LOGE(TAG, "BLE not initialized");
@@ -268,14 +259,14 @@ void Lane::notifyState(LaneState s) {
   }
   auto &notify_char = *this->ble.ctrl_char;
   auto buf          = std::array<uint8_t, LaneState_size>();
-  ::LaneState st    = LaneState_init_zero;
-  st.head           = s.head.count();
-  st.tail           = s.tail.count();
-  st.shift          = s.shift.count();
-  st.speed          = s.speed;
-  st.status         = static_cast<::LaneStatus>(s.status);
+  ::LaneState pb_st = LaneState_init_zero;
+  pb_st.head        = st.head.count();
+  pb_st.tail        = st.tail.count();
+  pb_st.shift       = st.shift.count();
+  pb_st.speed       = st.speed;
+  pb_st.status      = static_cast<::LaneStatus>(st.status);
   auto stream       = pb_ostream_from_buffer(buf.data(), buf.size());
-  auto ok           = pb_encode(&stream, LaneState_fields, &st);
+  auto ok           = pb_encode(&stream, LaneState_fields, &pb_st);
   if (!ok) {
     ESP_LOGE(TAG, "Failed to encode the state");
     return;
@@ -286,7 +277,6 @@ void Lane::notifyState(LaneState s) {
   notify_char.notify();
 }
 
-/// always success and
 void Lane::setCountLEDs(uint32_t count) {
   this->cfg.line_LEDs_num = count;
 }

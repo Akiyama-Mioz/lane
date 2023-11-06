@@ -1,19 +1,30 @@
 //
-// Created by Kurosu Chan on 2022/8/4.
+// Created by Kurosu Chan on 2023/10/27.
 //
-#include "inc/utils.h"
 
-std::string to_hex(const uint8_t *v, const size_t s) {
-  std::stringstream ss;
-  ss << std::hex << std::setfill('0');
-  for (int i = 0; i < s; i++) {
-    ss << std::hex << std::setw(2) << static_cast<int>(v[i]);
+#include "utils.h"
+
+namespace utils {
+
+size_t sprintHex(char *out, size_t outSize, const uint8_t *bytes, size_t size) {
+  size_t i = 0;
+  // 2 hex chars
+  if (outSize < (size * 2)) {
+    return 0;
   }
-  return ss.str();
-}
-std::string to_hex(const char *s, size_t len){
-  return to_hex(reinterpret_cast<const uint8_t *>(s), len);
+  while (i < (size * 2)) {
+    // consider endianness
+    uint8_t byte   = bytes[i / 2];
+    uint8_t nibble = (i % 2 == 0) ? (byte >> 4) : (byte & 0x0F);
+    out[i++]       = (nibble < 10) ? ('0' + nibble) : ('a' + nibble - 10);
+  }
+  return i;
 };
-std::string to_hex(const std::basic_string<char> &s) {
-  return to_hex(reinterpret_cast<const uint8_t *>(s.c_str()), s.size());
+
+std::string toHex(const uint8_t *bytes, size_t size) {
+  auto sizeNeeded = size * 2;
+  auto res        = std::string(sizeNeeded, '\0');
+  auto _len       = sprintHex(const_cast<char *>(res.data()), sizeNeeded, bytes, size);
+  return res;
+}
 }

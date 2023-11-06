@@ -4,23 +4,19 @@
 #ifndef HELLO_WORLD_UTILS_H
 #define HELLO_WORLD_UTILS_H
 
-#include <c++/8.4.0/chrono>
-#include <c++/8.4.0/algorithm>
-#include <c++/8.4.0/sstream>
-#include <c++/8.4.0/iostream>
-#include <c++/8.4.0/iomanip>
-#include <c++/8.4.0/vector>
+#include <chrono>
+#include <algorithm>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
+#include <vector>
 #include "pb_encode.h"
-#include <c++/8.4.0/map>
+#include <map>
 #include <esp_timer.h>
 
 #if __cplusplus >= 202002L
 #include <concepts>
 #endif
-
-std::string to_hex(const std::basic_string<char> &s);
-std::string to_hex(const char *s, size_t len);
-std::string to_hex(const uint8_t *s, size_t len);
 
 /**
  * @brief a function retrieve value by the number nearing the key. always move a unit up.
@@ -167,6 +163,21 @@ public:
 };
 
 namespace utils {
+
+/**
+ * @brief put hex string to out
+ * @param out the output buffer
+ * @param outSize the size of output buffer, will NOT include the null terminator
+ * @param bytes the input bytes
+ * @param size the size of input bytes
+ * @return the length of output string
+ * @note length of output string will not include the null terminator
+ *       and the user should add it manually to the buffer, if null terminator is needed
+ */
+size_t sprintHex(char *out, size_t outSize, const uint8_t *bytes, size_t size);
+
+std::string toHex(const uint8_t *bytes, size_t size);
+
 #if __cplusplus >= 202002L
 template <typename T>
 concept is_intmax_t = std::is_same_v<T, decltype(std::ratio<1>::num) &>;

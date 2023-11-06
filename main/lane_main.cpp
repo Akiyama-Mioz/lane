@@ -12,13 +12,40 @@
 #include "common.h"
 #include "inc/ScanCallback.h"
 #include <RadioLib.h>
+#include <mutex>
 #include "EspHal.h"
 
 void *rf_receive_data = nullptr;
 struct rf_receive_data_t {
   EventGroupHandle_t evt_grp = nullptr;
 };
-constexpr auto RecvBit = BIT0;
+
+constexpr auto RecvEvt = BIT0;
+
+/**
+ * @brief try to transmit the data
+ * @note would block until the transmission is done and will start receiving after that
+ */
+void try_transmit(uint8_t *data, size_t size,
+                  SemaphoreHandle_t lk, TickType_t timeout_tick,
+                  LLCC68 &rf) {
+  const auto TAG = "try_transmit";
+  if (xSemaphoreTake(lk, timeout_tick) != pdTRUE) {
+    ESP_LOGE(TAG, "failed to take rf_lock; no transmission happens;");
+    return;
+  }
+  auto err = rf.transmit(data, size);
+  if (err == RADIOLIB_ERR_NONE) {
+    // ok
+  } else if (err == RADIOLIB_ERR_TX_TIMEOUT) {
+    ESP_LOGW(TAG, "tx timeout; please check the busy pin;");
+  } else {
+    ESP_LOGE(TAG, "failed to transmit, code %d", err);
+  }
+  rf.standby();
+  rf.startReceive();
+  xSemaphoreGive(lk);
+}
 
 using namespace common;
 using namespace lane;
@@ -57,30 +84,37 @@ void app_main() {
 
   Preferences pref;
   pref.begin(PREF_RECORD_NAME, true);
-  auto line_length        = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
-  auto active_length      = pref.getFloat(PREF_ACTIVE_LENGTH_NAME, DEFAULT_ACTIVE_LENGTH.count());
-  auto line_LEDs_num      = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
-  auto total_length       = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
-  auto color              = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
-  auto default_cfg = lane::LaneConfig{
-      .color         = color,
-      .line_length   = lane::meter(line_length),
-      .active_length = lane::meter(active_length),
-      .total_length  = lane::meter(total_length),
-      .line_LEDs_num = line_LEDs_num,
-      .fps           = DEFAULT_FPS,
+  auto line_length   = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
+  auto active_length = pref.getFloat(PREF_ACTIVE_LENGTH_NAME, DEFAULT_ACTIVE_LENGTH.count());
+  auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
+  auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
+  auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
+  auto default_cfg   = lane::LaneConfig{
+        .color         = color,
+        .line_length   = lane::meter(line_length),
+        .active_length = lane::meter(active_length),
+        .total_length  = lane::meter(total_length),
+        .line_LEDs_num = line_LEDs_num,
+        .fps           = DEFAULT_FPS,
   };
   pref.end();
 
   static auto hal    = EspHal(pin::SCK, pin::MISO, pin::MOSI);
   static auto module = Module(&hal, pin::NSS, pin::DIO1, pin::LoRa_RST, pin::BUSY);
-  static auto rf     = LLCC68(&module);
-  auto st            = rf.begin(434, 500.0, 7, 7,
-                                RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 8, 1.6);
+  auto *rf_lock      = xSemaphoreCreateMutex();
+  if (rf_lock == nullptr) {
+    ESP_LOGE("rf", "failed to create rf_lock");
+    esp_restart();
+  }
+  static auto rf = LLCC68(&module);
+  auto st        = rf.begin(434, 500.0, 7, 7,
+                            RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 8, 1.6);
   if (st != RADIOLIB_ERR_NONE) {
     ESP_LOGE("rf", "failed, code %d", st);
     esp_restart();
   }
+
+  /********* recv interrupt initialization *********/
   auto evt_grp    = xEventGroupCreate();
   auto *data      = new rf_receive_data_t{.evt_grp = evt_grp};
   rf_receive_data = data;
@@ -90,15 +124,63 @@ void app_main() {
     if (data->evt_grp != nullptr) {
       // https://github.com/espressif/esp-idf/issues/5897
       // https://github.com/espressif/esp-idf/pull/6692
-      xEventGroupSetBits(data->evt_grp, RecvBit);
+      xEventGroupSetBits(data->evt_grp, RecvEvt);
     }
   });
-  ESP_LOGI("rf", "RF init success!");
+  /********* end of recv interrupt initialization *********/
 
-  NimBLEDevice::init(BLE_NAME);
-  auto &server = *NimBLEDevice::createServer();
-  server.setCallbacks(new ServerCallbacks());
+  /********* recv task initialization            *********/
+  auto recv_task = [evt_grp, rf_lock](LLCC68 &rf) {
+    const auto TAG = "recv";
+    for (;;) {
+      xEventGroupWaitBits(evt_grp, RecvEvt, pdTRUE, pdFALSE, portMAX_DELAY);
+      uint8_t data[255];
+      // https://www.freertos.org/a00122.html
+      if (xSemaphoreTake(rf_lock, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "failed to take rf_lock");
+        abort();
+      }
+      size_t size = rf.receive(data, sizeof(data));
+      xSemaphoreGive(rf_lock);
+      if (size == 0) {
+        ESP_LOGW(TAG, "empty data");
+      }
+      ESP_LOGI(TAG, "recv=%s", utils::toHex(data, size).c_str());
+      // handle_message(data, size, handle_message_callbacks);
+    }
+  };
 
+  struct recv_task_param_t {
+    std::function<void(LLCC68 &)> task;
+    LLCC68 *rf;
+    TaskHandle_t handle;
+    EventGroupHandle_t evt_grp;
+  };
+
+  /**
+   * a helper function to run a function on a new FreeRTOS task
+   */
+  auto run_recv_task = [](void *pvParameter) {
+    auto param = reinterpret_cast<recv_task_param_t *>(pvParameter);
+    [[unlikely]] if (param->task != nullptr && param->rf != nullptr) {
+      param->task(*param->rf);
+    } else {
+      ESP_LOGW("recv task", "bad precondition");
+    }
+    auto handle = param->handle;
+    delete param;
+    vTaskDelete(handle);
+  };
+  static auto recv_param = recv_task_param_t{recv_task, &rf, nullptr, evt_grp};
+  xTaskCreate(run_recv_task,
+              "recv", 4096,
+              &recv_param, 1,
+              &recv_param.handle);
+  /********** end of recv task initialization **********/
+
+  ESP_LOGI(TAG, "LoRa RF initiated");
+
+  /********* lane initialization *********/
   auto lane_task = [](void *param) {
     auto &lane = *static_cast<Lane *>(param);
     lane.loop();
@@ -107,12 +189,18 @@ void app_main() {
   auto &lane = Lane::get();
   lane.setStrip(std::make_unique<decltype(s)>(std::move(s)));
   auto lane_ble = LaneBLE{};
+  /********* end of lane initialization *********/
+
+  /********* BLE initialization *********/
+  NimBLEDevice::init(BLE_NAME);
+  auto &server = *NimBLEDevice::createServer();
+  server.setCallbacks(new ServerCallbacks());
+
   initBLE(&server, lane_ble, lane);
   lane.setBLE(lane_ble);
   lane.setConfig(default_cfg);
   ESP_ERROR_CHECK(lane.begin());
 
-  /************** HR char initialization ****************/
   auto &hr_service = *server.createService(BLE_CHAR_HR_SERVICE_UUID);
   auto &hr_char    = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,
                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
@@ -126,7 +214,7 @@ void app_main() {
   // https://lang-ship.com/reference/unofficial/M5StickC/Functions/freertos/task/
   xTaskCreatePinnedToCore(lane_task,
                           "lane", 5120,
-                          &lane, configMAX_PRIORITIES - 3,
+                          &lane, configMAX_PRIORITIES - 4,
                           nullptr, 1);
 
   server.start();
