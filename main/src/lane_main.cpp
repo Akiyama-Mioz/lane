@@ -29,7 +29,7 @@ constexpr auto MAX_DEVICE_COUNT        = 16;
 using repeater_t                       = HrLoRa::repeater_status::t;
 using device_name_map_t                = etl::flat_map<int, repeater_t, MAX_DEVICE_COUNT>;
 
-struct handle_message_callbacks {
+struct handle_message_callbacks_t {
   std::function<std::optional<std::string>(int)> get_name_by_key;
   /// note that it's the connected device's addr instead of the reapeter's addr
   std::function<std::optional<HrLoRa::addr_t>(int)> get_device_addr_by_key;
@@ -37,7 +37,7 @@ struct handle_message_callbacks {
   std::function<void(std::string name, int hr)> on_hr_data;
 };
 
-void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks &callbacks) {
+void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_t &callbacks) {
   bool callback_ok = callbacks.get_name_by_key != nullptr &&
                      callbacks.get_device_addr_by_key != nullptr &&
                      callbacks.update_device != nullptr &&
@@ -272,6 +272,7 @@ void app_main() {
   });
   /********* end of recv interrupt initialization *********/
 
+  /********* status requester **********/
   static auto device_map        = device_name_map_t{};
   static auto status_requester  = StatusRequester{};
   status_requester.is_map_empty = []() {
@@ -292,6 +293,7 @@ void app_main() {
   status_requester.send_status_request = send_status_request;
 
   /********* recv task initialization            *********/
+  static handle_message_callbacks_t handle_message_callbacks{};
   auto recv_task = [evt_grp, rf_lock](LLCC68 &rf) {
     const auto TAG = "recv";
     for (;;) {
@@ -302,14 +304,17 @@ void app_main() {
         ESP_LOGE(TAG, "failed to take rf_lock");
         abort();
       }
-      size_t size = rf.receive(data, sizeof(data));
+      auto length = rf.getPacketLength(true);
+      auto size = rf.readData(data, length);
       xSemaphoreGive(rf_lock);
       if (size == 0) {
         ESP_LOGW(TAG, "empty data");
+        continue;
+      } else {
+        ESP_LOGI(TAG, "data=%s(%d)", utils::toHex(data, size).c_str(), size);
       }
-      ESP_LOGI(TAG, "recv=%s", utils::toHex(data, size).c_str());
       // TODO: handle message stuff
-      // handle_message(data, size, handle_message_callbacks);
+       handle_message(data, size, handle_message_callbacks);
     }
   };
 
@@ -368,6 +373,33 @@ void app_main() {
   auto &hr_char    = *hr_service.createCharacteristic(BLE_CHAR_HEARTBEAT_UUID,
                                                       NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   hr_service.start();
+
+  handle_message_callbacks = handle_message_callbacks_t{
+      .get_name_by_key = [](int key) -> std::optional<std::string> {
+        auto it = device_map.find(key);
+        if (it == device_map.end()) {
+          return std::nullopt;
+        } else {
+          return it->second.device->name;
+        }
+      },
+      .get_device_addr_by_key = [](int key) -> std::optional<HrLoRa::addr_t> {
+        auto it = device_map.find(key);
+        if (it == device_map.end()) {
+          return std::nullopt;
+        } else {
+          return it->second.device->addr;
+        }
+      },
+      .update_device = [](repeater_t repeater) {
+        auto it = device_map.find(repeater.key);
+        if (it == device_map.end()) {
+          device_map.insert({repeater.key, repeater});
+        } else {
+          it->second = repeater;
+        } },
+      .on_hr_data    = [hr_char](std::string name, int hr) { ESP_LOGI("recv", "hr: %d, name: %s", hr, name.c_str()); },
+  };
 
   auto &ad = *NimBLEDevice::getAdvertising();
   ad.setName(BLE_NAME);
