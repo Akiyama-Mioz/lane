@@ -26,10 +26,12 @@ constexpr auto RecvEvt = BIT0;
 
 constexpr auto MAX_DEVICE_COUNT = 16;
 using repeater_t                = HrLoRa::repeater_status::t;
-using device_name_map_t         = etl::vector<repeater_t, MAX_DEVICE_COUNT>;
+using device_name_map_t         = etl::flat_map<int, repeater_t, MAX_DEVICE_COUNT>;
 
 struct handle_message_callbacks {
   std::function<std::optional<std::string>(int)> get_name_by_key;
+  /// note that it's the connected device's addr instead of the reapeter's addr
+  std::function<std::optional<HrLoRa::addr_t>(int)> get_device_addr_by_key;
   std::function<void(repeater_t)> update_device;
   std::function<void(std::string name, int hr)> on_hr_data;
 };
@@ -51,8 +53,18 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks 
     }
     case HrLoRa::named_hr_data::magic: {
       auto p_hr_data = HrLoRa::named_hr_data::unmarshal(pdata, size);
-      // TODO: check if the name is the same in the `device_name_map`
       if (p_hr_data) {
+        auto p_addr = callbacks.get_device_addr_by_key(p_hr_data->key);
+        if (!p_addr) {
+          ESP_LOGW("recv", "no addr for key %d", p_hr_data->key);
+          return;
+        }
+        if (std::equal(p_addr->begin(), p_addr->end(), p_hr_data->addr.begin())) {
+          ESP_LOGW("recv", "addr mismatch %s and %s",
+                   utils::toHex(p_addr->data(), p_addr->size()).c_str(),
+                   utils::toHex(p_hr_data->addr.data(), p_hr_data->addr.size()).c_str());
+          return;
+        }
         auto p_name = callbacks.get_name_by_key(p_hr_data->key);
         if (!p_name) {
           ESP_LOGW("recv", "no name for key %d", p_hr_data->key);
