@@ -143,6 +143,7 @@ void Lane::loop() {
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
+    // TODO: use xTimerCreateStatic to avoid heap allocation repeatedly
     auto delete_timer = [this]() {
       if (this->timer_handle != nullptr) {
         xTimerStop(this->timer_handle, portMAX_DELAY);
