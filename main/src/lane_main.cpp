@@ -306,9 +306,28 @@ void app_main() {
       }
       auto length = rf.getPacketLength(true);
       auto size = rf.readData(data, length);
+      std::string irq_status_str;
+      auto status = rf.getIrqStatus();
+      if (status & RADIOLIB_SX126X_IRQ_TIMEOUT) {
+        irq_status_str += "t";
+      }
+      if (status & RADIOLIB_SX126X_IRQ_RX_DONE) {
+        irq_status_str += "r";
+      }
+      if (status & RADIOLIB_SX126X_IRQ_CRC_ERR) {
+        irq_status_str += "c";
+      }
+      if (status & RADIOLIB_SX126X_IRQ_HEADER_ERR) {
+        irq_status_str += "h";
+      }
+      if (status & RADIOLIB_SX126X_IRQ_TX_DONE) {
+        irq_status_str += "x";
+      }
+      if (!irq_status_str.empty()) {
+        ESP_LOGI(TAG, "flag=%s", irq_status_str.c_str());
+      }
       xSemaphoreGive(rf_lock);
       if (size == 0) {
-        ESP_LOGW(TAG, "empty data");
         continue;
       } else {
         ESP_LOGI(TAG, "data=%s(%d)", utils::toHex(data, size).c_str(), size);
