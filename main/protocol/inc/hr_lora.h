@@ -14,9 +14,11 @@
 #include "hr_data.tpp"
 #include "query_device_by_mac.tpp"
 #include "set_name_map_key.tpp"
+#include "named_hr_data.tpp"
 
 namespace HrLoRa::hr_lora_msg {
 using t = std::variant<
+    named_hr_data::t,
     hr_data::t,
     query_device_by_mac::t,
     query_device_by_mac_response::t,
@@ -37,6 +39,9 @@ overloaded(Ts...) -> overloaded<Ts...>;
 
 size_t marshal(t &data, uint8_t *buffer, size_t size) {
   return std::visit(overloaded{
+                        [buffer, size](named_hr_data::t &data) {
+                          return named_hr_data::marshal(data, buffer, size);
+                        },
                         [buffer, size](hr_data::t &data) {
                           return hr_data::marshal(data, buffer, size);
                         },
@@ -76,6 +81,9 @@ etl::optional<t> unmarshal(const uint8_t *buffer, size_t size) {
   }
   auto magic = buffer[0];
   switch (magic) {
+    case named_hr_data::magic: {
+      return unmarshal_helper<named_hr_data>(buffer, size);
+    }
     case hr_data::magic: {
       return unmarshal_helper<hr_data>(buffer, size);
     }

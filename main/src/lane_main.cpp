@@ -7,12 +7,14 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "Lane.h"
+#include <etl/map.h>
 #include "whitelist.h"
 #include <memory.h>
 #include "common.h"
 #include "ScanCallback.h"
 #include "src/RadioLib.h"
 #include <mutex>
+#include "hr_lora.h"
 #include "EspHal.h"
 
 void *rf_receive_data = nullptr;
@@ -21,6 +23,44 @@ struct rf_receive_data_t {
 };
 
 constexpr auto RecvEvt = BIT0;
+
+constexpr auto MAX_DEVICE_COUNT = 16;
+using device_name_map_t         = etl::map<int, std::string, MAX_DEVICE_COUNT>;
+
+struct handle_message_callbacks {
+  std::function<std::optional<std::string>(int)> get_device;
+  std::function<void(etl::pair<int, std::string>)> set_device;
+};
+
+void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks &callbacks) {
+  auto magic = pdata[0];
+  switch (magic) {
+    case HrLoRa::hr_data::magic: {
+      auto p_hr_data = HrLoRa::hr_data::unmarshal(pdata, size);
+      if (p_hr_data) {
+        auto p_name = callbacks.get_device(p_hr_data->key);
+        if (!p_name) {
+          return;
+        }
+      }
+      break;
+    }
+    case HrLoRa::query_device_by_mac_response::magic: {
+      auto p_response = HrLoRa::query_device_by_mac::unmarshal(pdata, size);
+      if (p_response){
+
+      }
+      break;
+    }
+    case HrLoRa::query_device_by_mac::magic:
+    case HrLoRa::set_name_map_key::magic: {
+      break;
+    }
+    default: {
+      ESP_LOGW("recv", "unknown magic: %d", magic);
+    }
+  }
+}
 
 /**
  * @brief try to transmit the data
