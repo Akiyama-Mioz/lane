@@ -37,6 +37,14 @@ struct handle_message_callbacks {
 };
 
 void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks &callbacks) {
+  bool callback_ok = callbacks.get_name_by_key != nullptr &&
+                     callbacks.get_device_addr_by_key != nullptr &&
+                     callbacks.update_device != nullptr &&
+                     callbacks.on_hr_data != nullptr;
+  if (!callback_ok) {
+    ESP_LOGE("recv", "bad callback");
+    return;
+  }
   auto magic = pdata[0];
   switch (magic) {
     case HrLoRa::hr_data::magic: {
@@ -75,6 +83,7 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks 
       break;
     }
     case HrLoRa::repeater_status::magic: {
+      // the strategy is to respect new data
       auto p_response = HrLoRa::repeater_status::unmarshal(pdata, size);
       if (p_response) {
         callbacks.update_device(p_response.value());
@@ -115,6 +124,58 @@ void try_transmit(uint8_t *data, size_t size,
   rf.startReceive();
   xSemaphoreGive(lk);
 }
+
+class StatusRequester {
+public:
+  static constexpr auto TAG                     = "StatusRequester";
+  static constexpr auto NORMAL_REQUEST_INTERVAL = std::chrono::seconds{10};
+  static constexpr auto FAST_REQUEST_INTERVAL   = std::chrono::seconds{3};
+  std::function<bool()> is_map_empty            = []() { return true; };
+  std::function<void()> send_status_request     = []() {};
+
+private:
+  TimerHandle_t status_request_timer         = nullptr;
+  std::chrono::seconds last_request_interval = FAST_REQUEST_INTERVAL;
+
+  [[nodiscard]] std::chrono::seconds get_target_request_interval() const {
+    if (is_map_empty()) {
+      return FAST_REQUEST_INTERVAL;
+    } else {
+      return NORMAL_REQUEST_INTERVAL;
+    }
+  }
+
+public:
+  void start() {
+    auto run_timer_task = [](TimerHandle_t timer) {
+      auto &self = *static_cast<StatusRequester *>(pvTimerGetTimerID(timer));
+      self.send_status_request();
+      auto target_interval = self.get_target_request_interval();
+      if (self.last_request_interval != target_interval) {
+        ESP_LOGI(TAG, "change request interval to %d second", target_interval.count());
+        const auto target_millis = std::chrono::duration_cast<std::chrono::milliseconds>(target_interval);
+        xTimerChangePeriod(timer, pdMS_TO_TICKS(target_millis.count()), portMAX_DELAY);
+        self.last_request_interval = target_interval;
+      }
+      // https://www.freertos.org/FreeRTOS-timers-xTimerReset.html
+      // https://greenwaves-technologies.com/manuals/BUILD/FREERTOS/html/timers_8h.html
+      // https://cloud.tencent.com/developer/article/1914701
+      xTimerReset(timer, portMAX_DELAY);
+    };
+
+    send_status_request();
+
+    assert(status_request_timer == nullptr);
+    const auto target_interval = get_target_request_interval();
+    const auto target_millis   = std::chrono::duration_cast<std::chrono::milliseconds>(target_interval);
+    status_request_timer       = xTimerCreate("reqt",
+                                              target_millis.count(),
+                                              pdFALSE,
+                                              this,
+                                              run_timer_task);
+    xTimerStart(status_request_timer, portMAX_DELAY);
+  }
+};
 
 using namespace common;
 using namespace lane;
