@@ -18,7 +18,8 @@ struct query_device_by_mac {
   static consteval size_t size_needed() {
     return BLE_ADDR_SIZE + 1;
   }
-  static constexpr uint8_t magic = 0x37;
+  static constexpr addr_t broadcast_addr = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  static constexpr uint8_t magic         = 0x37;
   static size_t marshal(const t &data, uint8_t *buffer, size_t size) {
     if (size < size_needed()) {
       return 0;

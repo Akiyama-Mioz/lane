@@ -24,9 +24,10 @@ struct rf_receive_data_t {
 
 constexpr auto RecvEvt = BIT0;
 
-constexpr auto MAX_DEVICE_COUNT = 16;
-using repeater_t                = HrLoRa::repeater_status::t;
-using device_name_map_t         = etl::flat_map<int, repeater_t, MAX_DEVICE_COUNT>;
+static const auto send_lk_timeout_tick = 100;
+constexpr auto MAX_DEVICE_COUNT        = 16;
+using repeater_t                       = HrLoRa::repeater_status::t;
+using device_name_map_t                = etl::flat_map<int, repeater_t, MAX_DEVICE_COUNT>;
 
 struct handle_message_callbacks {
   std::function<std::optional<std::string>(int)> get_name_by_key;
@@ -125,13 +126,22 @@ void try_transmit(uint8_t *data, size_t size,
   xSemaphoreGive(lk);
 }
 
+/**
+ * @brief send status request repeatedly
+ */
 class StatusRequester {
 public:
   static constexpr auto TAG                     = "StatusRequester";
   static constexpr auto NORMAL_REQUEST_INTERVAL = std::chrono::seconds{10};
   static constexpr auto FAST_REQUEST_INTERVAL   = std::chrono::seconds{3};
-  std::function<bool()> is_map_empty            = []() { return true; };
-  std::function<void()> send_status_request     = []() {};
+  /**
+   * @brief the callback to check if the device map is empty
+   */
+  std::function<bool()> is_map_empty = []() { return true; };
+  /**
+   * @brief the callback to send the status request
+   */
+  std::function<void()> send_status_request = []() {};
 
 private:
   TimerHandle_t status_request_timer         = nullptr;
@@ -254,10 +264,32 @@ void app_main() {
     if (data->evt_grp != nullptr) {
       // https://github.com/espressif/esp-idf/issues/5897
       // https://github.com/espressif/esp-idf/pull/6692
-      xEventGroupSetBits(data->evt_grp, RecvEvt);
+      auto xResult = xEventGroupSetBitsFromISR(data->evt_grp, RecvEvt, &task_woken);
+      if (xResult != pdFAIL) {
+        portYIELD_FROM_ISR(task_woken);
+      }
     }
   });
   /********* end of recv interrupt initialization *********/
+
+  static auto device_map        = device_name_map_t{};
+  static auto status_requester  = StatusRequester{};
+  status_requester.is_map_empty = []() {
+    return device_map.empty();
+  };
+  auto send_status_request = [rf_lock]() {
+    const auto req = HrLoRa::query_device_by_mac::t{
+        .addr = HrLoRa::query_device_by_mac::broadcast_addr};
+
+    uint8_t buf[16];
+    auto sz = HrLoRa::query_device_by_mac::marshal(req, buf, sizeof(buf));
+    if (sz == 0) {
+      ESP_LOGE("send status request", "failed to marshal");
+      return;
+    }
+    try_transmit(buf, sz, rf_lock, send_lk_timeout_tick, rf);
+  };
+  status_requester.send_status_request = send_status_request;
 
   /********* recv task initialization            *********/
   auto recv_task = [evt_grp, rf_lock](LLCC68 &rf) {
