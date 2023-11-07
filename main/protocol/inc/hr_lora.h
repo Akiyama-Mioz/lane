@@ -15,13 +15,14 @@
 #include "query_device_by_mac.tpp"
 #include "set_name_map_key.tpp"
 #include "named_hr_data.tpp"
+#include "repeater_status.tpp"
 
 namespace HrLoRa::hr_lora_msg {
 using t = std::variant<
     named_hr_data::t,
     hr_data::t,
     query_device_by_mac::t,
-    query_device_by_mac_response::t,
+    repeater_status::t,
     set_name_map_key::t>;
 
 // https://en.cppreference.com/w/cpp/utility/variant/visit
@@ -48,8 +49,8 @@ size_t marshal(t &data, uint8_t *buffer, size_t size) {
                         [buffer, size](query_device_by_mac::t &data) {
                           return query_device_by_mac::marshal(data, buffer, size);
                         },
-                        [buffer, size](query_device_by_mac_response::t &data) {
-                          return query_device_by_mac_response::marshal(data, buffer, size);
+                        [buffer, size](repeater_status::t &data) {
+                          return repeater_status::marshal(data, buffer, size);
                         },
                         [buffer, size](set_name_map_key::t &data) {
                           return set_name_map_key::marshal(data, buffer, size);
@@ -90,8 +91,8 @@ etl::optional<t> unmarshal(const uint8_t *buffer, size_t size) {
     case query_device_by_mac::magic: {
       return unmarshal_helper<query_device_by_mac>(buffer, size);
     }
-    case query_device_by_mac_response::magic: {
-      return unmarshal_helper<query_device_by_mac_response>(buffer, size);
+    case repeater_status::magic: {
+      return unmarshal_helper<repeater_status>(buffer, size);
     }
     case set_name_map_key::magic: {
       return unmarshal_helper<set_name_map_key>(buffer, size);

@@ -12,27 +12,26 @@ struct named_hr_data {
     using module = named_hr_data;
     uint8_t key  = 0;
     uint8_t hr   = 0;
-    std::string name{};
+    addr_t addr{};
   };
-  static size_t size_needed(const t &data) {
+  consteval static size_t size_needed() {
     // key + hr + magic
-    return sizeof(magic) + sizeof(t::key) + sizeof(t::hr) + data.name.size() + 1;
+    return sizeof(magic) + sizeof(t::key) + sizeof(t::hr) + BLE_ADDR_SIZE;
   }
   static size_t marshal(const t &data, uint8_t *buffer, size_t buffer_size) {
-    if (buffer_size < size_needed(data)) {
+    if (buffer_size < size_needed()) {
       return 0;
     }
     size_t offset    = 0;
     buffer[offset++] = magic;
     buffer[offset++] = data.key;
     buffer[offset++] = data.hr;
-    std::copy(data.name.begin(), data.name.end(), buffer + 3);
-    offset += data.name.size();
-    buffer[offset++] = 0;
+    std::copy(data.addr.begin(), data.addr.end(), buffer + offset);
+    offset += BLE_ADDR_SIZE;
     return offset;
   }
   static etl::optional<t> unmarshal(const uint8_t *buffer, size_t size) {
-    if (size < size_needed(t{})) {
+    if (size < size_needed()) {
       return etl::nullopt;
     }
 
@@ -41,9 +40,10 @@ struct named_hr_data {
       return etl::nullopt;
     }
 
-    data.key  = buffer[1];
-    data.hr   = buffer[2];
-    data.name = std::string(reinterpret_cast<const char *>(buffer + 3));
+    data.key = buffer[1];
+    data.hr  = buffer[2];
+    std::copy(buffer + 3, buffer + 3 + BLE_ADDR_SIZE, data.addr.begin());
+
     return data;
   }
 };

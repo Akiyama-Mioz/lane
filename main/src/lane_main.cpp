@@ -25,11 +25,13 @@ struct rf_receive_data_t {
 constexpr auto RecvEvt = BIT0;
 
 constexpr auto MAX_DEVICE_COUNT = 16;
-using device_name_map_t         = etl::map<int, std::string, MAX_DEVICE_COUNT>;
+using repeater_t                = HrLoRa::repeater_status::t;
+using device_name_map_t         = etl::vector<repeater_t, MAX_DEVICE_COUNT>;
 
 struct handle_message_callbacks {
-  std::function<std::optional<std::string>(int)> get_device;
-  std::function<void(etl::pair<int, std::string>)> set_device;
+  std::function<std::optional<std::string>(int)> get_name_by_key;
+  std::function<void(repeater_t)> update_device;
+  std::function<void(std::string name, int hr)> on_hr_data;
 };
 
 void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks &callbacks) {
@@ -38,17 +40,32 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks 
     case HrLoRa::hr_data::magic: {
       auto p_hr_data = HrLoRa::hr_data::unmarshal(pdata, size);
       if (p_hr_data) {
-        auto p_name = callbacks.get_device(p_hr_data->key);
+        auto p_name = callbacks.get_name_by_key(p_hr_data->key);
         if (!p_name) {
+          ESP_LOGW("recv", "no name for key %d", p_hr_data->key);
           return;
         }
+        callbacks.on_hr_data(p_name.value(), p_hr_data->hr);
       }
       break;
     }
-    case HrLoRa::query_device_by_mac_response::magic: {
-      auto p_response = HrLoRa::query_device_by_mac::unmarshal(pdata, size);
-      if (p_response){
-
+    case HrLoRa::named_hr_data::magic: {
+      auto p_hr_data = HrLoRa::named_hr_data::unmarshal(pdata, size);
+      // TODO: check if the name is the same in the `device_name_map`
+      if (p_hr_data) {
+        auto p_name = callbacks.get_name_by_key(p_hr_data->key);
+        if (!p_name) {
+          ESP_LOGW("recv", "no name for key %d", p_hr_data->key);
+          return;
+        }
+        callbacks.on_hr_data(p_name.value(), p_hr_data->hr);
+      }
+      break;
+    }
+    case HrLoRa::repeater_status::magic: {
+      auto p_response = HrLoRa::repeater_status::unmarshal(pdata, size);
+      if (p_response) {
+        callbacks.update_device(p_response.value());
       }
       break;
     }
@@ -147,7 +164,7 @@ void app_main() {
     esp_restart();
   }
   static auto rf = LLCC68(&module);
-  auto st        = rf.begin(434, 500.0, 7, 7,
+  auto st        = rf.begin(433.2, 500.0, 10, 7,
                             RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 8, 1.6);
   if (st != RADIOLIB_ERR_NONE) {
     ESP_LOGE("rf", "failed, code %d", st);
