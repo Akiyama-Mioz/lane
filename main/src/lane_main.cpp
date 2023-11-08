@@ -160,6 +160,49 @@ void try_transmit(uint8_t *data, size_t size,
   xSemaphoreGive(lk);
 }
 
+size_t try_receive(uint8_t *buf, size_t max_size,
+                   SemaphoreHandle_t lk, TickType_t timeout_tick,
+                   LLCC68 &rf) {
+  const auto TAG = "try_receive";
+  // https://www.freertos.org/a00122.html
+  if (xSemaphoreTake(lk, timeout_tick) != pdTRUE) {
+    ESP_LOGE(TAG, "failed to take rf_lock");
+    return 0;
+  }
+  auto length = rf.getPacketLength(true);
+  if (length > max_size) {
+    ESP_LOGE(TAG, "packet length %d > %d max buffer size", length, max_size);
+    return 0;
+  }
+  auto err = rf.readData(buf, length);
+  std::string irq_status_str;
+  auto status = rf.getIrqStatus();
+  if (status & RADIOLIB_SX126X_IRQ_TIMEOUT) {
+    irq_status_str += "t";
+  }
+  if (status & RADIOLIB_SX126X_IRQ_RX_DONE) {
+    irq_status_str += "r";
+  }
+  if (status & RADIOLIB_SX126X_IRQ_CRC_ERR) {
+    irq_status_str += "c";
+  }
+  if (status & RADIOLIB_SX126X_IRQ_HEADER_ERR) {
+    irq_status_str += "h";
+  }
+  if (status & RADIOLIB_SX126X_IRQ_TX_DONE) {
+    irq_status_str += "x";
+  }
+  if (!irq_status_str.empty()) {
+    ESP_LOGI(TAG, "flag=%s", irq_status_str.c_str());
+  }
+  if (err != RADIOLIB_ERR_NONE) {
+    ESP_LOGE(TAG, "failed to read data, code %d", err);
+    return 0;
+  }
+  xSemaphoreGive(lk);
+  return length;
+}
+
 /**
  * @brief send status request repeatedly
  */
@@ -290,14 +333,11 @@ void app_main() {
 
   /********* recv interrupt initialization *********/
   auto evt_grp    = xEventGroupCreate();
-  auto *data      = new rf_receive_data_t{.evt_grp = evt_grp};
-  rf_receive_data = data;
+  rf_receive_data = new rf_receive_data_t{.evt_grp = evt_grp};
   rf.setPacketReceivedAction([]() {
     auto *data            = static_cast<rf_receive_data_t *>(rf_receive_data);
     BaseType_t task_woken = pdFALSE;
     if (data->evt_grp != nullptr) {
-      // https://github.com/espressif/esp-idf/issues/5897
-      // https://github.com/espressif/esp-idf/pull/6692
       auto xResult = xEventGroupSetBitsFromISR(data->evt_grp, RecvEvt, &task_woken);
       if (xResult != pdFAIL) {
         portYIELD_FROM_ISR(task_woken);
@@ -333,34 +373,7 @@ void app_main() {
     for (;;) {
       xEventGroupWaitBits(evt_grp, RecvEvt, pdTRUE, pdFALSE, portMAX_DELAY);
       uint8_t data[255];
-      // https://www.freertos.org/a00122.html
-      if (xSemaphoreTake(rf_lock, portMAX_DELAY) != pdTRUE) {
-        ESP_LOGE(TAG, "failed to take rf_lock");
-        abort();
-      }
-      auto length = rf.getPacketLength(true);
-      auto size   = rf.readData(data, length);
-      std::string irq_status_str;
-      auto status = rf.getIrqStatus();
-      if (status & RADIOLIB_SX126X_IRQ_TIMEOUT) {
-        irq_status_str += "t";
-      }
-      if (status & RADIOLIB_SX126X_IRQ_RX_DONE) {
-        irq_status_str += "r";
-      }
-      if (status & RADIOLIB_SX126X_IRQ_CRC_ERR) {
-        irq_status_str += "c";
-      }
-      if (status & RADIOLIB_SX126X_IRQ_HEADER_ERR) {
-        irq_status_str += "h";
-      }
-      if (status & RADIOLIB_SX126X_IRQ_TX_DONE) {
-        irq_status_str += "x";
-      }
-      if (!irq_status_str.empty()) {
-        ESP_LOGI(TAG, "flag=%s", irq_status_str.c_str());
-      }
-      xSemaphoreGive(rf_lock);
+      auto size = try_receive(data, sizeof(data), rf_lock, portMAX_DELAY, rf);
       if (size == 0) {
         continue;
       } else {
@@ -512,6 +525,8 @@ void app_main() {
   auto &ad = *NimBLEDevice::getAdvertising();
   ad.setName(BLE_NAME);
   ad.setScanResponse(false);
+
+  status_requester.start();
 
   // intend to give it higher priority
   xTaskCreatePinnedToCore(lane_task,
