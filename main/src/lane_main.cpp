@@ -32,9 +32,7 @@ using repeater_t                       = HrLoRa::repeater_status::t;
 using device_name_map_t                = etl::flat_map<int, repeater_t, MAX_DEVICE_COUNT>;
 
 struct handle_message_callbacks_t {
-  std::function<std::optional<std::string>(int)> get_name_by_key;
-  /// note that it's the connected device's addr instead of the reapeter's addr
-  std::function<std::optional<HrLoRa::addr_t>(int)> get_device_addr_by_key;
+  std::function<std::optional<HrLoRa::hr_device::t>(int)> get_device_by_key;
   /// return true if the device is updated successfully, otherwise a key change is requested
   std::function<bool(repeater_t)> update_device;
   std::function<void(std::string name, int hr)> on_hr_data;
@@ -43,8 +41,7 @@ struct handle_message_callbacks_t {
 
 void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_t &callbacks) {
   static constexpr auto TAG = "handle_message";
-  bool callback_ok          = callbacks.get_name_by_key != nullptr &&
-                     callbacks.get_device_addr_by_key != nullptr &&
+  bool callback_ok          = callbacks.get_device_by_key != nullptr &&
                      callbacks.update_device != nullptr &&
                      callbacks.rf_send != nullptr &&
                      callbacks.on_hr_data != nullptr;
@@ -58,35 +55,36 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
     case HrLoRa::hr_data::magic: {
       auto p_hr_data = HrLoRa::hr_data::unmarshal(pdata, size);
       if (p_hr_data) {
-        auto p_name = callbacks.get_name_by_key(p_hr_data->key);
-        if (!p_name) {
+        auto p_dev = callbacks.get_device_by_key(p_hr_data->key);
+        if (!p_dev) {
           ESP_LOGW(TAG, "no name for key %d", p_hr_data->key);
           return;
         }
-        callbacks.on_hr_data(p_name.value(), p_hr_data->hr);
+        callbacks.on_hr_data(p_dev->name, p_hr_data->hr);
       }
       break;
     }
     case HrLoRa::named_hr_data::magic: {
       auto p_hr_data = HrLoRa::named_hr_data::unmarshal(pdata, size);
       if (p_hr_data) {
-        auto p_addr = callbacks.get_device_addr_by_key(p_hr_data->key);
-        if (!p_addr) {
+        auto p_dev = callbacks.get_device_by_key(p_hr_data->key);
+        if (!p_dev) {
           ESP_LOGW(TAG, "no addr for key %d", p_hr_data->key);
           return;
         }
-        if (!std::equal(p_addr->begin(), p_addr->end(), p_hr_data->addr.begin())) {
+        if (!std::equal(p_dev->addr.begin(), p_dev->addr.end(), p_hr_data->addr.begin())) {
           ESP_LOGW(TAG, "addr mismatch %s and %s",
-                   utils::toHex(p_addr->data(), p_addr->size()).c_str(),
+                   utils::toHex(p_dev->addr.data(), p_dev->addr.size()).c_str(),
                    utils::toHex(p_hr_data->addr.data(), p_hr_data->addr.size()).c_str());
           return;
         }
-        auto p_name = callbacks.get_name_by_key(p_hr_data->key);
-        if (!p_name) {
-          ESP_LOGW(TAG, "no name for key %d", p_hr_data->key);
-          return;
+        auto name = p_dev->name;
+        if (name.empty()) {
+          auto addr_str = utils::toHex(p_hr_data->addr.data(), p_hr_data->addr.size());
+          callbacks.on_hr_data(addr_str, p_hr_data->hr);
+        } else {
+          callbacks.on_hr_data(name, p_hr_data->hr);
         }
-        callbacks.on_hr_data(p_name.value(), p_hr_data->hr);
       }
       break;
     }
@@ -100,7 +98,7 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
           // TODO: Handle the case where all keys are in use and a new one cannot be generated
           constexpr auto limit = MAX_DEVICE_COUNT;
           auto counter         = 0;
-          while (callbacks.get_name_by_key(new_key).has_value()) {
+          while (callbacks.get_device_by_key(new_key).has_value()) {
             new_key = rng.range(0, 255);
             if (++counter > limit) {
               ESP_LOGE(TAG, "failed to generate a unique key");
@@ -443,20 +441,16 @@ void app_main() {
   hr_service.start();
 
   handle_message_callbacks = handle_message_callbacks_t{
-      .get_name_by_key = [](int key) -> std::optional<std::string> {
+      .get_device_by_key = [](int key) -> std::optional<HrLoRa::hr_device::t> {
         auto it = device_map.find(key);
         if (it == device_map.end()) {
           return std::nullopt;
         } else {
-          return it->second.device->name;
-        }
-      },
-      .get_device_addr_by_key = [](int key) -> std::optional<HrLoRa::addr_t> {
-        auto it = device_map.find(key);
-        if (it == device_map.end()) {
-          return std::nullopt;
-        } else {
-          return it->second.device->addr;
+          if (it->second.device.has_value()) {
+            return std::make_optional(it->second.device.value());
+          } else {
+            return std::nullopt;
+          }
         }
       },
       .update_device = [](repeater_t repeater) {
@@ -525,11 +519,9 @@ void app_main() {
         auto sz         = ble::hr_data::marshal(ble_hr_data, buf, sizeof(buf));
         if (sz == 0) {
           ESP_LOGE(TAG, "failed to marshal");
-          return true;
+          return;
         }
-        hr_char.setValue(buf, sz);
-        return true;
-      },
+        hr_char.setValue(buf, sz); },
       .rf_send       = [rf_lock](uint8_t *pdata, size_t size) { try_transmit(pdata, size, rf_lock, send_lk_timeout_tick, rf); },
   };
 
