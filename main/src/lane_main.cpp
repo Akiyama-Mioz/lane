@@ -17,6 +17,7 @@
 #include "hr_lora.h"
 #include "EspHal.h"
 #include "ble_hr_data.h"
+#include <etl/random.h>
 
 void *rf_receive_data = nullptr;
 struct rf_receive_data_t {
@@ -34,27 +35,32 @@ struct handle_message_callbacks_t {
   std::function<std::optional<std::string>(int)> get_name_by_key;
   /// note that it's the connected device's addr instead of the reapeter's addr
   std::function<std::optional<HrLoRa::addr_t>(int)> get_device_addr_by_key;
-  std::function<void(repeater_t)> update_device;
+  /// return true if the device is updated successfully, otherwise a key change is requested
+  std::function<bool(repeater_t)> update_device;
   std::function<void(std::string name, int hr)> on_hr_data;
+  std::function<void(uint8_t *data, size_t size)> rf_send;
 };
 
 void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_t &callbacks) {
-  bool callback_ok = callbacks.get_name_by_key != nullptr &&
+  static constexpr auto TAG = "handle_message";
+  bool callback_ok          = callbacks.get_name_by_key != nullptr &&
                      callbacks.get_device_addr_by_key != nullptr &&
                      callbacks.update_device != nullptr &&
+                     callbacks.rf_send != nullptr &&
                      callbacks.on_hr_data != nullptr;
   if (!callback_ok) {
-    ESP_LOGE("recv", "bad callback");
+    ESP_LOGE(TAG, "bad callback");
     return;
   }
-  auto magic = pdata[0];
+  static auto rng = etl::random_xorshift(esp_random());
+  auto magic      = pdata[0];
   switch (magic) {
     case HrLoRa::hr_data::magic: {
       auto p_hr_data = HrLoRa::hr_data::unmarshal(pdata, size);
       if (p_hr_data) {
         auto p_name = callbacks.get_name_by_key(p_hr_data->key);
         if (!p_name) {
-          ESP_LOGW("recv", "no name for key %d", p_hr_data->key);
+          ESP_LOGW(TAG, "no name for key %d", p_hr_data->key);
           return;
         }
         callbacks.on_hr_data(p_name.value(), p_hr_data->hr);
@@ -66,18 +72,18 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
       if (p_hr_data) {
         auto p_addr = callbacks.get_device_addr_by_key(p_hr_data->key);
         if (!p_addr) {
-          ESP_LOGW("recv", "no addr for key %d", p_hr_data->key);
+          ESP_LOGW(TAG, "no addr for key %d", p_hr_data->key);
           return;
         }
         if (std::equal(p_addr->begin(), p_addr->end(), p_hr_data->addr.begin())) {
-          ESP_LOGW("recv", "addr mismatch %s and %s",
+          ESP_LOGW(TAG, "addr mismatch %s and %s",
                    utils::toHex(p_addr->data(), p_addr->size()).c_str(),
                    utils::toHex(p_hr_data->addr.data(), p_hr_data->addr.size()).c_str());
           return;
         }
         auto p_name = callbacks.get_name_by_key(p_hr_data->key);
         if (!p_name) {
-          ESP_LOGW("recv", "no name for key %d", p_hr_data->key);
+          ESP_LOGW(TAG, "no name for key %d", p_hr_data->key);
           return;
         }
         callbacks.on_hr_data(p_name.value(), p_hr_data->hr);
@@ -85,10 +91,28 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
       break;
     }
     case HrLoRa::repeater_status::magic: {
-      // the strategy is to respect new data
       auto p_response = HrLoRa::repeater_status::unmarshal(pdata, size);
       if (p_response) {
-        callbacks.update_device(p_response.value());
+        bool ok = callbacks.update_device(*p_response);
+        if (!ok) {
+          // request a key change
+          auto new_key = static_cast<uint8_t>(rng.range(0, 255));
+          // TODO: Handle the case where all keys are in use and a new one cannot be generated
+          while (callbacks.get_name_by_key(new_key).has_value()) {
+            new_key = rng.range(0, 255);
+          }
+          const auto req = HrLoRa::set_name_map_key::t{
+              .addr = p_response->repeater_addr,
+              .key  = p_response->key,
+          };
+          uint8_t buf[16] = {0};
+          auto sz         = HrLoRa::set_name_map_key::marshal(req, buf, sizeof(buf));
+          if (sz == 0) {
+            ESP_LOGE("recv", "failed to marshal");
+            return;
+          }
+          callbacks.rf_send(buf, sz);
+        }
       }
       break;
     }
@@ -411,19 +435,55 @@ void app_main() {
           return it->second.device->addr;
         }
       },
+      // TODO: Handle the case where the device map is full and cannot accept new devices.
       .update_device = [](repeater_t repeater) {
-        auto it = device_map.find(repeater.key);
-        if (it == device_map.end()) {
-          device_map.insert({repeater.key, repeater});
+        auto repeater_addr = repeater.repeater_addr;
+        // use the repeater's addr as the key
+        auto addr_it = std::find_if(device_map.begin(), device_map.end(),
+                                    [&repeater_addr](const auto &pair) {
+                                      const auto [key, r] = pair;
+                                      return std::equal(r.repeater_addr.begin(),
+                                                        r.repeater_addr.end(),
+                                                        repeater_addr.begin());
+                                    });
+
+        if (addr_it == device_map.end()) {
+          // goto key_it since the repeater's addr is not in the map
         } else {
-          it->second = repeater;
+          // check if the key of the repeater is changed
+          if (repeater.key == addr_it->second.key) {
+            // same key, just update
+            addr_it->second = std::move(repeater);
+            return true;
+          } else {
+            // key mismatch, remove the old one
+            device_map.erase(addr_it);
+          }
+        }
+
+        auto key_it = device_map.find(repeater.key);
+        if (key_it == device_map.end()) {
+          // a key that is not in the map, just insert it
+          device_map.insert({repeater.key, std::move(repeater)});
+          return true;
+        } else {
+          // request a key change
+          return false;
         } },
-      .on_hr_data    = [hr_char](std::string name, int hr) {
+      .on_hr_data    = [&hr_char](std::string name, int hr) {
         ESP_LOGI("recv", "hr=%d, name=%s", hr, name.c_str());
         auto ble_hr_data = ble::hr_data::t{
-            .addr
+            .name = std::move(name),
+            .hr = static_cast<uint8_t>(hr)
         };
-      },
+        uint8_t buf[32] = {0};
+        auto sz         = ble::hr_data::marshal(ble_hr_data, buf, sizeof(buf));
+        if (sz == 0) {
+          ESP_LOGE("recv", "failed to marshal");
+          return;
+        }
+        hr_char.setValue(buf, sz); },
+      .rf_send       = [rf_lock](uint8_t *pdata, size_t size) { try_transmit(pdata, size, rf_lock, send_lk_timeout_tick, rf); },
   };
 
   auto &ad = *NimBLEDevice::getAdvertising();
