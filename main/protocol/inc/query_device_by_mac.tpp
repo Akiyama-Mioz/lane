@@ -15,7 +15,12 @@ struct query_device_by_mac {
     using module = query_device_by_mac;
     addr_t addr{};
   };
-  static consteval size_t size_needed() {
+#if __cpp_consteval >= 202002L
+  consteval
+#else
+  constexpr
+#endif
+  static size_t size_needed() {
     return BLE_ADDR_SIZE + 1;
   }
   static constexpr addr_t broadcast_addr = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};

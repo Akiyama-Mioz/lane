@@ -17,7 +17,13 @@ struct set_name_map_key {
     addr_t addr{};
     name_map_key_t key = 0;
   };
-  static consteval size_t size_needed() {
+
+#if __cpp_consteval >= 202002L
+  consteval
+#else
+  constexpr
+#endif
+  static size_t size_needed() {
     // addr + key + magic
     return BLE_ADDR_SIZE + sizeof(t::key) + sizeof(magic);
   }

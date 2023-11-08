@@ -124,7 +124,7 @@ void ScanCallback::handleHrWhiteListConnection(BLEAdvertisedDevice *advertisedDe
   auto l       = advertisedDevice->getPayloadLength();
   auto pHrChar = this->hr_char;
   ESP_LOGI(TAG, "Name: %s, Data: %s, RSSI: %d", name.c_str(),
-           to_hex(pp, l).c_str(),
+           utils::toHex(pp, l).c_str(),
            advertisedDevice->getRSSI());
   auto &device_map = this->devices;
   auto native_addr = advertisedDevice->getAddress().getNative();
@@ -258,7 +258,7 @@ void ScanCallback::handleHrAdvertised(BLEAdvertisedDevice *advertisedDevice) {
   auto pattern              = etl::search(payload.begin(), payload.end(), name.begin(), name.end());
   if (pattern != payload.end()) {
     auto msg = etl::span(pattern + name.size() + 2, payload.end());
-    ESP_LOGD(TAG, "(%s) %s", to_hex(msg.data(), msg.size()).c_str(), name.c_str());
+    ESP_LOGD(TAG, "(%s) %s", utils::toHex(msg.data(), msg.size()).c_str(), name.c_str());
     auto info = WatchInfo::from_bytes(msg.data(), msg.size());
     ESP_LOGI(TAG, "%s", to_string(info).c_str());
     auto pair = hr_pair_t{name, info.hr};
@@ -318,7 +318,7 @@ void ServerCallbacks::onMTUChange(uint16_t MTU, NimBLEConnInfo &connInfo) {
 }
 void HRClientCallbacks::onDisconnect(NimBLEClient *pClient, int reason) {
   const auto TAG = "HRClientCallbacks::onDisconnect";
-  ESP_LOGI(TAG, "Disconnected from %s", to_hex(addr.data(), addr.size()).c_str());
+  ESP_LOGI(TAG, "Disconnected from %s", utils::toHex(addr.data(), addr.size()).c_str());
   auto &addr = this->addr;
   auto pInfo = etl::find_if(devices->begin(), devices->end(), [&addr](const DeviceInfo &info) {
     return std::equal(addr.begin(), addr.end(), info.address.begin());
@@ -388,7 +388,7 @@ void WhiteListCallback::onWrite(NimBLECharacteristic *pCharacteristic, NimBLECon
           ESP_LOGI(TAG, "Name: %s", name.name.c_str());
         } else if (std::holds_alternative<white_list::Addr>(item)) {
           auto &addr = std::get<white_list::Addr>(item);
-          ESP_LOGI(TAG, "Addr: %s", to_hex(addr.addr.data(), addr.addr.size()).c_str());
+          ESP_LOGI(TAG, "Addr: %s", utils::toHex(addr.addr.data(), addr.addr.size()).c_str());
         };
       }
       if (setList != nullptr) {

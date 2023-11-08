@@ -172,6 +172,7 @@ size_t try_receive(uint8_t *buf, size_t max_size,
   auto length = rf.getPacketLength(true);
   if (length > max_size) {
     ESP_LOGE(TAG, "packet length %d > %d max buffer size", length, max_size);
+    xSemaphoreGive(lk);
     return 0;
   }
   auto err = rf.readData(buf, length);
@@ -197,6 +198,7 @@ size_t try_receive(uint8_t *buf, size_t max_size,
   }
   if (err != RADIOLIB_ERR_NONE) {
     ESP_LOGE(TAG, "failed to read data, code %d", err);
+    xSemaphoreGive(lk);
     return 0;
   }
   xSemaphoreGive(lk);
@@ -237,10 +239,10 @@ public:
     auto run_timer_task = [](TimerHandle_t timer) {
       auto &self = *static_cast<StatusRequester *>(pvTimerGetTimerID(timer));
       self.send_status_request();
-      auto target_interval = self.get_target_request_interval();
+      auto target_interval = std::chrono::duration_cast<std::chrono::seconds>(self.get_target_request_interval());
+      const auto target_millis = std::chrono::duration_cast<std::chrono::milliseconds>(target_interval);
       if (self.last_request_interval != target_interval) {
-        ESP_LOGI(TAG, "change request interval to %d second", target_interval.count());
-        const auto target_millis = std::chrono::duration_cast<std::chrono::milliseconds>(target_interval);
+        ESP_LOGI(TAG, "change request interval to %f second", target_millis / 1000);
         xTimerChangePeriod(timer, pdMS_TO_TICKS(target_millis.count()), portMAX_DELAY);
         self.last_request_interval = target_interval;
       }

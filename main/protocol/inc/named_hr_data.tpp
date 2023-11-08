@@ -14,7 +14,13 @@ struct named_hr_data {
     uint8_t hr   = 0;
     addr_t addr{};
   };
-  consteval static size_t size_needed() {
+
+#if __cpp_consteval >= 202002L
+  consteval
+#else
+  constexpr
+#endif
+  static size_t size_needed() {
     // key + hr + magic
     return sizeof(magic) + sizeof(t::key) + sizeof(t::hr) + BLE_ADDR_SIZE;
   }

@@ -16,7 +16,12 @@ struct hr_data {
     uint8_t key  = 0;
     uint8_t hr   = 0;
   };
-  static consteval size_t size_needed() {
+#if __cpp_consteval >= 202002L
+  consteval
+#else
+  constexpr
+#endif
+  static size_t size_needed() {
     // key + hr + magic
     return sizeof(magic) + sizeof(t::key) + sizeof(t::hr);
   }
