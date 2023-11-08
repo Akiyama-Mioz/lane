@@ -16,6 +16,7 @@
 #include <mutex>
 #include "hr_lora.h"
 #include "EspHal.h"
+#include "ble_hr_data.h"
 
 void *rf_receive_data = nullptr;
 struct rf_receive_data_t {
@@ -305,7 +306,7 @@ void app_main() {
         abort();
       }
       auto length = rf.getPacketLength(true);
-      auto size = rf.readData(data, length);
+      auto size   = rf.readData(data, length);
       std::string irq_status_str;
       auto status = rf.getIrqStatus();
       if (status & RADIOLIB_SX126X_IRQ_TIMEOUT) {
@@ -333,7 +334,7 @@ void app_main() {
         ESP_LOGI(TAG, "data=%s(%d)", utils::toHex(data, size).c_str(), size);
       }
       // TODO: handle message stuff
-       handle_message(data, size, handle_message_callbacks);
+      handle_message(data, size, handle_message_callbacks);
     }
   };
 
@@ -417,7 +418,12 @@ void app_main() {
         } else {
           it->second = repeater;
         } },
-      .on_hr_data    = [hr_char](std::string name, int hr) { ESP_LOGI("recv", "hr: %d, name: %s", hr, name.c_str()); },
+      .on_hr_data    = [hr_char](std::string name, int hr) {
+        ESP_LOGI("recv", "hr=%d, name=%s", hr, name.c_str());
+        auto ble_hr_data = ble::hr_data::t{
+            .addr
+        };
+      },
   };
 
   auto &ad = *NimBLEDevice::getAdvertising();

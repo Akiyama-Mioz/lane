@@ -9,26 +9,40 @@
 #include <etl/optional.h>
 
 namespace ble {
-static const auto BLE_ADDR_SIZE  = 6;
-using addr_t                  = std::array<uint8_t, BLE_ADDR_SIZE>;
-struct hr_data{
+static const auto BLE_ADDR_SIZE = 6;
+using addr_t                    = std::array<uint8_t, BLE_ADDR_SIZE>;
+// TODO: use Bluetooth LE address instead of name since name is not unique
+// open a characteristic to get the name of the device
+struct hr_data {
   struct t {
-    std::string name;
-    std::array<uint8_t, 6> addr;
+    using module = hr_data;
+    std::string name{};
+    uint8_t hr = 0;
   };
   static size_t size_needed(const t &data) {
     return BLE_ADDR_SIZE + 1 + data.name.size();
   }
+  static size_t marshal(const t &data, uint8_t *buffer, size_t size) {
+    if (size < size_needed(data)) {
+      return 0;
+    }
+    size_t offset    = 0;
+    buffer[offset++] = static_cast<uint8_t>(data.name.size());
+    for (char i : data.name) {
+      buffer[offset++] = i;
+    }
+    buffer[offset++] = data.hr;
+    return offset;
+  }
+
   static etl::optional<t> unmarshal(const uint8_t *buffer, size_t buffer_size) {
     if (buffer_size < BLE_ADDR_SIZE) {
       return etl::nullopt;
     }
     t data;
-    for (int i = 0; i < BLE_ADDR_SIZE; ++i) {
-      data.addr[i] = buffer[i];
-    }
-    size_t sz = buffer[BLE_ADDR_SIZE];
-
+    size_t sz = buffer[0];
+    data.name = std::string(reinterpret_cast<const char *>(buffer + BLE_ADDR_SIZE + 1), sz);
+    data.hr   = buffer[BLE_ADDR_SIZE + 1 + sz];
     return data;
   }
 };
