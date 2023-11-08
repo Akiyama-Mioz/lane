@@ -75,7 +75,7 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
           ESP_LOGW(TAG, "no addr for key %d", p_hr_data->key);
           return;
         }
-        if (std::equal(p_addr->begin(), p_addr->end(), p_hr_data->addr.begin())) {
+        if (!std::equal(p_addr->begin(), p_addr->end(), p_hr_data->addr.begin())) {
           ESP_LOGW(TAG, "addr mismatch %s and %s",
                    utils::toHex(p_addr->data(), p_addr->size()).c_str(),
                    utils::toHex(p_hr_data->addr.data(), p_hr_data->addr.size()).c_str());
@@ -212,7 +212,7 @@ class StatusRequester {
 public:
   static constexpr auto TAG                     = "StatusRequester";
   static constexpr auto NORMAL_REQUEST_INTERVAL = std::chrono::seconds{10};
-  static constexpr auto FAST_REQUEST_INTERVAL   = std::chrono::seconds{3};
+  static constexpr auto FAST_REQUEST_INTERVAL   = std::chrono::seconds{5};
   /**
    * @brief the callback to check if the device map is empty
    */
@@ -239,10 +239,10 @@ public:
     auto run_timer_task = [](TimerHandle_t timer) {
       auto &self = *static_cast<StatusRequester *>(pvTimerGetTimerID(timer));
       self.send_status_request();
-      auto target_interval = std::chrono::duration_cast<std::chrono::seconds>(self.get_target_request_interval());
+      auto target_interval     = std::chrono::duration_cast<std::chrono::seconds>(self.get_target_request_interval());
       const auto target_millis = std::chrono::duration_cast<std::chrono::milliseconds>(target_interval);
       if (self.last_request_interval != target_interval) {
-        ESP_LOGI(TAG, "change request interval to %f second", target_millis / 1000);
+        ESP_LOGI(TAG, "change request interval to %f second", static_cast<float>(target_millis.count()) / 1000.f);
         xTimerChangePeriod(timer, pdMS_TO_TICKS(target_millis.count()), portMAX_DELAY);
         self.last_request_interval = target_interval;
       }
@@ -461,6 +461,10 @@ void app_main() {
       },
       .update_device = [](repeater_t repeater) {
         constexpr auto TAG = "update_device";
+        if (!repeater.device.has_value()){
+          ESP_LOGW(TAG, "null device");
+          return true;
+        }
         auto repeater_addr = repeater.repeater_addr;
         // search for the repeater's addr first
         auto addr_it = std::find_if(device_map.begin(), device_map.end(),
@@ -496,9 +500,12 @@ void app_main() {
             device_map.clear();
           }
           auto& addr = repeater.repeater_addr;
-          ESP_LOGI(TAG, "new repeater %s with key %d",
+          auto& dev_addr = repeater.device->addr;
+          ESP_LOGI(TAG, "new repeater addr=%s; key=%d; dev_addr=%s; dev_name=%s;",
                    utils::toHex(addr.data(), addr.size()).c_str(),
-                   repeater.key);
+                   repeater.key,
+                   utils::toHex(dev_addr.data(), dev_addr.size()).c_str(),
+                   repeater.device->name.c_str());
           device_map.insert({repeater.key, std::move(repeater)});
           return true;
         } else {
@@ -518,9 +525,11 @@ void app_main() {
         auto sz         = ble::hr_data::marshal(ble_hr_data, buf, sizeof(buf));
         if (sz == 0) {
           ESP_LOGE(TAG, "failed to marshal");
-          return;
+          return true;
         }
-        hr_char.setValue(buf, sz); },
+        hr_char.setValue(buf, sz);
+        return true;
+      },
       .rf_send       = [rf_lock](uint8_t *pdata, size_t size) { try_transmit(pdata, size, rf_lock, send_lk_timeout_tick, rf); },
   };
 
