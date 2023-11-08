@@ -98,8 +98,14 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
           // request a key change
           auto new_key = static_cast<uint8_t>(rng.range(0, 255));
           // TODO: Handle the case where all keys are in use and a new one cannot be generated
+          constexpr auto limit = MAX_DEVICE_COUNT;
+          auto counter         = 0;
           while (callbacks.get_name_by_key(new_key).has_value()) {
             new_key = rng.range(0, 255);
+            if (++counter > limit) {
+              ESP_LOGE(TAG, "failed to generate a unique key");
+              return;
+            }
           }
           const auto req = HrLoRa::set_name_map_key::t{
               .addr = p_response->repeater_addr,
@@ -108,20 +114,23 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
           uint8_t buf[16] = {0};
           auto sz         = HrLoRa::set_name_map_key::marshal(req, buf, sizeof(buf));
           if (sz == 0) {
-            ESP_LOGE("recv", "failed to marshal");
+            ESP_LOGE(TAG, "failed to marshal");
             return;
           }
           callbacks.rf_send(buf, sz);
         }
+      } else {
+        ESP_LOGE(TAG, "failed to unmarshal repeater_status");
       }
       break;
     }
     case HrLoRa::query_device_by_mac::magic:
     case HrLoRa::set_name_map_key::magic: {
+      // leave out intentionally
       break;
     }
     default: {
-      ESP_LOGW("recv", "unknown magic: %d", magic);
+      ESP_LOGW(TAG, "unknown magic: %d", magic);
     }
   }
 }
@@ -435,10 +444,10 @@ void app_main() {
           return it->second.device->addr;
         }
       },
-      // TODO: Handle the case where the device map is full and cannot accept new devices.
       .update_device = [](repeater_t repeater) {
+        constexpr auto TAG = "update_device";
         auto repeater_addr = repeater.repeater_addr;
-        // use the repeater's addr as the key
+        // search for the repeater's addr first
         auto addr_it = std::find_if(device_map.begin(), device_map.end(),
                                     [&repeater_addr](const auto &pair) {
                                       const auto [key, r] = pair;
@@ -457,21 +466,35 @@ void app_main() {
             return true;
           } else {
             // key mismatch, remove the old one
+            auto &addr = addr_it->second.repeater_addr;
+            ESP_LOGI(TAG, "%s key %d (new) != %d (old)",
+                     utils::toHex(addr.data(),addr.size()).c_str(),
+                     addr_it->second.key, repeater.key);
             device_map.erase(addr_it);
           }
         }
 
         auto key_it = device_map.find(repeater.key);
         if (key_it == device_map.end()) {
-          // a key that is not in the map, just insert it
+          if (device_map.size() >= MAX_DEVICE_COUNT) {
+            ESP_LOGW(TAG, "full device map; clear it");
+            device_map.clear();
+          }
+          auto& addr = repeater.repeater_addr;
+          ESP_LOGI(TAG, "new repeater %s with key %d",
+                   utils::toHex(addr.data(), addr.size()).c_str(),
+                   repeater.key);
           device_map.insert({repeater.key, std::move(repeater)});
           return true;
         } else {
-          // request a key change
+          auto &addr = key_it->second.repeater_addr;
+          ESP_LOGW(TAG, "key %d is already used by %s", repeater.key,
+                   utils::toHex(addr.data(), addr.size()).c_str());
           return false;
         } },
       .on_hr_data    = [&hr_char](std::string name, int hr) {
-        ESP_LOGI("recv", "hr=%d, name=%s", hr, name.c_str());
+        constexpr auto TAG = "on_hr_data";
+        ESP_LOGI(TAG, "hr=%d; name=%s", hr, name.c_str());
         auto ble_hr_data = ble::hr_data::t{
             .name = std::move(name),
             .hr = static_cast<uint8_t>(hr)
@@ -479,7 +502,7 @@ void app_main() {
         uint8_t buf[32] = {0};
         auto sz         = ble::hr_data::marshal(ble_hr_data, buf, sizeof(buf));
         if (sz == 0) {
-          ESP_LOGE("recv", "failed to marshal");
+          ESP_LOGE(TAG, "failed to marshal");
           return;
         }
         hr_char.setValue(buf, sz); },
