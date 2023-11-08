@@ -521,7 +521,9 @@ void app_main() {
           ESP_LOGE(TAG, "failed to marshal");
           return;
         }
-        hr_char.setValue(buf, sz); },
+        hr_char.setValue(buf, sz);
+        hr_char.notify();
+      },
       .rf_send       = [rf_lock](uint8_t *pdata, size_t size) { try_transmit(pdata, size, rf_lock, send_lk_timeout_tick, rf); },
   };
 
