@@ -418,6 +418,7 @@ void app_main() {
   auto lane_task = [](void *param) {
     auto &lane = *static_cast<Lane *>(param);
     lane.loop();
+    ESP_LOGE("lane", "lane loop exited");
   };
   auto s     = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
   auto &lane = Lane::get();

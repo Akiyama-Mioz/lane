@@ -136,7 +136,12 @@ struct UpdateTaskParam {
   }
 };
 
+[[noreturn]]
 void Lane::loop() {
+  auto instant                  = Instant();
+  auto update_instant           = Instant();
+  auto debug_instant            = Instant();
+  auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "loop");
   for (;;) {
     if (strip == nullptr) {
@@ -144,9 +149,11 @@ void Lane::loop() {
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
+
     // TODO: use xTimerCreateStatic to avoid heap allocation repeatedly
     auto delete_timer = [this]() {
       if (this->timer_handle != nullptr) {
+        ESP_LOGI(TAG, "delete timer");
         auto ok = xTimerStop(this->timer_handle, TIMER_TIMEOUT_TICKS);
         if (!ok){
           ESP_LOGE(TAG, "Failed to stop timer");
@@ -158,6 +165,7 @@ void Lane::loop() {
           return;
         }
         this->timer_handle = nullptr;
+      } else {
       }
     };
     /**
@@ -166,10 +174,11 @@ void Lane::loop() {
     auto try_create_timer = [this]() {
       // https://www.nextptr.com/tutorial/ta1430524603/capture-this-in-lambda-expression-timeline-of-change
       auto notify_fn = [this]() {
-        ESP_LOGI(TAG, "head=%.2f; tail=%.2f; shift=%.2f; speed=%.2f; status=%s; color=%0x06x;",
+        ESP_LOGI(TAG, "head=%.2f; tail=%.2f; shift=%.2f; speed=%.2f; status=%s; color=%0x06x; fps=%f",
                  state.head.count(), state.tail.count(), state.shift.count(), state.speed,
-                 statusToStr(state.status).c_str(), cfg.color);
+                 statusToStr(state.status).c_str(), cfg.color, this->cfg.fps);
         this->notifyState(this->state);
+        xTimerReset(this->timer_handle, TIMER_TIMEOUT_TICKS);
       };
 
       auto run_notify_fn = [](TimerHandle_t handle) {
@@ -182,7 +191,7 @@ void Lane::loop() {
         this->timer_param.fn = notify_fn;
         this->timer_handle   = xTimerCreate("notify_timer",
                                             pdMS_TO_TICKS(BLUE_TRANSMIT_INTERVAL.count()),
-                                            pdTRUE,
+                                            pdFALSE,
                                             &this->timer_param,
                                             run_notify_fn);
         [[unlikely]] if (this->timer_handle == nullptr) {
@@ -196,17 +205,46 @@ void Lane::loop() {
     switch (params.status) {
       case LaneStatus::FORWARD:
       case LaneStatus::BACKWARD: {
-        auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
-        auto instant     = Instant();
+        instant.reset();
         iterate();
-        try_create_timer();
-
-        auto e = instant.elapsed();
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
-          ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
+        if (debug_instant.elapsed() > DEBUG_INTERVAL) {
+          ESP_LOGI(TAG, "head: %.2f, tail: %.2f, shift: %.2f, speed: %.2f, status: %s, color %0x06x", state.head.count(), state.tail.count(), state.shift.count(), state.speed, statusToStr(state.status).c_str(), cfg.color);
+          debug_instant.reset();
+        }
+        // I could use the timer from FreeRTOS, but I prefer SystemClock now.
+        if (update_instant.elapsed() > BLUE_TRANSMIT_INTERVAL) {
+          auto task = [](void *param) {
+            auto &update_param = *static_cast<UpdateTaskParam *>(param);
+            (*update_param.fn)();
+            // handled in the destructor
+            delete &update_param;
+          };
+          auto &l          = *this;
+          auto update_task = [&l]() {
+            if (l.ble.ctrl_char == nullptr) {
+              ESP_LOGE("Lane::updateTask", "BLE not initialized");
+              return;
+            }
+            l.notifyState(l.state);
+          };
+          auto param = new UpdateTaskParam{
+              .fn     = new std::function<void()>(update_task),
+              .handle = nullptr,
+          };
+          auto res = xTaskCreate(task, "update_state", 4096, param, 1, &param->handle);
+          if (res != pdPASS) [[unlikely]] {
+            ESP_LOGE(TAG, "Failed to create task: %s", esp_err_to_name(res));
+            delete param;
+          }
+          update_instant.reset();
+        }
+        auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
+        auto delay = std::chrono::milliseconds(static_cast<uint16_t>(1000 / cfg.fps)) - diff;
+        if (delay < std::chrono::milliseconds(0)) [[unlikely]] {
+          ESP_LOGW(TAG, "delay timeout %lld", delay.count());
         } else {
-          auto delay = interval_ms - e;
-          vTaskDelay(pdMS_TO_TICKS(delay.count()));
+          auto ticks = pdMS_TO_TICKS(delay.count());
+          vTaskDelay(ticks);
         }
         break;
       }
