@@ -24,6 +24,7 @@ static inline float LEDsCountToMeter(uint32_t count, float LEDs_per_meter) {
 }
 
 namespace lane {
+static constexpr auto TIMER_TIMEOUT_TICKS = 100;
 std::string statusToStr(LaneStatus status) {
   static const std::map<LaneStatus, std::string> LANE_STATUS_STR = {
       {LaneStatus::FORWARD, "FORWARD"},
@@ -146,8 +147,16 @@ void Lane::loop() {
     // TODO: use xTimerCreateStatic to avoid heap allocation repeatedly
     auto delete_timer = [this]() {
       if (this->timer_handle != nullptr) {
-        xTimerStop(this->timer_handle, portMAX_DELAY);
-        xTimerDelete(this->timer_handle, portMAX_DELAY);
+        auto ok = xTimerStop(this->timer_handle, TIMER_TIMEOUT_TICKS);
+        if (!ok){
+          ESP_LOGE(TAG, "Failed to stop timer");
+          return;
+        }
+        ok = xTimerDelete(this->timer_handle, TIMER_TIMEOUT_TICKS);
+        if (!ok){
+          ESP_LOGE(TAG, "Failed to delete timer");
+          return;
+        }
         this->timer_handle = nullptr;
       }
     };
@@ -180,7 +189,7 @@ void Lane::loop() {
           ESP_LOGE(TAG, "Failed to create timer");
           abort();
         }
-        xTimerStart(this->timer_handle, portMAX_DELAY);
+        xTimerStart(this->timer_handle, TIMER_TIMEOUT_TICKS);
       }
     };
 
@@ -199,11 +208,14 @@ void Lane::loop() {
           auto delay = interval_ms - e;
           vTaskDelay(pdMS_TO_TICKS(delay.count()));
         }
+        break;
       }
       case LaneStatus::STOP: {
         this->state = LaneState::zero();
         delete_timer();
+        stop();
         vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
+        break;
       }
       case LaneStatus::BLINK: {
         auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
@@ -213,6 +225,7 @@ void Lane::loop() {
         vTaskDelay(delay);
         strip->fill_and_show_forward(0, cfg.line_LEDs_num, cfg.color);
         vTaskDelay(delay);
+        break;
       }
       default:
         break;
