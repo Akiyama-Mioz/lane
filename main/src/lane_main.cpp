@@ -19,6 +19,8 @@
 #include "ble_hr_data.h"
 #include <etl/random.h>
 
+// #define DEBUG_SPEED
+
 void *rf_receive_data = nullptr;
 struct rf_receive_data_t {
   EventGroupHandle_t evt_grp = nullptr;
@@ -533,6 +535,11 @@ void app_main() {
   ad.setScanResponse(false);
 
   status_requester.start();
+
+#ifdef DEBUG_SPEED
+  lane.setStatus(lane::LaneStatus::FORWARD);
+  lane.setSpeed(2);
+#endif
 
   // intend to give it higher priority
   xTaskCreatePinnedToCore(lane_task,
