@@ -21,6 +21,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "Adafruit_NeoPixel.h"
+#include "common.h"
 
 namespace lane {
 const auto PREF_RECORD_NAME = "rec";
@@ -121,42 +122,62 @@ struct LaneParams {
 // note: I assume every time call this function the time interval is 1/fps
 LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input);
 
-struct LaneBLE {
-  // I don't know how to release the memory of the NimBLECharacteristic
-  // or other BLE stuff. So I choose to not free the memory. (the device
-  // should be always alive with BLE anyway.)
-  NimBLECharacteristic *ctrl_char   = nullptr;
-  NimBLECharacteristic *config_char = nullptr;
-
-  NimBLEService *service = nullptr;
-};
-
 //**************************************** Lane *********************************/
 
 /**
  * @brief The Lane class
  */
 class Lane {
-  friend class ControlCharCallback;
-  friend class ConfigCharCallback;
+private:
+  /**
+   * @brief The ControlCharCallback class, which can notify the client the current state of the strip and accept the input from the client.
+   */
+  class ControlCharCallback : public NimBLECharacteristicCallbacks {
+    lane::Lane &lane;
 
-protected:
+  public:
+    void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) override;
+
+    explicit ControlCharCallback(lane::Lane &lane) : lane(lane){};
+  };
+
+  class ConfigCharCallback : public NimBLECharacteristicCallbacks {
+    lane::Lane &lane;
+
+  public:
+    /// would expect LaneConfig variant
+    void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) override;
+    /// would output LaneConfigRO variant
+    void onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override;
+
+    explicit ConfigCharCallback(lane::Lane &lane) : lane(lane) {}
+  };
+
+  /**
+   * @brief Bluetooth LE and lane related stuff
+   */
+  struct LaneBLE {
+    Lane *lane                        = nullptr;
+    NimBLECharacteristic *ctrl_char   = nullptr;
+    NimBLECharacteristic *config_char = nullptr;
+
+    NimBLEService *service = nullptr;
+    ControlCharCallback ctrl_cb;
+    ConfigCharCallback config_cb;
+    explicit LaneBLE(Lane *lane) : lane(lane), ctrl_cb(*lane), config_cb(*lane) {}
+  };
+
   Preferences pref;
   using strip_ptr_t                    = std::unique_ptr<strip::IStrip>;
   strip_ptr_t strip                    = nullptr;
   static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
-  Adafruit_NeoPixel *pixels            = nullptr;
   int pin                              = 23;
   notify_timer_param timer_param{[]() {}};
   TimerHandle_t timer_handle = nullptr;
   std::array<uint8_t, DECODE_BUFFER_SIZE>
       decode_buffer = {0};
 
-  LaneBLE ble = {
-      .ctrl_char   = nullptr,
-      .config_char = nullptr,
-      .service     = nullptr,
-  };
+  LaneBLE ble    = LaneBLE{this};
   LaneConfig cfg = {
       .color         = utils::Colors::Red,
       .line_length   = DEFAULT_LINE_LENGTH,
@@ -171,25 +192,51 @@ protected:
       .status = LaneStatus::STOP,
   };
 
-  ~Lane() = default;
-  Lane()  = default;
-
   void iterate();
+
+  /**
+   * @brief config the characteristic for BLE
+   * @param[in] server
+   * @param[out] ble the LaneBLE to be written, expected to be initialized
+   * @param[in] lane
+   * @warning `ctrl_cb` and `config_cb` are static variables, so they are initialized only once.
+   * It would be a problem if you have multiple lanes. However, nobody would do that.
+   */
+  static void _initBLE(NimBLEServer &server, LaneBLE &ble) {
+    ble.service = server.createService(common::BLE_SERVICE_UUID);
+
+    ble.ctrl_char = ble.service->createCharacteristic(common::BLE_CHAR_CONTROL_UUID,
+                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+    ble.ctrl_char->setCallbacks(&ble.ctrl_cb);
+
+    /// write to control and read/notify for the state
+    ble.config_char = ble.service->createCharacteristic(common::BLE_CHAR_CONFIG_UUID,
+                                                        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    ble.config_char->setCallbacks(&ble.config_cb);
+
+    ble.service->start();
+  }
 
   void stop() const;
 
 public:
-  Lane(Lane const &) = delete;
-
-  Lane &operator=(Lane const &) = delete;
-
-  Lane(Lane &&) = delete;
-
-  Lane &operator=(Lane &&) = delete;
-
+  explicit Lane(strip_ptr_t strip) : strip(std::move(strip)){};
   [[nodiscard]] meter lengthPerLED() const;
   [[nodiscard]] auto getLaneLEDsNum() const {
     return this->cfg.line_LEDs_num;
+  }
+
+  /**
+   * @brief Initialize the BLE service.
+   * @param server the BLE server
+   * @warning
+   */
+  void initBLE(NimBLEServer &server) {
+    if (this->ble.service != nullptr) {
+      ESP_LOGE("LANE", "BLE has already been initialized");
+      return;
+    }
+    _initBLE(server, ble);
   }
 
   /**
@@ -200,14 +247,6 @@ public:
    * @return No return
    */
   [[noreturn]] void loop();
-
-  void setBLE(LaneBLE ble) {
-    this->ble = ble;
-  };
-
-  void setStrip(strip_ptr_t strip) {
-    this->strip = std::move(strip);
-  };
 
   /**
    * @brief sets the maximum number of LEDs that can be used. i.e. Circle Length.
@@ -224,12 +263,10 @@ public:
    */
   void notifyState(LaneState st);
 
-  static Lane &get();
-
   esp_err_t begin();
 
-  void setConfig(LaneConfig cfg) {
-    this->cfg = cfg;
+  void setConfig(const LaneConfig &newCfg) {
+    this->cfg = newCfg;
   };
 
   /// set track length (count LEDs)
@@ -257,34 +294,11 @@ public:
   inline void resetDecodeBuffer() {
     decode_buffer.fill(0);
   }
-  float LEDsPerMeter() const;
+  [[nodiscard]] float LEDsPerMeter() const;
 };
 
 //*********************************** Callbacks ****************************************/
 
-/**
- * @brief The ControlCharCallback class, which can notify the client the current state of the strip and accept the input from the client.
- */
-class ControlCharCallback : public NimBLECharacteristicCallbacks {
-  lane::Lane &lane;
-
-public:
-  void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) override;
-
-  explicit ControlCharCallback(lane::Lane &lane) : lane(lane){};
-};
-
-class ConfigCharCallback : public NimBLECharacteristicCallbacks {
-  lane::Lane &lane;
-
-public:
-  /// would expect LaneConfig variant
-  void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) override;
-  /// would output LaneConfigRO variant
-  void onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override;
-
-  explicit ConfigCharCallback(lane::Lane &lane) : lane(lane) {}
-};
 };
 
 #endif // HELLO_WORLD_STRIP_H

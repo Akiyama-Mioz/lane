@@ -248,15 +248,6 @@ void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
 }
 
 /**
- * @brief Get the instance/pointer of the strip.
- * @return the instance/pointer of the strip.
- */
-Lane &Lane::get() {
-  static auto lane = Lane{};
-  return lane;
-}
-
-/**
  * @brief initialize the strip. this function should only be called once.
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */

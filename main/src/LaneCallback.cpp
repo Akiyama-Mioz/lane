@@ -8,7 +8,7 @@
 //****************************** Callback ************************************/
 
 namespace lane {
-void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
+void Lane::ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
   auto TAG                  = "control";
   auto data                 = characteristic->getValue();
   ::LaneControl control_msg = LaneControl_init_zero;
@@ -30,7 +30,7 @@ void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECo
   }
 }
 
-void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
+void Lane::ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
   const auto TAG          = "config::write";
   auto data               = characteristic->getValue();
   ::LaneConfig config_msg = LaneConfig_init_zero;
@@ -68,7 +68,7 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
   }
   lane.pref.end();
 }
-void ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
+void Lane::ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
   const auto TAG        = "config::read";
   constexpr size_t size = LaneConfigRO_size + 16;
   uint8_t data[size];

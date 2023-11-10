@@ -268,32 +268,6 @@ public:
 
 using namespace common;
 using namespace lane;
-/**
- * @brief config the characteristic for BLE
- * @param[in] server
- * @param[out] ble the LaneBLE to be written, expected to be initialized
- * @param[in] lane
- */
-void initBLE(NimBLEServer *server, LaneBLE &ble, Lane &lane) {
-  if (server == nullptr) {
-    return;
-  }
-
-  ble.service = server->createService(BLE_SERVICE_UUID);
-
-  ble.ctrl_char = ble.service->createCharacteristic(BLE_CHAR_CONTROL_UUID,
-                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
-  auto ctrl_cb  = new ControlCharCallback(lane);
-  ble.ctrl_char->setCallbacks(ctrl_cb);
-
-  /// write to control and read/notify for the state
-  ble.config_char = ble.service->createCharacteristic(BLE_CHAR_CONFIG_UUID,
-                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-  auto config_cb  = new ConfigCharCallback(lane);
-  ble.config_char->setCallbacks(config_cb);
-
-  ble.service->start();
-}
 
 extern "C" void app_main();
 
@@ -422,10 +396,8 @@ void app_main() {
     lane.loop();
     ESP_LOGE("lane", "lane loop exited");
   };
-  auto s     = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
-  auto &lane = Lane::get();
-  lane.setStrip(std::make_unique<decltype(s)>(std::move(s)));
-  auto lane_ble = LaneBLE{};
+  auto s           = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
+  static auto lane = Lane{std::make_unique<decltype(s)>(std::move(s))};
   /********* end of lane initialization *********/
 
   /********* BLE initialization *********/
@@ -433,8 +405,7 @@ void app_main() {
   auto &server = *NimBLEDevice::createServer();
   server.setCallbacks(new ServerCallbacks());
 
-  initBLE(&server, lane_ble, lane);
-  lane.setBLE(lane_ble);
+  lane.initBLE(server);
   lane.setConfig(default_cfg);
   ESP_ERROR_CHECK(lane.begin());
 
@@ -525,8 +496,7 @@ void app_main() {
           return;
         }
         hr_char.setValue(buf, sz);
-        hr_char.notify();
-      },
+        hr_char.notify(); },
       .rf_send       = [rf_lock](uint8_t *pdata, size_t size) { try_transmit(pdata, size, rf_lock, send_lk_timeout_tick, rf); },
   };
 
