@@ -267,7 +267,7 @@ public:
 };
 
 using namespace common;
-using namespace lane;
+using namespace common::lanely;
 
 extern "C" void app_main();
 
@@ -282,7 +282,7 @@ void app_main() {
   auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
   auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
   auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
-  auto default_cfg   = lane::LaneConfig{
+  auto default_cfg   = ::lane::LaneConfig{
         .color         = color,
         .line_length   = lane::meter(line_length),
         .active_length = lane::meter(active_length),
@@ -392,12 +392,12 @@ void app_main() {
 
   /********* lane initialization *********/
   auto lane_task = [](void *param) {
-    auto &lane = *static_cast<Lane *>(param);
+    auto &lane = *static_cast<lane::Lane *>(param);
     lane.loop();
     ESP_LOGE("lane", "lane loop exited");
   };
   auto s           = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
-  static auto lane = Lane{std::make_unique<decltype(s)>(std::move(s))};
+  static auto lane = lane::Lane{std::make_unique<decltype(s)>(std::move(s))};
   /********* end of lane initialization *********/
 
   /********* BLE initialization *********/

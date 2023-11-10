@@ -17,6 +17,31 @@ static const char *BLE_CHAR_CONFIG_UUID     = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5
 static const char *BLE_CHAR_HEARTBEAT_UUID  = "048b8928-d0a5-43e2-ada9-b925ec62ba27";
 static const char *BLE_CHAR_WHITE_LIST_UUID = "12a481f0-9384-413d-b002-f8660566d3b0";
 static const char *BLE_CHAR_DEVICE_UUID     = "a2f05114-fdb6-4549-ae2a-845b4be1ac48";
+
+/**
+ * @brief some common *constant* definitions for `lane`
+ * @note it's called `lanely` since `lane` the namespace has been taken in global namespace
+ */
+namespace lanely {
+  using centimeter                   = utils::length<float, std::centi>;
+  using meter                        = utils::length<float, std::ratio<1>>;
+  const auto PREF_RECORD_NAME        = "rec";
+  const auto PREF_LINE_LENGTH_NAME   = "ll";
+  const auto PREF_ACTIVE_LENGTH_NAME = "al";
+  const auto PREF_LINE_LEDs_NUM_NAME = "ln";
+  const auto PREF_TOTAL_LENGTH_NAME  = "to"; // float
+  const auto PREF_COLOR_NAME         = "co"; // uint32_t
+
+  const auto DEFAULT_ACTIVE_LENGTH         = meter(0.6);  // the line would be active for this length
+  const auto DEFAULT_LINE_LENGTH           = meter(50);   // line... it would wrap around
+  const auto DEFAULT_TARGET_LENGTH         = meter(1000); // like shift
+  const auto DEFAULT_LINE_LEDs_NUM         = static_cast<uint32_t>(DEFAULT_LINE_LENGTH.count() * (100 / 3.3));
+  const auto DEFAULT_FPS                   = 10;
+  constexpr size_t DECODE_BUFFER_SIZE      = 2048;
+  static const auto BLUE_TRANSMIT_INTERVAL = std::chrono::milliseconds(1000);
+  static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
+}
+
 namespace pin {
   static const auto LED      = GPIO_NUM_23;
   static const auto SCK      = GPIO_NUM_16;

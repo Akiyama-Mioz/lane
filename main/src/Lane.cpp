@@ -187,7 +187,7 @@ struct UpdateTaskParam {
       if (this->timer_handle == nullptr) {
         this->timer_param.fn = notify_fn;
         this->timer_handle   = xTimerCreate("notify_timer",
-                                            pdMS_TO_TICKS(BLUE_TRANSMIT_INTERVAL.count()),
+                                            pdMS_TO_TICKS(common::lanely::BLUE_TRANSMIT_INTERVAL.count()),
                                             pdFALSE,
                                             &this->timer_param,
                                             run_notify_fn);
@@ -219,7 +219,7 @@ struct UpdateTaskParam {
         this->state = LaneState::zero();
         delete_timer();
         stop();
-        vTaskDelay(pdMS_TO_TICKS(HALT_INTERVAL.count()));
+        vTaskDelay(pdMS_TO_TICKS(common::lanely::HALT_INTERVAL.count()));
         break;
       }
       case LaneStatus::BLINK: {
@@ -339,5 +339,20 @@ void Lane::iterate() {
     default:
       return;
   }
+}
+
+void Lane::_initBLE(NimBLEServer &server, Lane::LaneBLE &ble) {
+  ble.service = server.createService(common::BLE_SERVICE_UUID);
+
+  ble.ctrl_char = ble.service->createCharacteristic(common::BLE_CHAR_CONTROL_UUID,
+                                                    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+  ble.ctrl_char->setCallbacks(&ble.ctrl_cb);
+
+  /// write to control and read/notify for the state
+  ble.config_char = ble.service->createCharacteristic(common::BLE_CHAR_CONFIG_UUID,
+                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+  ble.config_char->setCallbacks(&ble.config_cb);
+
+  ble.service->start();
 }
 }

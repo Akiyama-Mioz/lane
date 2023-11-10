@@ -24,42 +24,9 @@
 #include "common.h"
 
 namespace lane {
-const auto PREF_RECORD_NAME = "rec";
-// float
-const auto PREF_LINE_LENGTH_NAME = "ll";
-// float
-const auto PREF_ACTIVE_LENGTH_NAME = "al";
-// uint32_t
-const auto PREF_LINE_LEDs_NUM_NAME = "ln";
-// float
-const auto PREF_TOTAL_LENGTH_NAME = "to";
-// uint32_t
-const auto PREF_COLOR_NAME = "co";
 
-const auto PREF_WHITE_LIST_NAME       = "wh";
-const auto PREF_WHITE_LIST_MAX_LENGTH = 256;
-
-using centimeter = utils::length<float, std::centi>;
-using meter      = utils::length<float, std::ratio<1>>;
-
-// the line would be active for this length
-const auto DEFAULT_ACTIVE_LENGTH = meter(0.6);
-// line... it would wrap around
-const auto DEFAULT_LINE_LENGTH = meter(50);
-// like shift
-const auto DEFAULT_TARGET_LENGTH = meter(1000);
-const auto DEFAULT_LINE_LEDs_NUM = static_cast<uint32_t>(DEFAULT_LINE_LENGTH.count() * (100 / 3.3));
-const auto DEFAULT_FPS           = 10;
-
-static const auto BLUE_TRANSMIT_INTERVAL = std::chrono::milliseconds(1000);
-static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
-// mem_block_symbols must be even and at least 64
-// https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/wdts.html
-// https://stackoverflow.com/questions/51750377/how-to-disable-interrupt-watchdog-in-esp32-or-increase-isr-time-limit
-// Increase IWTD (Interrupt Watchdog Timer) timeout is necessary.
-// Make this higher than the FreeRTOS tick rate (wait? the tick rate is 1000Hz i.e. 1ms, so it's not the FreeRTOS blocking)
-static const auto RMT_MEM_BLOCK_NUM = 512;
-constexpr size_t DECODE_BUFFER_SIZE = 2048;
+using centimeter = common::lanely::centimeter;
+using meter      = common::lanely::meter;
 
 struct notify_timer_param {
   std::function<void()> fn;
@@ -174,17 +141,17 @@ private:
   int pin                              = 23;
   notify_timer_param timer_param{[]() {}};
   TimerHandle_t timer_handle = nullptr;
-  std::array<uint8_t, DECODE_BUFFER_SIZE>
+  std::array<uint8_t, common::lanely::DECODE_BUFFER_SIZE>
       decode_buffer = {0};
 
   LaneBLE ble    = LaneBLE{this};
   LaneConfig cfg = {
       .color         = utils::Colors::Red,
-      .line_length   = DEFAULT_LINE_LENGTH,
-      .active_length = utils::length_cast<meter>(DEFAULT_ACTIVE_LENGTH),
-      .total_length  = DEFAULT_TARGET_LENGTH,
-      .line_LEDs_num = DEFAULT_LINE_LEDs_NUM,
-      .fps           = DEFAULT_FPS,
+      .line_length   = common::lanely::DEFAULT_LINE_LENGTH,
+      .active_length = utils::length_cast<meter>(common::lanely::DEFAULT_ACTIVE_LENGTH),
+      .total_length  = common::lanely::DEFAULT_TARGET_LENGTH,
+      .line_LEDs_num = common::lanely::DEFAULT_LINE_LEDs_NUM,
+      .fps           = common::lanely::DEFAULT_FPS,
   };
   LaneState state   = LaneState::zero();
   LaneParams params = {
@@ -202,20 +169,7 @@ private:
    * @warning `ctrl_cb` and `config_cb` are static variables, so they are initialized only once.
    * It would be a problem if you have multiple lanes. However, nobody would do that.
    */
-  static void _initBLE(NimBLEServer &server, LaneBLE &ble) {
-    ble.service = server.createService(common::BLE_SERVICE_UUID);
-
-    ble.ctrl_char = ble.service->createCharacteristic(common::BLE_CHAR_CONTROL_UUID,
-                                                      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
-    ble.ctrl_char->setCallbacks(&ble.ctrl_cb);
-
-    /// write to control and read/notify for the state
-    ble.config_char = ble.service->createCharacteristic(common::BLE_CHAR_CONFIG_UUID,
-                                                        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
-    ble.config_char->setCallbacks(&ble.config_cb);
-
-    ble.service->start();
-  }
+  static void _initBLE(NimBLEServer &server, LaneBLE &ble);
 
   void stop() const;
 

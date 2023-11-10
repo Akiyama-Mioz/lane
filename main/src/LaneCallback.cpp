@@ -31,6 +31,7 @@ void Lane::ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, Ni
 }
 
 void Lane::ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
+  using namespace common::lanely;
   const auto TAG          = "config::write";
   auto data               = characteristic->getValue();
   ::LaneConfig config_msg = LaneConfig_init_zero;
