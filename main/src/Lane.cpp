@@ -47,12 +47,13 @@ inline LaneStatus revert_state(LaneStatus state) {
 
 /**
  * @brief get the next state. should be a pure function.
- * @param last_state
- * @param cfg
- * @param [in, out]input param
- * @return the next state.
+ * @param [in]last_state
+ * @param [in]cfg
+ * @param [in]input param
+ * @return the next state and the param (external input/state)
  */
-LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
+static std::tuple<LaneState, LaneParams>
+nextState(const LaneState &last_state, const LaneConfig &cfg, const LaneParams &input) {
   auto TAG        = "lane::nextState";
   auto zero_state = LaneState::zero();
   auto stop_case  = [=]() {
@@ -74,19 +75,20 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
     }
   };
   switch (last_state.status) {
-    case LaneStatus::STOP: {
-      return stop_case();
-    }
+    case LaneStatus::STOP:
     case LaneStatus::BLINK: {
-      return stop_case();
+      return {stop_case(), input};
     }
     default: {
-      if (input.status == LaneStatus::STOP) {
-        return zero_state;
+      if (input.status == LaneStatus::STOP ||
+          input.status == LaneStatus::BLINK) {
+        return {zero_state, input};
       }
       if (input.status != last_state.status) {
         ESP_LOGW(TAG, "Invalid status changed from %s to %s", statusToStr(last_state.status).c_str(), statusToStr(input.status).c_str());
-        input.status = last_state.status;
+        auto param   = input;
+        param.status = last_state.status;
+        return {last_state, param};
       }
       auto ret  = last_state;
       ret.speed = input.speed;
@@ -110,7 +112,7 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
         auto temp_tail = temp_head - cfg.active_length;
         ret.tail       = temp_tail > meter(0) ? temp_tail : meter(0);
       }
-      return ret;
+      return {ret, input};
     }
   }
 }
@@ -306,7 +308,7 @@ void Lane::iterate() {
     ESP_LOGE(TAG, "strip is null");
     return;
   }
-  auto next_state = nextState(this->state, this->cfg, this->params);
+  auto [next_state, params] = nextState(this->state, this->cfg, this->params);
   // meter
   auto head       = this->state.head.count();
   auto tail       = this->state.tail.count();
@@ -314,6 +316,7 @@ void Lane::iterate() {
   auto head_index = meterToLEDsCount(head, LEDsPerMeter());
   auto tail_index = meterToLEDsCount(tail, LEDsPerMeter());
   auto count      = meterToLEDsCount(length, LEDsPerMeter());
+  this->params    = params;
   if (head_index > this->cfg.line_LEDs_num) {
     head_index = this->cfg.line_LEDs_num;
   }

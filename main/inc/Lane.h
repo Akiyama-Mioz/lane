@@ -84,14 +84,18 @@ struct LaneConfig {
   float fps;
 };
 
-// input. could be changed by external device.
+/**
+ * @brief input; external, outside world could change it
+ * (instead of changing the state directly)
+ */
 struct LaneParams {
   float speed;
   LaneStatus status;
 };
 
 // note: I assume every time call this function the time interval is 1/fps
-LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input);
+std::tuple<LaneState, LaneParams>
+static nextState(const LaneState &last_state, const LaneConfig &cfg, const LaneParams &input);
 
 //**************************************** Lane *********************************/
 
