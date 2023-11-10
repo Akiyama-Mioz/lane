@@ -1,23 +1,22 @@
-#include "utils.h"
 #include <vector>
-#include <cstdio>
-#include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "Arduino.h"
-#include "NimBLEDevice.h"
-#include "Lane.h"
+#include <sdkconfig.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <Arduino.h>
+#include <NimBLEDevice.h>
 #include <etl/map.h>
-#include "whitelist.h"
+#include <mutex>
+#include <etl/random.h>
 #include <memory.h>
+#include <RadioLib.h>
+#include "utils.h"
+#include "Lane.h"
+#include "whitelist.h"
 #include "common.h"
 #include "ScanCallback.h"
-#include "src/RadioLib.h"
-#include <mutex>
 #include "hr_lora.h"
 #include "EspHal.h"
 #include "ble_hr_data.h"
-#include <etl/random.h>
 
 // #define DEBUG_SPEED
 

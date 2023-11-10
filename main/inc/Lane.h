@@ -5,22 +5,20 @@
 #ifndef HELLO_WORLD_STRIP_H
 #define HELLO_WORLD_STRIP_H
 
-#include "esp_random.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <NimBLEDevice.h>
+#include <Preferences.h>
+#include <esp_random.h>
+#include <map>
+#include <vector>
+#include <memory>
+#include <pb_common.h>
+#include <pb_decode.h>
+#include <Adafruit_NeoPixel.h>
 #include "utils.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "NimBLEDevice.h"
-#include "Preferences.h"
-#include "c++/8.4.0/map"
-#include "c++/8.4.0/vector"
 #include "lane.pb.h"
-#include "pb_common.h"
-#include "pb_decode.h"
 #include "Strip.hpp"
-#include <c++/8.4.0/memory>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "Adafruit_NeoPixel.h"
 #include "common.h"
 
 namespace lane {
@@ -94,8 +92,7 @@ struct LaneParams {
 };
 
 // note: I assume every time call this function the time interval is 1/fps
-std::tuple<LaneState, LaneParams>
-static nextState(const LaneState &last_state, const LaneConfig &cfg, const LaneParams &input);
+std::tuple<LaneState, LaneParams> static nextState(const LaneState &last_state, const LaneConfig &cfg, const LaneParams &input);
 
 //**************************************** Lane *********************************/
 

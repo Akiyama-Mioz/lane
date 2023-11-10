@@ -8,7 +8,7 @@
 #include <variant>
 #include <string>
 #include <regex>
-#include "etl/optional.h"
+#include <etl/optional.h>
 #include "ble.pb.h"
 
 #ifdef SIMPLE_LOG
