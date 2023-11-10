@@ -73,9 +73,13 @@ struct LaneState {
 // won't change unless the status is STOP
 struct LaneConfig {
   uint32_t color;
+  /// @brief the length of the line
   meter line_length;
+  /// @brief the length of the active part of the line
   meter active_length;
-  meter total_length;
+  /// @brief after this length, the line would be stop and reset
+  meter finish_length;
+  /// @brief the number of LEDs that form the line
   uint32_t line_LEDs_num;
   float fps;
 };
@@ -95,6 +99,9 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input);
  * @brief The Lane class
  */
 class Lane {
+  friend class ControlCharCallback;
+  friend class ConfigCharCallback;
+
 private:
   /**
    * @brief The ControlCharCallback class, which can notify the client the current state of the strip and accept the input from the client.
@@ -135,10 +142,8 @@ private:
   };
 
   Preferences pref;
-  using strip_ptr_t                    = std::unique_ptr<strip::IStrip>;
-  strip_ptr_t strip                    = nullptr;
-  static const neoPixelType pixel_type = NEO_RGB + NEO_KHZ800;
-  int pin                              = 23;
+  using strip_ptr_t = std::unique_ptr<strip::IStrip>;
+  strip_ptr_t strip = nullptr;
   notify_timer_param timer_param{[]() {}};
   TimerHandle_t timer_handle = nullptr;
   std::array<uint8_t, common::lanely::DECODE_BUFFER_SIZE>
@@ -149,7 +154,7 @@ private:
       .color         = utils::Colors::Red,
       .line_length   = common::lanely::DEFAULT_LINE_LENGTH,
       .active_length = utils::length_cast<meter>(common::lanely::DEFAULT_ACTIVE_LENGTH),
-      .total_length  = common::lanely::DEFAULT_TARGET_LENGTH,
+      .finish_length = common::lanely::DEFAULT_TARGET_LENGTH,
       .line_LEDs_num = common::lanely::DEFAULT_LINE_LEDs_NUM,
       .fps           = common::lanely::DEFAULT_FPS,
   };
@@ -222,11 +227,6 @@ public:
   void setConfig(const LaneConfig &newCfg) {
     this->cfg = newCfg;
   };
-
-  /// set track length (count LEDs)
-  void setCountLEDs(uint32_t count);
-
-  void setCircleLength(float meter);
 
   void setSpeed(float speed) {
     this->params.speed = speed;

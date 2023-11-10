@@ -60,9 +60,9 @@ void Lane::ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, Nim
       lane.pref.putFloat(PREF_ACTIVE_LENGTH_NAME, config_msg.msg.length_cfg.active_length_m);
       lane.pref.putFloat(PREF_TOTAL_LENGTH_NAME, config_msg.msg.length_cfg.total_length_m);
       lane.pref.putULong(PREF_LINE_LEDs_NUM_NAME, config_msg.msg.length_cfg.line_leds_num);
+      lane.cfg.finish_length = meter(config_msg.msg.length_cfg.total_length_m);
       lane.cfg.line_length   = meter(config_msg.msg.length_cfg.line_length_m);
       lane.cfg.active_length = meter(config_msg.msg.length_cfg.active_length_m);
-      lane.cfg.total_length  = meter(config_msg.msg.length_cfg.total_length_m);
       lane.setMaxLEDs(config_msg.msg.length_cfg.line_leds_num);
       break;
     }
@@ -80,7 +80,7 @@ void Lane::ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, Nim
   config_msg.has_length_cfg             = true;
   config_msg.length_cfg.line_length_m   = lane.cfg.line_length.count();
   config_msg.length_cfg.active_length_m = lane.cfg.active_length.count();
-  config_msg.length_cfg.total_length_m  = lane.cfg.total_length.count();
+  config_msg.length_cfg.total_length_m  = lane.cfg.finish_length.count();
   config_msg.length_cfg.line_leds_num   = lane.cfg.line_LEDs_num;
   config_msg.color_cfg.rgb              = lane.cfg.color;
   ESP_LOGI(TAG, "line length=%.2f; active length=%.2f; total length=%.2f; line LEDs=%ld; Color=0x%06lx",

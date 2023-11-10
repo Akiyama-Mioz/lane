@@ -40,6 +40,7 @@ namespace lanely {
   constexpr size_t DECODE_BUFFER_SIZE      = 2048;
   static const auto BLUE_TRANSMIT_INTERVAL = std::chrono::milliseconds(1000);
   static const auto HALT_INTERVAL          = std::chrono::milliseconds(500);
+  static const neoPixelType PIXEL_TYPE     = NEO_RGB + NEO_KHZ800;
 }
 
 namespace pin {

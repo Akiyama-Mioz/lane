@@ -286,7 +286,7 @@ void app_main() {
         .color         = color,
         .line_length   = lane::meter(line_length),
         .active_length = lane::meter(active_length),
-        .total_length  = lane::meter(total_length),
+        .finish_length = lane::meter(total_length),
         .line_LEDs_num = line_LEDs_num,
         .fps           = DEFAULT_FPS,
   };
@@ -396,7 +396,7 @@ void app_main() {
     lane.loop();
     ESP_LOGE("lane", "lane loop exited");
   };
-  auto s           = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, strip::AdafruitPixel::default_pixel_type);
+  auto s           = strip::AdafruitPixel(default_cfg.line_LEDs_num, pin::LED, common::lanely::PIXEL_TYPE);
   static auto lane = lane::Lane{std::make_unique<decltype(s)>(std::move(s))};
   /********* end of lane initialization *********/
 

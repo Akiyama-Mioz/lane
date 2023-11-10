@@ -177,15 +177,15 @@ public:
 
 class AdafruitPixel : public IStrip {
 private:
-  size_t max_LEDs = 0;
-  uint8_t pin     = GPIO_NUM_NC;
+  size_t max_LEDs                          = 0;
+  uint8_t pin                              = GPIO_NUM_NC;
+  std::unique_ptr<Adafruit_NeoPixel> pixel = nullptr;
   neoPixelType pixelType;
-  Adafruit_NeoPixel *pixel = nullptr;
+  bool has_begun = false;
 
 public:
-  static constexpr neoPixelType default_pixel_type = NEO_RGB + NEO_KHZ800;
   explicit AdafruitPixel(size_t max_LEDs, uint8_t pin, neoPixelType pixel_type) : max_LEDs(max_LEDs), pin(pin), pixelType(pixel_type) {
-    pixel = new Adafruit_NeoPixel(max_LEDs, pin, pixel_type);
+    pixel = std::make_unique<Adafruit_NeoPixel>(Adafruit_NeoPixel(max_LEDs, pin, pixel_type));
     pixel->setBrightness(255);
   }
 
@@ -194,18 +194,18 @@ public:
     this->max_LEDs  = rhs.max_LEDs;
     this->pin       = rhs.pin;
     this->pixelType = rhs.pixelType;
-    this->pixel     = rhs.pixel;
+    this->pixel     = std::move(rhs.pixel);
     rhs.pixel       = nullptr;
   };
   AdafruitPixel(AdafruitPixel const &rhs)  = delete;
   void operator=(AdafruitPixel const &rhs) = delete;
 
-  ~AdafruitPixel() noexcept override {
-    delete pixel;
-  }
-
   bool begin() override {
+    if (pixel == nullptr) {
+      return false;
+    }
     pixel->begin();
+    has_begun = true;
     return true;
   }
 
@@ -221,10 +221,12 @@ public:
     if (pixel == nullptr) {
       return false;
     }
-    delete pixel;
     this->max_LEDs = new_max_LEDs;
-    pixel          = new Adafruit_NeoPixel(new_max_LEDs, pin, pixelType);
+    pixel          = std::make_unique<Adafruit_NeoPixel>(Adafruit_NeoPixel(new_max_LEDs, pin, pixelType));
     pixel->setBrightness(255);
+    if (has_begun) {
+      pixel->begin();
+    }
     return true;
   }
 

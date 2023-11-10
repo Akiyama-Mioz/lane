@@ -238,7 +238,6 @@ struct UpdateTaskParam {
   }
 }
 
-/// i.e. Circle LEDs
 void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
   if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
@@ -282,14 +281,6 @@ void Lane::notifyState(LaneState st) {
   auto h = utils::toHex(buf.cbegin(), stream.bytes_written);
   notify_char.setValue(buf.cbegin(), stream.bytes_written);
   notify_char.notify();
-}
-
-void Lane::setCountLEDs(uint32_t count) {
-  this->cfg.line_LEDs_num = count;
-}
-
-void Lane::setCircleLength(float l) {
-  this->cfg.line_length = meter(l);
 }
 
 meter Lane::lengthPerLED() const {
