@@ -29,6 +29,9 @@ void Lane::ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, Ni
       ESP_LOGI(TAG, "Set status to %d", control_msg.msg.set_status.status);
       lane.setStatus(control_msg.msg.set_status.status);
       break;
+    default:
+      ESP_LOGE(TAG, "Unknown message type");
+      break;
   }
 }
 
@@ -56,15 +59,18 @@ void Lane::ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, Nim
         return;
       }
       ESP_LOGI(TAG, "line length=%.2f; active length=%.2f; total length=%.2f; line LEDs=%ld;",
-               config_msg.msg.length_cfg.line_length_m, config_msg.msg.length_cfg.active_length_m,
-               config_msg.msg.length_cfg.total_length_m, config_msg.msg.length_cfg.line_leds_num);
+               config_msg.msg.length_cfg.line_length_m,
+               config_msg.msg.length_cfg.active_length_m,
+               config_msg.msg.length_cfg.total_length_m,
+               config_msg.msg.length_cfg.line_leds_num);
       lane.pref.putFloat(PREF_LINE_LENGTH_NAME, config_msg.msg.length_cfg.line_length_m);
       lane.pref.putFloat(PREF_ACTIVE_LENGTH_NAME, config_msg.msg.length_cfg.active_length_m);
       lane.pref.putFloat(PREF_TOTAL_LENGTH_NAME, config_msg.msg.length_cfg.total_length_m);
       lane.pref.putULong(PREF_LINE_LEDs_NUM_NAME, config_msg.msg.length_cfg.line_leds_num);
-      lane.cfg.finish_length = meter(config_msg.msg.length_cfg.total_length_m);
       lane.cfg.line_length   = meter(config_msg.msg.length_cfg.line_length_m);
       lane.cfg.active_length = meter(config_msg.msg.length_cfg.active_length_m);
+      lane.cfg.finish_length = meter(config_msg.msg.length_cfg.total_length_m);
+      lane.cfg.line_LEDs_num = config_msg.msg.length_cfg.line_leds_num;
       lane.setMaxLEDs(config_msg.msg.length_cfg.line_leds_num);
       break;
     }
@@ -89,8 +95,7 @@ void Lane::ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, Nim
            config_msg.length_cfg.line_length_m, config_msg.length_cfg.active_length_m,
            config_msg.length_cfg.total_length_m, config_msg.length_cfg.line_leds_num,
            config_msg.color_cfg.rgb);
-  auto ok = pb_encode(&ostream, LaneConfigRO_fields, &config_msg);
-  if (!ok) {
+  if (const auto ok = pb_encode(&ostream, LaneConfigRO_fields, &config_msg); !ok) {
     ESP_LOGE(TAG, "encode: %s", PB_GET_ERROR(&ostream));
     return;
   }

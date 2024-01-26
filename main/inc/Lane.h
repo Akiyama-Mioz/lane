@@ -46,7 +46,7 @@ struct LaneState {
   float speed = 0;
   // head should be always larger than tail
   meter head = meter(0);
-  /// hidden head for calculation
+  // hidden head for calculation
   meter _head       = meter(0);
   meter tail        = meter(0);
   LaneStatus status = LaneStatus::STOP;
@@ -101,7 +101,7 @@ private:
   /**
    * @brief The ControlCharCallback class, which can notify the client the current state of the strip and accept the input from the client.
    */
-  class ControlCharCallback : public NimBLECharacteristicCallbacks {
+  class ControlCharCallback final : public NimBLECharacteristicCallbacks {
     lane::Lane &lane;
 
   public:
@@ -110,7 +110,7 @@ private:
     explicit ControlCharCallback(lane::Lane &lane) : lane(lane){};
   };
 
-  class ConfigCharCallback : public NimBLECharacteristicCallbacks {
+  class ConfigCharCallback final : public NimBLECharacteristicCallbacks {
     lane::Lane &lane;
 
   public:
@@ -220,15 +220,15 @@ public:
     this->cfg = newCfg;
   };
 
-  void setSpeed(float speed) {
+  void setSpeed(const float speed) {
     this->params.speed = speed;
   };
 
-  void setColor(uint32_t color) {
+  void setColor(const uint32_t color) {
     this->cfg.color = color;
   };
 
-  void setStatus(LaneStatus status) {
+  void setStatus(const LaneStatus status) {
     this->params.status = status;
   };
 

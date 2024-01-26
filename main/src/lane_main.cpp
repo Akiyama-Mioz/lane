@@ -41,7 +41,7 @@ struct handle_message_callbacks_t {
 
 void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_t &callbacks) {
   static constexpr auto TAG = "handle_message";
-  bool callback_ok          = callbacks.get_device_by_key != nullptr &&
+  const bool callback_ok          = callbacks.get_device_by_key != nullptr &&
                      callbacks.update_device != nullptr &&
                      callbacks.rf_send != nullptr &&
                      callbacks.on_hr_data != nullptr;
@@ -50,7 +50,7 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
     return;
   }
   static auto rng = etl::random_xorshift(esp_random());
-  auto magic      = pdata[0];
+  const auto magic      = pdata[0];
   switch (magic) {
     case HrLoRa::hr_data::magic: {
       if (const auto hr_data_ = HrLoRa::hr_data::unmarshal(pdata, size)) {
@@ -291,7 +291,7 @@ void app_main() {
     esp_restart();
   }
   static auto rf = LLCC68(&module);
-  auto st        = rf.begin(433.2, 500.0, 10, 7,
+  const auto st        = rf.begin(433.2, 500.0, 10, 7,
                             RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 8, 1.6);
   if (st != RADIOLIB_ERR_NONE) {
     ESP_LOGE("rf", "failed, code %d", st);
@@ -324,7 +324,7 @@ void app_main() {
         .addr = HrLoRa::query_device_by_mac::broadcast_addr};
 
     uint8_t buf[16];
-    auto sz = HrLoRa::query_device_by_mac::marshal(req, buf, sizeof(buf));
+    const auto sz = HrLoRa::query_device_by_mac::marshal(req, buf, sizeof(buf));
     if (sz == 0) {
       ESP_LOGE("send status request", "failed to marshal");
       return;
