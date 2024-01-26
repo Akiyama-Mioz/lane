@@ -6,16 +6,16 @@
 #include "Strip.hpp"
 #include <esp_check.h>
 
-static const auto TAG = "LANE";
+static const auto TAG = "lane";
 
 // the resolution is the clock frequency instead of strip frequency
-const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
+constexpr auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
 
-static inline int meterToLEDsCount(float meter, float LEDs_per_meter) {
+static inline int meterToLEDsCount(const float meter, const float LEDs_per_meter) {
   return std::abs(static_cast<int>(std::round(meter * LEDs_per_meter))) + 1;
 }
 
-static inline float LEDsCountToMeter(uint32_t count, float LEDs_per_meter) {
+static inline float LEDsCountToMeter(const uint32_t count, const float LEDs_per_meter) {
   if (count <= 1) {
     return 0;
   } else {
@@ -54,9 +54,9 @@ inline LaneStatus revert_state(LaneStatus state) {
  */
 static std::tuple<LaneState, LaneParams>
 nextState(const LaneState &last_state, const LaneConfig &cfg, const LaneParams &input) {
-  auto TAG        = "lane::nextState";
-  auto zero_state = LaneState::zero();
-  auto stop_case  = [=]() {
+  constexpr auto TAG = "lane::nextState";
+  auto zero_state    = LaneState::zero();
+  auto stop_case     = [=]() {
     switch (input.status) {
       case LaneStatus::FORWARD: {
         auto ret   = zero_state;
@@ -225,8 +225,8 @@ struct UpdateTaskParam {
         break;
       }
       case LaneStatus::BLINK: {
-        auto const BLINK_INTERVAL = std::chrono::milliseconds(500);
-        auto delay                = pdMS_TO_TICKS(BLINK_INTERVAL.count());
+        constexpr auto BLINK_INTERVAL = std::chrono::milliseconds(500);
+        constexpr auto delay          = pdMS_TO_TICKS(BLINK_INTERVAL.count());
         delete_timer();
         stop();
         vTaskDelay(delay);
@@ -310,13 +310,13 @@ void Lane::iterate() {
   }
   auto [next_state, params] = nextState(this->state, this->cfg, this->params);
   // meter
-  auto head       = this->state.head.count();
-  auto tail       = this->state.tail.count();
-  auto length     = head - tail >= 0 ? head - tail : 0;
-  auto head_index = meterToLEDsCount(head, LEDsPerMeter());
-  auto tail_index = meterToLEDsCount(tail, LEDsPerMeter());
-  auto count      = meterToLEDsCount(length, LEDsPerMeter());
-  this->params    = params;
+  const auto head       = this->state.head.count();
+  const auto tail       = this->state.tail.count();
+  const auto length     = head - tail >= 0 ? head - tail : 0;
+  auto head_index       = meterToLEDsCount(head, LEDsPerMeter());
+  const auto tail_index = meterToLEDsCount(tail, LEDsPerMeter());
+  const auto count      = meterToLEDsCount(length, LEDsPerMeter());
+  this->params          = params;
   if (head_index > this->cfg.line_LEDs_num) {
     head_index = this->cfg.line_LEDs_num;
   }
@@ -331,7 +331,8 @@ void Lane::iterate() {
       break;
     }
     default:
-      return;
+      break;
+      ;
   }
 }
 
