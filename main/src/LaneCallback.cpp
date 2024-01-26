@@ -2,6 +2,8 @@
 // Created by Kurosu Chan on 2023/7/31.
 //
 
+#include <pb_common.h>
+#include <pb_decode.h>
 #include "Lane.h"
 #include "utils.h"
 

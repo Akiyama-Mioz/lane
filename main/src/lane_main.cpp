@@ -53,14 +53,13 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
   auto magic      = pdata[0];
   switch (magic) {
     case HrLoRa::hr_data::magic: {
-      auto p_hr_data = HrLoRa::hr_data::unmarshal(pdata, size);
-      if (p_hr_data) {
-        auto p_dev = callbacks.get_device_by_key(p_hr_data->key);
+      if (const auto hr_data_ = HrLoRa::hr_data::unmarshal(pdata, size)) {
+        auto p_dev = callbacks.get_device_by_key(hr_data_->key);
         if (!p_dev) {
-          ESP_LOGW(TAG, "no name for key %d", p_hr_data->key);
+          ESP_LOGW(TAG, "no name for key %d", hr_data_->key);
           return;
         }
-        callbacks.on_hr_data(p_dev->name, p_hr_data->hr);
+        callbacks.on_hr_data(p_dev->name, hr_data_->hr);
       }
       break;
     }
@@ -77,8 +76,7 @@ void handle_message(uint8_t *pdata, size_t size, const handle_message_callbacks_
                    utils::toHex(hr_data_->addr.data(), hr_data_->addr.size()).c_str());
           return;
         }
-        const auto name = dev_->name;
-        if (name.empty()) {
+        if (const auto name = dev_->name; name.empty()) {
           auto addr_str = utils::toHex(hr_data_->addr.data(), hr_data_->addr.size());
           callbacks.on_hr_data(addr_str, hr_data_->hr);
         } else {
@@ -142,8 +140,7 @@ void try_transmit(uint8_t *data, size_t size,
     ESP_LOGE(TAG, "failed to take rf_lock; no transmission happens;");
     return;
   }
-  auto err = rf.transmit(data, size);
-  if (err == RADIOLIB_ERR_NONE) {
+  if (const auto err = rf.transmit(data, size); err == RADIOLIB_ERR_NONE) {
     // ok
   } else if (err == RADIOLIB_ERR_TX_TIMEOUT) {
     ESP_LOGW(TAG, "tx timeout; please check the busy pin;");
@@ -231,7 +228,7 @@ private:
 
 public:
   void start() {
-    auto run_timer_task = [](TimerHandle_t timer) {
+    const auto run_timer_task = [](TimerHandle_t timer) {
       auto &self = *static_cast<StatusRequester *>(pvTimerGetTimerID(timer));
       self.send_status_request();
       const auto target_interval = std::chrono::duration_cast<std::chrono::seconds>(self.get_target_request_interval());

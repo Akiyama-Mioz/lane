@@ -45,7 +45,7 @@ void set_decode_white_item_addr(::WhiteItem &item, const addr_fn &write_addr) {
       return false;
     }
 
-    const auto &w = *reinterpret_cast<addr_fn *>(*arg);
+    const auto &w = *static_cast<addr_fn *>(*arg);
     if (!pb_read(stream, addr.addr.data(), BLE_MAC_ADDR_SIZE)) {
       LOG_ERR("white_list", "failed to read mac");
       return false;
@@ -61,7 +61,7 @@ void set_decode_white_item_name(::WhiteItem &item, const name_fn &write_name) {
       return false;
     }
     auto name     = Name{};
-    const auto &w = *reinterpret_cast<name_fn *>(*arg);
+    const auto &w = *static_cast<name_fn *>(*arg);
     // the 0x00 in the end?
     name.name.resize(stream->bytes_left + 1);
     if (!pb_read(stream, reinterpret_cast<pb_byte_t *>(name.name.data()), stream->bytes_left)) {
@@ -80,7 +80,7 @@ bool set_encode_white_item(::WhiteItem &pb_item, const item_t &item) {
     //  It can write as many or as few fields as it likes. For example,
     //  if you want to write out an array as repeated field, you should do it all in a single call.
     pb_item.item.name.funcs.encode = [](pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
-      const auto &name = *reinterpret_cast<const Name *>(*arg);
+      const auto &name = *static_cast<const Name *>(*arg);
       if (!pb_encode_tag_for_field(stream, field)) {
         return false;
       }
@@ -149,7 +149,7 @@ bool marshal_white_list_response(pb_ostream_t *ostream, ::WhiteListResponse &pb_
  * @brief Get the tag from istream without mutating it. Useful for oneof.
  * @param istream the stream to get tag from (usually is a parameter from a decode callback)
  */
-uint32_t pb_get_tag(pb_istream_t *istream) {
+uint32_t pb_get_tag(const pb_istream_t *istream) {
   pb_wire_type_t wire_type;
   uint32_t tag;
   // `pb_decode_tag` will mutate the original stream, create a copy
@@ -168,7 +168,7 @@ void set_decode_white_list(::WhiteList &list, DecodeWhiteListCallbacks &callback
   auto white_list_decode = [](pb_istream_t *stream, const pb_field_iter_t *field, void **arg) {
     const auto TAG = "unmarshal_set_white_list_callback";
     // https://stackoverflow.com/questions/73529672/decoding-oneof-nanopb
-    auto &cbs = *reinterpret_cast<DecodeWhiteListCallbacks *>(*arg);
+    auto &cbs = *static_cast<DecodeWhiteListCallbacks *>(*arg);
     if (field->tag == WhiteList_items_tag) {
       ::WhiteItem item = WhiteItem_init_zero;
 

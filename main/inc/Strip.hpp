@@ -1,8 +1,7 @@
 // include guard
 #ifndef TRACK_LONG_STRIP_HPP
 #define TRACK_LONG_STRIP_HPP
-#include "../../../../esp-idf/components/esp_common/include/esp_check.h"
-#include "../../components/NeoPixel/Adafruit_NeoPixel/Adafruit_NeoPixel.h"
+#include "Adafruit_NeoPixel.h"
 #ifdef ESP_LED_STRIP
 #include "led_strip.h"
 #endif
@@ -33,7 +32,6 @@ public:
   };
   /**
    * @note expect to call `show` inside the function
-   * @param total
    * @param start
    * @param count
    * @param color
@@ -177,15 +175,15 @@ public:
 
 class AdafruitPixel : public IStrip {
 private:
-  size_t max_LEDs          = 0;
-  uint8_t pin              = GPIO_NUM_NC;
-  Adafruit_NeoPixel *pixel = nullptr;
+  size_t max_LEDs = 0;
+  uint8_t pin     = GPIO_NUM_NC;
+  std::unique_ptr<Adafruit_NeoPixel> pixel{};
   neoPixelType pixelType;
   bool has_begun = false;
 
 public:
   explicit AdafruitPixel(size_t max_LEDs, uint8_t pin, neoPixelType pixel_type) : max_LEDs(max_LEDs), pin(pin), pixelType(pixel_type) {
-    pixel = new Adafruit_NeoPixel(max_LEDs, pin, pixel_type);
+    pixel = std::make_unique<Adafruit_NeoPixel>(max_LEDs, pin, pixel_type);
     pixel->setBrightness(255);
   }
 
@@ -222,9 +220,7 @@ public:
       return false;
     }
     this->max_LEDs = new_max_LEDs;
-    const auto old = pixel;
-    pixel          = new Adafruit_NeoPixel(new_max_LEDs, pin, pixelType);
-    delete old;
+    pixel          = std::make_unique<Adafruit_NeoPixel>(max_LEDs, pin, pixelType);
     pixel->setBrightness(255);
     if (has_begun) {
       pixel->begin();

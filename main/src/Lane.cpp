@@ -181,7 +181,7 @@ struct UpdateTaskParam {
       };
 
       auto run_notify_fn = [](TimerHandle_t handle) {
-        auto &param = *static_cast<notify_timer_param *>(pvTimerGetTimerID(handle));
+        const auto &param = *static_cast<notify_timer_param *>(pvTimerGetTimerID(handle));
         param.fn();
       };
 
@@ -207,12 +207,12 @@ struct UpdateTaskParam {
         instant.reset();
         iterate();
         try_create_timer();
-        auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
-        auto delay = std::chrono::milliseconds(static_cast<uint16_t>(1000 / cfg.fps)) - diff;
+        const auto diff  = std::chrono::duration_cast<std::chrono::milliseconds>(instant.elapsed());
+        const auto delay = std::chrono::milliseconds(static_cast<uint16_t>(1000 / cfg.fps)) - diff;
         if (delay < std::chrono::milliseconds(0)) [[unlikely]] {
           ESP_LOGW(TAG, "timeout %lld", delay.count());
         } else {
-          auto ticks = pdMS_TO_TICKS(delay.count());
+          const auto ticks = pdMS_TO_TICKS(delay.count());
           vTaskDelay(ticks);
         }
         break;
@@ -275,8 +275,7 @@ void Lane::notifyState(LaneState st) {
   pb_st.speed       = st.speed;
   pb_st.status      = static_cast<::LaneStatus>(st.status);
   auto stream       = pb_ostream_from_buffer(buf.data(), buf.size());
-  auto ok           = pb_encode(&stream, LaneState_fields, &pb_st);
-  if (!ok) {
+  if (const auto ok = pb_encode(&stream, LaneState_fields, &pb_st); !ok) {
     ESP_LOGE(TAG, "Failed to encode the state");
     return;
   }
@@ -313,14 +312,10 @@ void Lane::iterate() {
   const auto head       = this->state.head.count();
   const auto tail       = this->state.tail.count();
   const auto length     = head - tail >= 0 ? head - tail : 0;
-  auto head_index       = meterToLEDsCount(head, LEDsPerMeter());
   const auto tail_index = meterToLEDsCount(tail, LEDsPerMeter());
   const auto count      = meterToLEDsCount(length, LEDsPerMeter());
   this->params          = params;
-  if (head_index > this->cfg.line_LEDs_num) {
-    head_index = this->cfg.line_LEDs_num;
-  }
-  this->state = next_state;
+  this->state           = next_state;
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
       strip->fill_and_show_forward(tail_index, count, cfg.color);

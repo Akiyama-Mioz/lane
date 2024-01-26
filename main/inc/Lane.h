@@ -9,13 +9,7 @@
 #include <freertos/task.h>
 #include <NimBLEDevice.h>
 #include <Preferences.h>
-#include <esp_random.h>
-#include <map>
-#include <vector>
 #include <memory>
-#include <pb_common.h>
-#include <pb_decode.h>
-#include <Adafruit_NeoPixel.h>
 #include "utils.h"
 #include "lane.pb.h"
 #include "Strip.hpp"
@@ -171,7 +165,6 @@ private:
    * @brief config the characteristic for BLE
    * @param[in] server
    * @param[out] ble the LaneBLE to be written, expected to be initialized
-   * @param[in] lane
    * @warning `ctrl_cb` and `config_cb` are static variables, so they are initialized only once.
    * It would be a problem if you have multiple lanes. However, nobody would do that.
    */
@@ -203,7 +196,6 @@ public:
    * @brief Loop the strip.
    * @warning This function will never return and you should call this in creatTask/Thread
    *          or something equivalent in RTOS.
-   * @param void void
    * @return No return
    */
   [[noreturn]] void loop();
@@ -211,8 +203,7 @@ public:
   /**
    * @brief sets the maximum number of LEDs that can be used. i.e. Circle Length.
    * @warning This function will NOT set the corresponding bluetooth characteristic value.
-   * @param new_max_LEDs
-   * @param [in,out]cfg mutate in place
+   * @param new_max_LEDs the new maximum number of LEDs
    */
   void setMaxLEDs(uint32_t new_max_LEDs);
 
@@ -242,8 +233,7 @@ public:
   };
 
   void setStatus(::LaneStatus status) {
-    auto s              = static_cast<LaneStatus>(status);
-    this->params.status = s;
+    this->params.status = static_cast<LaneStatus>(status);
   }
 
   inline void resetDecodeBuffer() {

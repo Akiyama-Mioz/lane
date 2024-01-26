@@ -3,7 +3,6 @@
 //
 
 #include "ScanCallback.h"
-#include <string_view>
 #include <charconv>
 #include <esp_pthread.h>
 #include <freertos/FreeRTOS.h>

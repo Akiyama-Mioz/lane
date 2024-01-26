@@ -6,7 +6,6 @@
 
 #include <chrono>
 #include <algorithm>
-#include <sstream>
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -48,10 +47,10 @@ class ValueRetriever {
 private:
   std::map<int, T> m;
   std::vector<int> keys;
-  int max_key = 0;
+  size_t max_key{};
 
 public:
-  [[nodiscard]] int getMaxKey() const {
+  [[nodiscard]] decltype(max_key) getMaxKey() const {
     return max_key;
   }
 
@@ -104,26 +103,25 @@ public:
   }
 
   /// get the difference between now and the time Instant declared
-  duration_t elapsed() {
-    auto now      = std::chrono::steady_clock::now();
-    auto duration = now - this->time;
+  duration_t elapsed() const {
+    const auto now      = std::chrono::steady_clock::now();
+    const auto duration = now - this->time;
     return duration;
   }
 
   void reset() {
-    auto now   = std::chrono::steady_clock::now();
-    this->time = now;
+    const auto now = std::chrono::steady_clock::now();
+    this->time     = now;
   }
 
   duration_t elapsed_and_reset() {
-    auto now      = std::chrono::steady_clock::now();
-    auto duration = now - this->time;
-    this->time    = now;
+    const auto now      = std::chrono::steady_clock::now();
+    const auto duration = now - this->time;
+    this->time          = now;
     return duration;
   }
 
-  /// get inner time
-  [[nodiscard]] decltype(std::chrono::steady_clock::now()) getTime() const {
+  [[nodiscard]] decltype(std::chrono::steady_clock::now()) count() const {
     return time;
   }
 };
@@ -138,26 +136,26 @@ public:
     this->time = esp_timer_get_time();
   }
 
-  duration_t elapsed() {
-    auto now      = esp_timer_get_time();
-    auto diff     = now - this->time;
-    auto duration = duration_t{diff};
+  duration_t elapsed() const {
+    const auto now      = esp_timer_get_time();
+    const auto diff     = now - this->time;
+    const auto duration = duration_t{diff};
     return duration;
   }
 
   void reset() {
-    auto now   = esp_timer_get_time();
-    this->time = now;
+    const auto now = esp_timer_get_time();
+    this->time     = now;
   }
 
   duration_t elapsed_and_reset() {
-    auto now      = esp_timer_get_time();
-    auto duration = now - this->time;
-    this->time    = now;
+    const auto now      = esp_timer_get_time();
+    const auto duration = now - this->time;
+    this->time          = now;
     return duration_t{duration};
   }
 
-  time_point_t getTime() {
+  [[nodiscard]] time_point_t count() const {
     return time;
   }
 };
@@ -202,27 +200,27 @@ public:
   using rep   = Rep;
   using ratio = RI;
   using Self  = length<Rep, RI>;
-  Rep count() const {
+  constexpr Rep count() const {
     return value;
   }
   length() = default;
-  explicit length(Rep rep) : value(rep) {}
+  explicit constexpr length(Rep rep) : value(rep) {}
 
-  Self operator+=(const Self rhs) const {
+  constexpr Self operator+=(const Self rhs) const {
     value += rhs.value;
     return *this;
   }
 
-  Self operator-=(const Self rhs) const {
+  constexpr Self operator-=(const Self rhs) const {
     value -= rhs.value;
     return *this;
   }
 
-  Self operator+(Self rhs) const {
+  constexpr Self operator+(Self rhs) const {
     return Self(value + rhs.value);
   }
 
-  Self operator-(const Self rhs) const {
+  constexpr Self operator-(const Self rhs) const {
     return Self(value - rhs.value);
   }
 
@@ -232,7 +230,7 @@ public:
 #if __cplusplus >= 202002L
     requires std::is_arithmetic_v<U>
 #endif
-  Self operator*(U rhs) const {
+  constexpr Self operator*(U rhs) const {
     return Self(value * rhs);
   }
 
@@ -240,33 +238,33 @@ public:
 #if __cplusplus >= 202002L
     requires std::is_arithmetic_v<U>
 #endif
-  Self operator/(U rhs) const {
+  constexpr Self operator/(U rhs) const {
     return Self(value / rhs);
   }
 
   // Comparison operators
 
-  bool operator==(const Self rhs) const {
+  constexpr bool operator==(const Self rhs) const {
     return value == rhs.value;
   }
 
-  bool operator!=(const Self rhs) const {
+  constexpr bool operator!=(const Self rhs) const {
     return value != rhs.value;
   }
 
-  bool operator<(const Self rhs) const {
+  constexpr bool operator<(const Self rhs) const {
     return value < rhs.value;
   }
 
-  bool operator>(const Self rhs) const {
+  constexpr bool operator>(const Self rhs) const {
     return value > rhs.value;
   }
 
-  bool operator<=(const Self rhs) const {
+  constexpr bool operator<=(const Self rhs) const {
     return value <= rhs.value;
   }
 
-  bool operator>=(const Self rhs) const {
+  constexpr bool operator>=(const Self rhs) const {
     return value >= rhs.value;
   }
 };
@@ -274,7 +272,7 @@ public:
 template <class FromLength, class ToLength,
           class RI = typename std::ratio_divide<typename FromLength::ratio, typename ToLength::ratio>::type>
 struct __length_cast {
-  ToLength operator()(const FromLength &fl) const {
+  constexpr ToLength operator()(const FromLength &fl) const {
     using _Ct = typename std::common_type<typename FromLength::rep, typename ToLength::rep, intmax_t>::type;
     return ToLength(static_cast<typename ToLength::rep>(
         static_cast<_Ct>(fl.count()) * static_cast<_Ct>(RI::num) / static_cast<_Ct>(RI::den)));
@@ -285,7 +283,7 @@ template <class ToLength, class Rep, class RI>
 #if __cplusplus >= 202002L
   requires std::is_arithmetic_v<Rep> && is_ratio<RI>
 #endif
-ToLength length_cast(const length<Rep, RI> &fl) {
+constexpr ToLength length_cast(const length<Rep, RI> &fl) {
   return __length_cast<length<Rep, RI>, ToLength>()(fl);
 }
 

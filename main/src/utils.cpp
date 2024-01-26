@@ -14,9 +14,9 @@ size_t sprintHex(char *out, size_t outSize, const uint8_t *bytes, size_t size) {
   }
   while (i < (size * 2)) {
     // consider endianness
-    uint8_t byte   = bytes[i / 2];
-    uint8_t nibble = (i % 2 == 0) ? (byte >> 4) : (byte & 0x0F);
-    out[i++]       = (nibble < 10) ? ('0' + nibble) : ('a' + nibble - 10);
+    const uint8_t byte   = bytes[i / 2];
+    const uint8_t nibble = (i % 2 == 0) ? (byte >> 4) : (byte & 0x0F);
+    out[i++]             = (nibble < 10) ? ('0' + nibble) : ('a' + nibble - 10);
   }
   return i;
 };
@@ -24,7 +24,8 @@ size_t sprintHex(char *out, size_t outSize, const uint8_t *bytes, size_t size) {
 std::string toHex(const uint8_t *bytes, size_t size) {
   auto sizeNeeded = size * 2;
   auto res        = std::string(sizeNeeded, '\0');
-  auto _len       = sprintHex(const_cast<char *>(res.data()), sizeNeeded, bytes, size);
+  auto _          = sprintHex(res.data(), sizeNeeded, bytes, size);
+  static_cast<void>(_);
   return res;
 }
 }
