@@ -6,8 +6,9 @@ In your IDF directory.
 cd $IDF_PATH
 # I assume your origin is 
 # https://github.com/espressif/esp-idf.git
-git fetch origin v4.4.5
-git checkout v4.4.5
+# or v4.4.6
+git fetch origin release/v4.4
+git checkout release/v4.4
 git submodule update --init --recursive
 ./install.sh
 source export.sh

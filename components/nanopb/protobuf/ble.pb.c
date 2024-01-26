@@ -12,16 +12,13 @@ PB_BIND(WhiteItem, WhiteItem, AUTO)
 PB_BIND(WhiteList, WhiteList, AUTO)
 
 
-PB_BIND(AddWhiteItem, AddWhiteItem, AUTO)
-
-
-PB_BIND(SetWhiteList, SetWhiteList, AUTO)
+PB_BIND(bluetooth_device_pb, bluetooth_device_pb, AUTO)
 
 
 PB_BIND(WhiteListResponse, WhiteListResponse, AUTO)
 
 
-PB_BIND(WhiteListCommandRequest, WhiteListCommandRequest, AUTO)
+PB_BIND(WhiteListRequest, WhiteListRequest, AUTO)
 
 
 

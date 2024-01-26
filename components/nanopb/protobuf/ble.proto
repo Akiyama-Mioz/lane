@@ -13,37 +13,36 @@ message WhiteList {
 }
 
 enum WhiteListCommand {
-  REMOVE = 0;
-  CLEAR = 1;
-  // response with WhiteListResponse
-  REQUEST = 2;
+  // response with list
+  REQUEST = 0;
 }
 
-enum BlueScanErrorCode {
-  OUT_OF_MEMORY = 0;
-  TOO_MANY_DEVICES = 1;
+enum WhiteListErrorCode {
+  OK = 0;
+  NULL = 1;
+  OUT_OF_MEMORY = 2;
 }
 
-message AddWhiteItem {
-  WhiteItem item = 1;
+message bluetooth_device_pb {
+  bytes mac = 1;
+  string name = 2;
 }
 
-message SetWhiteList {
-  WhiteList list = 1;
-}
+//message scan_result_pb {
+//  repeated bluetooth_device_pb devices = 1;
+//}
 
 message WhiteListResponse {
   oneof response {
     WhiteList list = 1;
-    BlueScanErrorCode code = 2;
+    WhiteListErrorCode code = 2;
   }
 }
 
-message WhiteListCommandRequest {
+message WhiteListRequest {
   oneof request {
     WhiteListCommand command = 1;
-    AddWhiteItem add = 2;
-    SetWhiteList set = 3;
+    WhiteList set = 2;
   }
 }
 

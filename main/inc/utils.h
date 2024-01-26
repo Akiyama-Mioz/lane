@@ -18,10 +18,6 @@
 #include <concepts>
 #endif
 
-std::string to_hex(const std::basic_string<char> &s);
-std::string to_hex(const char *s, size_t len);
-std::string to_hex(const uint8_t *s, size_t len);
-
 /**
  * @brief a function retrieve value by the number nearing the key. always move a unit up.
  *
@@ -96,48 +92,6 @@ public:
   }
 };
 
-/**
- * @brief A auxiliary class to handle the callback of nanopb encoding.
- *        This exists because the need for
- * @warning: T must be a pointer type (with a little star behind it)
- */
-template <class T>
-struct PbEncodeCallback {
-  using PbEncodeFunc = bool (*)(pb_ostream_t *stream, const pb_field_t *field, T const *arg);
-  using PbEncodeVoid = bool (*)(pb_ostream_t *stream, const pb_field_t *field, void *const *arg);
-  /**
-   * @brief The parameter should be passed to the func with pointer type T.
-   */
-  T arg;
-  /**
-   * @brief The function to be called when encoding.
-   */
-  PbEncodeFunc func;
-
-  /**
-   * @brief cast the function to the type of PbEncodeCallbackVoid.
-   * @return a function pointer of bool (*)(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
-   */
-  inline PbEncodeVoid func_to_void() {
-    return reinterpret_cast<PbEncodeVoid>(func);
-  }
-
-  /**
-   * @brief cast the arg (which should already be a pointer) to void *.
-   * @return void *
-   */
-  inline void *arg_to_void() {
-    return const_cast<void *>(reinterpret_cast<const void *>(arg));
-  }
-
-  /**
-   * @note constructor is deleted. use the struct initializer instead.
-   * @warning T must be a pointer type (with a little star behind it)
-   * @see <a href="https://en.cppreference.com/w/c/language/struct_initialization">Struct Initialization</a>
-   */
-  // PbEncodeCallback() = delete;
-};
-
 using tp = decltype(std::chrono::steady_clock::now());
 
 class Instant {
@@ -209,6 +163,21 @@ public:
 };
 
 namespace utils {
+
+/**
+ * @brief put hex string to out
+ * @param out the output buffer
+ * @param outSize the size of output buffer, will NOT include the null terminator
+ * @param bytes the input bytes
+ * @param size the size of input bytes
+ * @return the length of output string
+ * @note length of output string will not include the null terminator
+ *       and the user should add it manually to the buffer, if null terminator is needed
+ */
+size_t sprintHex(char *out, size_t outSize, const uint8_t *bytes, size_t size);
+
+std::string toHex(const uint8_t *bytes, size_t size);
+
 #if __cplusplus >= 202002L
 template <typename T>
 concept is_intmax_t = std::is_same_v<T, decltype(std::ratio<1>::num) &>;
@@ -221,21 +190,6 @@ concept is_ratio = requires(T t) {
   { t.den } -> is_intmax_t;
 };
 #endif
-
-///// basic string
-//bool is_start_with(const std::string &str, const std::string &prefix) {
-//  return str.find(prefix, 0) == 0;
-//};
-//
-///// sentinel (zero terminated) string
-//bool is_start_with(const std::string &str, const char *prefix) {
-//  return str.find(prefix, 0) == 0;
-//};
-//
-///// string with length
-//bool is_start_with(const std::string &str, const char *prefix, size_t len) {
-//  return str.find(prefix, 0, len) == 0;
-//};
 
 template <class Rep, class RI = std::ratio<1>>
 #if __cplusplus >= 202002L

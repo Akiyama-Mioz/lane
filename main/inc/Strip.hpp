@@ -1,8 +1,8 @@
 // include guard
 #ifndef TRACK_LONG_STRIP_HPP
 #define TRACK_LONG_STRIP_HPP
-#include <esp_check.h>
-#include <Adafruit_NeoPixel.h>
+#include "../../../../esp-idf/components/esp_common/include/esp_check.h"
+#include "../../components/NeoPixel/Adafruit_NeoPixel/Adafruit_NeoPixel.h"
 #ifdef ESP_LED_STRIP
 #include "led_strip.h"
 #endif
@@ -59,8 +59,8 @@ public:
   virtual bool show()                                           = 0;
   virtual bool begin()                                          = 0;
   virtual bool set_max_LEDs(size_t new_max_LEDs)                = 0;
-  virtual size_t get_max_LEDs() const                           = 0;
-  // resolve some complain in destructor
+  [[nodiscard]] virtual size_t get_max_LEDs() const             = 0;
+  // resolve some  complain in destructor
   virtual ~IStrip() = default;
 };
 
@@ -175,21 +175,21 @@ public:
 };
 #endif
 
-class AdafruitPixel final : public IStrip {
+class AdafruitPixel : public IStrip {
 private:
-  size_t max_LEDs = 0;
-  uint8_t pin     = GPIO_NUM_NC;
-  neoPixelType pixelType;
+  size_t max_LEDs                          = 0;
+  uint8_t pin                              = GPIO_NUM_NC;
   std::unique_ptr<Adafruit_NeoPixel> pixel = nullptr;
+  neoPixelType pixelType;
+  bool has_begun = false;
 
 public:
-  static constexpr neoPixelType default_pixel_type = NEO_RGB + NEO_KHZ800;
   explicit AdafruitPixel(size_t max_LEDs, uint8_t pin, neoPixelType pixel_type) : max_LEDs(max_LEDs), pin(pin), pixelType(pixel_type) {
-    pixel = std::make_unique<Adafruit_NeoPixel>(max_LEDs, pin, pixel_type);
+    pixel = std::make_unique<Adafruit_NeoPixel>(Adafruit_NeoPixel(max_LEDs, pin, pixel_type));
     pixel->setBrightness(255);
   }
 
-  // move constructor
+  /// move constructor
   AdafruitPixel(AdafruitPixel &&rhs) noexcept {
     this->max_LEDs  = rhs.max_LEDs;
     this->pin       = rhs.pin;
@@ -201,7 +201,11 @@ public:
   void operator=(AdafruitPixel const &rhs) = delete;
 
   bool begin() override {
+    if (pixel == nullptr) {
+      return false;
+    }
     pixel->begin();
+    has_begun = true;
     return true;
   }
 
@@ -218,12 +222,15 @@ public:
       return false;
     }
     this->max_LEDs = new_max_LEDs;
-    pixel          = std::make_unique<Adafruit_NeoPixel>(new_max_LEDs, pin, pixelType);
+    pixel          = std::make_unique<Adafruit_NeoPixel>(Adafruit_NeoPixel(new_max_LEDs, pin, pixelType));
     pixel->setBrightness(255);
+    if (has_begun) {
+      pixel->begin();
+    }
     return true;
   }
 
-  size_t get_max_LEDs() const override {
+  [[nodiscard]] size_t get_max_LEDs() const override {
     return max_LEDs;
   }
 

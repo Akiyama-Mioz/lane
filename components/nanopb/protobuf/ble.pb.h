@@ -11,16 +11,15 @@
 
 /* Enum definitions */
 typedef enum _WhiteListCommand {
-    WhiteListCommand_REMOVE = 0,
-    WhiteListCommand_CLEAR = 1,
-    /* response with WhiteListResponse */
-    WhiteListCommand_REQUEST = 2
+    /* response with list */
+    WhiteListCommand_REQUEST = 0
 } WhiteListCommand;
 
-typedef enum _BlueScanErrorCode {
-    BlueScanErrorCode_OUT_OF_MEMORY = 0,
-    BlueScanErrorCode_TOO_MANY_DEVICES = 1
-} BlueScanErrorCode;
+typedef enum _WhiteListErrorCode {
+    WhiteListErrorCode_OK = 0,
+    WhiteListErrorCode_NULL = 1,
+    WhiteListErrorCode_OUT_OF_MEMORY = 2
+} WhiteListErrorCode;
 
 /* Struct definitions */
 typedef struct _WhiteItem {
@@ -36,42 +35,32 @@ typedef struct _WhiteList {
     pb_callback_t items;
 } WhiteList;
 
-typedef struct _AddWhiteItem {
-    bool has_item;
-    WhiteItem item;
-} AddWhiteItem;
-
-typedef struct _SetWhiteList {
-    bool has_list;
-    WhiteList list;
-} SetWhiteList;
+typedef struct _WhiteListRequest {
+    WhiteListCommand command;
+    bool has_set;
+    WhiteList set;
+} WhiteListRequest;
 
 typedef struct _WhiteListResponse {
-    pb_size_t which_response;
-    union {
-        WhiteList list;
-        BlueScanErrorCode code;
-    } response;
+    bool has_list;
+    WhiteList list;
+    WhiteListErrorCode code;
 } WhiteListResponse;
 
-typedef struct _WhiteListCommandRequest {
-    pb_size_t which_request;
-    union {
-        WhiteListCommand command;
-        AddWhiteItem add;
-        SetWhiteList set;
-    } request;
-} WhiteListCommandRequest;
+typedef struct _bluetooth_device_pb {
+    pb_callback_t mac;
+    char name[21];
+} bluetooth_device_pb;
 
 
 /* Helper constants for enums */
-#define _WhiteListCommand_MIN WhiteListCommand_REMOVE
+#define _WhiteListCommand_MIN WhiteListCommand_REQUEST
 #define _WhiteListCommand_MAX WhiteListCommand_REQUEST
 #define _WhiteListCommand_ARRAYSIZE ((WhiteListCommand)(WhiteListCommand_REQUEST+1))
 
-#define _BlueScanErrorCode_MIN BlueScanErrorCode_OUT_OF_MEMORY
-#define _BlueScanErrorCode_MAX BlueScanErrorCode_TOO_MANY_DEVICES
-#define _BlueScanErrorCode_ARRAYSIZE ((BlueScanErrorCode)(BlueScanErrorCode_TOO_MANY_DEVICES+1))
+#define _WhiteListErrorCode_MIN WhiteListErrorCode_OK
+#define _WhiteListErrorCode_MAX WhiteListErrorCode_OUT_OF_MEMORY
+#define _WhiteListErrorCode_ARRAYSIZE ((WhiteListErrorCode)(WhiteListErrorCode_OUT_OF_MEMORY+1))
 
 
 #ifdef __cplusplus
@@ -81,28 +70,25 @@ extern "C" {
 /* Initializer values for message structs */
 #define WhiteItem_init_default                   {0, {{{NULL}, NULL}}}
 #define WhiteList_init_default                   {{{NULL}, NULL}}
-#define AddWhiteItem_init_default                {false, WhiteItem_init_default}
-#define SetWhiteList_init_default                {false, WhiteList_init_default}
-#define WhiteListResponse_init_default           {0, {WhiteList_init_default}}
-#define WhiteListCommandRequest_init_default     {0, {_WhiteListCommand_MIN}}
+#define bluetooth_device_pb_init_default         {{{NULL}, NULL}, ""}
+#define WhiteListResponse_init_default           {false, WhiteList_init_default, _WhiteListErrorCode_MIN}
+#define WhiteListRequest_init_default            {_WhiteListCommand_MIN, false, WhiteList_init_default}
 #define WhiteItem_init_zero                      {0, {{{NULL}, NULL}}}
 #define WhiteList_init_zero                      {{{NULL}, NULL}}
-#define AddWhiteItem_init_zero                   {false, WhiteItem_init_zero}
-#define SetWhiteList_init_zero                   {false, WhiteList_init_zero}
-#define WhiteListResponse_init_zero              {0, {WhiteList_init_zero}}
-#define WhiteListCommandRequest_init_zero        {0, {_WhiteListCommand_MIN}}
+#define bluetooth_device_pb_init_zero            {{{NULL}, NULL}, ""}
+#define WhiteListResponse_init_zero              {false, WhiteList_init_zero, _WhiteListErrorCode_MIN}
+#define WhiteListRequest_init_zero               {_WhiteListCommand_MIN, false, WhiteList_init_zero}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define WhiteItem_name_tag                       1
 #define WhiteItem_mac_tag                        2
 #define WhiteList_items_tag                      1
-#define AddWhiteItem_item_tag                    1
-#define SetWhiteList_list_tag                    1
+#define WhiteListRequest_command_tag             1
+#define WhiteListRequest_set_tag                 2
 #define WhiteListResponse_list_tag               1
 #define WhiteListResponse_code_tag               2
-#define WhiteListCommandRequest_command_tag      1
-#define WhiteListCommandRequest_add_tag          2
-#define WhiteListCommandRequest_set_tag          3
+#define bluetooth_device_pb_mac_tag              1
+#define bluetooth_device_pb_name_tag             2
 
 /* Struct field encoding specification for nanopb */
 #define WhiteItem_FIELDLIST(X, a) \
@@ -117,56 +103,45 @@ X(a, CALLBACK, REPEATED, MESSAGE,  items,             1)
 #define WhiteList_DEFAULT NULL
 #define WhiteList_items_MSGTYPE WhiteItem
 
-#define AddWhiteItem_FIELDLIST(X, a) \
-X(a, STATIC,   OPTIONAL, MESSAGE,  item,              1)
-#define AddWhiteItem_CALLBACK NULL
-#define AddWhiteItem_DEFAULT NULL
-#define AddWhiteItem_item_MSGTYPE WhiteItem
-
-#define SetWhiteList_FIELDLIST(X, a) \
-X(a, STATIC,   OPTIONAL, MESSAGE,  list,              1)
-#define SetWhiteList_CALLBACK NULL
-#define SetWhiteList_DEFAULT NULL
-#define SetWhiteList_list_MSGTYPE WhiteList
+#define bluetooth_device_pb_FIELDLIST(X, a) \
+X(a, CALLBACK, SINGULAR, BYTES,    mac,               1) \
+X(a, STATIC,   SINGULAR, STRING,   name,              2)
+#define bluetooth_device_pb_CALLBACK pb_default_field_callback
+#define bluetooth_device_pb_DEFAULT NULL
 
 #define WhiteListResponse_FIELDLIST(X, a) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (response,list,response.list),   1) \
-X(a, STATIC,   ONEOF,    UENUM,    (response,code,response.code),   2)
+X(a, STATIC,   OPTIONAL, MESSAGE,  list,              1) \
+X(a, STATIC,   SINGULAR, UENUM,    code,              2)
 #define WhiteListResponse_CALLBACK NULL
 #define WhiteListResponse_DEFAULT NULL
-#define WhiteListResponse_response_list_MSGTYPE WhiteList
+#define WhiteListResponse_list_MSGTYPE WhiteList
 
-#define WhiteListCommandRequest_FIELDLIST(X, a) \
-X(a, STATIC,   ONEOF,    UENUM,    (request,command,request.command),   1) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (request,add,request.add),   2) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (request,set,request.set),   3)
-#define WhiteListCommandRequest_CALLBACK NULL
-#define WhiteListCommandRequest_DEFAULT NULL
-#define WhiteListCommandRequest_request_add_MSGTYPE AddWhiteItem
-#define WhiteListCommandRequest_request_set_MSGTYPE SetWhiteList
+#define WhiteListRequest_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UENUM,    command,           1) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  set,               2)
+#define WhiteListRequest_CALLBACK NULL
+#define WhiteListRequest_DEFAULT NULL
+#define WhiteListRequest_set_MSGTYPE WhiteList
 
 extern const pb_msgdesc_t WhiteItem_msg;
 extern const pb_msgdesc_t WhiteList_msg;
-extern const pb_msgdesc_t AddWhiteItem_msg;
-extern const pb_msgdesc_t SetWhiteList_msg;
+extern const pb_msgdesc_t bluetooth_device_pb_msg;
 extern const pb_msgdesc_t WhiteListResponse_msg;
-extern const pb_msgdesc_t WhiteListCommandRequest_msg;
+extern const pb_msgdesc_t WhiteListRequest_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define WhiteItem_fields &WhiteItem_msg
 #define WhiteList_fields &WhiteList_msg
-#define AddWhiteItem_fields &AddWhiteItem_msg
-#define SetWhiteList_fields &SetWhiteList_msg
+#define bluetooth_device_pb_fields &bluetooth_device_pb_msg
 #define WhiteListResponse_fields &WhiteListResponse_msg
-#define WhiteListCommandRequest_fields &WhiteListCommandRequest_msg
+#define WhiteListRequest_fields &WhiteListRequest_msg
 
 /* Maximum encoded size of messages (where known) */
 /* WhiteItem_size depends on runtime parameters */
 /* WhiteList_size depends on runtime parameters */
-/* AddWhiteItem_size depends on runtime parameters */
-/* SetWhiteList_size depends on runtime parameters */
+/* bluetooth_device_pb_size depends on runtime parameters */
 /* WhiteListResponse_size depends on runtime parameters */
-/* WhiteListCommandRequest_size depends on runtime parameters */
+/* WhiteListRequest_size depends on runtime parameters */
 
 #ifdef __cplusplus
 } /* extern "C" */
