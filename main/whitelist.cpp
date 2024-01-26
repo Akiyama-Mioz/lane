@@ -11,7 +11,7 @@ bool is_device_in_whitelist(const WhiteItem &item, BLEAdvertisedDevice &device) 
   return std::visit(IsDeviceVisitor{device}, item);
 }
 
-std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, size_t size) {
+std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, const size_t size) {
   std::vector<WhiteItem> result;
   pb_istream_t stream        = pb_istream_from_buffer(buffer, size);
   WhiteListResponse response = WhiteListResponse_init_zero;
@@ -22,7 +22,7 @@ std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, size_t s
     if (arg == nullptr) {
       return false;
     }
-    auto &result = *reinterpret_cast<std::vector<WhiteItem> *>(*arg);
+    auto &result = *static_cast<std::vector<WhiteItem> *>(*arg);
     ::WhiteItem item;
     std::string name{};
     std::array<uint8_t, BLE_MAC_ADDR_SIZE> addr{};
@@ -30,7 +30,7 @@ std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, size_t s
       if (arg == nullptr) {
         return false;
       }
-      auto &addr = *reinterpret_cast<std::array<uint8_t, BLE_MAC_ADDR_SIZE> *>(*arg);
+      auto &addr = *static_cast<std::array<uint8_t, BLE_MAC_ADDR_SIZE> *>(*arg);
       return false;
     };
     item.item.mac.arg           = &addr;
@@ -38,7 +38,7 @@ std::vector<WhiteItem> parse_white_list_response(const uint8_t *buffer, size_t s
       if (arg == nullptr) {
         return false;
       }
-      auto &name = *reinterpret_cast<std::string *>(*arg);
+      auto &name = *static_cast<std::string *>(*arg);
       return false;
     };
     item.item.name.arg = &name;

@@ -7,14 +7,14 @@
 
 //****************************** Callback ************************************/
 
-static auto TAG = "LaneCallback";
+static constexpr auto TAG = "LaneCallback";
 
 namespace lane {
 void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
   auto data                 = characteristic->getValue();
   ::LaneControl control_msg = LaneControl_init_zero;
   auto ostream              = pb_istream_from_buffer(data.data(), data.size());
-  auto ok                   = pb_decode(&ostream, LaneControl_fields, &control_msg);
+  const auto ok             = pb_decode(&ostream, LaneControl_fields, &control_msg);
   if (!ok) {
     ESP_LOGE(TAG, "Failed to decode the control message");
     return;
@@ -28,31 +28,36 @@ void ControlCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECo
       ESP_LOGI(TAG, "Set status to %d", control_msg.msg.set_status.status);
       lane.setStatus(control_msg.msg.set_status.status);
       break;
+    default:
+      ESP_LOGE(TAG, "Unknown control message");
+      break;
   }
 }
 
 void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) {
-  auto data               = characteristic->getValue();
+  constexpr auto PTAG     = "ConfigCharCallback::onWrite";
+  const auto data         = characteristic->getValue();
   ::LaneConfig config_msg = LaneConfig_init_zero;
   auto ostream            = pb_istream_from_buffer(data.data(), data.size());
-  auto ok                 = pb_decode(&ostream, LaneConfig_fields, &config_msg);
+  const auto ok           = pb_decode(&ostream, LaneConfig_fields, &config_msg);
   if (!ok) {
     ESP_LOGE("LANE", "Failed to decode the config message");
     return;
   }
   lane.pref.begin(PREF_RECORD_NAME, false);
   switch (config_msg.which_msg) {
-    case LaneConfig_color_cfg_tag:
+    case LaneConfig_color_cfg_tag: {
       lane.pref.putULong(PREF_COLOR_NAME, config_msg.msg.color_cfg.rgb);
-      ESP_LOGI((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Set color to 0x%06lx", config_msg.msg.color_cfg.rgb);
+      ESP_LOGI(PTAG, "Set color to 0x%06lx", config_msg.msg.color_cfg.rgb);
       lane.setColor(config_msg.msg.color_cfg.rgb);
       break;
+    }
     case LaneConfig_length_cfg_tag: {
       if (lane.state.status != LaneStatus::STOP) {
-        ESP_LOGE((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Can't change the length while the lane is running");
+        ESP_LOGE(PTAG, "Can't change the length while the lane is running");
         return;
       }
-      ESP_LOGI((std::string(TAG) + "::configCharCallback::onWrite").c_str(), "Set line length to %.2f; active length %.2f; total length %.2f; line LEDs: %ld;", config_msg.msg.length_cfg.line_length_m, config_msg.msg.length_cfg.active_length_m, config_msg.msg.length_cfg.total_length_m, config_msg.msg.length_cfg.line_leds_num);
+      ESP_LOGI(PTAG, "Set line length to %.2f; active length %.2f; total length %.2f; line LEDs: %ld;", config_msg.msg.length_cfg.line_length_m, config_msg.msg.length_cfg.active_length_m, config_msg.msg.length_cfg.total_length_m, config_msg.msg.length_cfg.line_leds_num);
       lane.pref.putFloat(PREF_LINE_LENGTH_NAME, config_msg.msg.length_cfg.line_length_m);
       lane.pref.putFloat(PREF_ACTIVE_LENGTH_NAME, config_msg.msg.length_cfg.active_length_m);
       lane.pref.putFloat(PREF_TOTAL_LENGTH_NAME, config_msg.msg.length_cfg.total_length_m);
@@ -63,14 +68,17 @@ void ConfigCharCallback::onWrite(NimBLECharacteristic *characteristic, NimBLECon
       lane.setMaxLEDs(config_msg.msg.length_cfg.line_leds_num);
       break;
     }
+    default:
+      ESP_LOGE(PTAG, "Unknown config message");
+      break;
   }
   lane.pref.end();
 }
 void ConfigCharCallback::onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
   constexpr size_t size = LaneConfigRO_size;
   uint8_t data[size];
-  ::LaneConfigRO config_msg             = LaneConfigRO_init_zero;
-  auto ostream                          = pb_ostream_from_buffer(data, size);
+  ::LaneConfigRO config_msg = LaneConfigRO_init_zero;
+  auto ostream              = pb_ostream_from_buffer(data, size);
   // https://stackoverflow.com/questions/56661663/nanopb-encode-always-size-0-but-no-encode-failure
   config_msg.has_color_cfg              = true;
   config_msg.has_length_cfg             = true;

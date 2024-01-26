@@ -11,15 +11,14 @@
 #include <memory.h>
 #include "ScanCallback.h"
 
-static auto BLE_NAME          = "lane-011";
-static const uint16_t LED_PIN = 23;
-// static const uint16_t LED_PIN = 2;
+static auto BLE_NAME              = "lane-011";
+static constexpr uint16_t LED_PIN = 23;
 
-static const char *BLE_SERVICE_UUID         = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
-static const char *BLE_CHAR_HR_SERVICE_UUID = "180d";
-static const char *BLE_CHAR_CONTROL_UUID    = "24207642-0d98-40cd-84bb-910008579114";
-static const char *BLE_CHAR_CONFIG_UUID     = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
-static const char *BLE_CHAR_HEARTBEAT_UUID  = "048b8928-d0a5-43e2-ada9-b925ec62ba27";
+static constexpr auto BLE_SERVICE_UUID         = "15ce51cd-7f34-4a66-9187-37d30d3a1464";
+static constexpr auto BLE_CHAR_HR_SERVICE_UUID = "180d";
+static constexpr auto BLE_CHAR_CONTROL_UUID    = "24207642-0d98-40cd-84bb-910008579114";
+static constexpr auto BLE_CHAR_CONFIG_UUID     = "e89cf8f0-7b7e-4a2e-85f4-85c814ab5cab";
+static constexpr auto BLE_CHAR_HEARTBEAT_UUID  = "048b8928-d0a5-43e2-ada9-b925ec62ba27";
 
 using namespace lane;
 /**
@@ -50,25 +49,25 @@ void initBLE(NimBLEServer *server, LaneBLE &ble, Lane &lane) {
 }
 
 extern "C" [[noreturn]] void app_main() {
-  const auto TAG = "main";
+  constexpr auto TAG = "main";
   initArduino();
 
   etl::array<uint8_t, PREF_WHITE_RULE_MAX_LENGTH> white_rules_bytes{};
   Preferences pref;
   pref.begin(PREF_RECORD_NAME, true);
-  auto line_length   = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
-  auto active_length = pref.getFloat(PREF_ACTIVE_LENGTH_NAME, DEFAULT_ACTIVE_LENGTH.count());
-  auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
-  auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
-  auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
-  auto sz            = pref.getBytes(PREF_WHITE_RULE_NAME, white_rules_bytes.data(), PREF_WHITE_RULE_MAX_LENGTH);
+  const auto line_length   = pref.getFloat(PREF_LINE_LENGTH_NAME, DEFAULT_LINE_LENGTH.count());
+  const auto active_length = pref.getFloat(PREF_ACTIVE_LENGTH_NAME, DEFAULT_ACTIVE_LENGTH.count());
+  const auto line_LEDs_num = pref.getULong(PREF_LINE_LEDs_NUM_NAME, DEFAULT_LINE_LEDs_NUM);
+  const auto total_length  = pref.getFloat(PREF_TOTAL_LENGTH_NAME, DEFAULT_TARGET_LENGTH.count());
+  const auto color         = pref.getULong(PREF_COLOR_NAME, utils::Colors::Red);
+  const auto sz            = pref.getBytes(PREF_WHITE_RULE_NAME, white_rules_bytes.data(), PREF_WHITE_RULE_MAX_LENGTH);
   if (sz > 0) {
     // TODO: serialize the white rules
   } else {
     ESP_LOGE(TAG, "Failed to read white rules from flash. Skip deserialization.");
   }
   pref.end();
-  auto default_cfg = lane::LaneConfig{
+  const auto default_cfg = lane::LaneConfig{
       .color         = color,
       .line_length   = lane::meter(line_length),
       .active_length = lane::meter(active_length),
@@ -115,14 +114,14 @@ extern "C" [[noreturn]] void app_main() {
   // https://lang-ship.com/reference/unofficial/M5StickC/Functions/freertos/task/
   xTaskCreatePinnedToCore(lane_loop,
                           "lane", 5120,
-                          &lane, configMAX_PRIORITIES - 3,
+                          &lane, 3,
                           nullptr, 1);
 
   server.start();
   NimBLEDevice::startAdvertising();
-  auto &scan   = *BLEDevice::getScan();
-  auto pScanCb = new ScanCallback(&hr_char);
-  scan.setScanCallbacks(pScanCb);
+  auto &scan          = *BLEDevice::getScan();
+  static auto pScanCb = ScanCallback(&hr_char);
+  scan.setScanCallbacks(&pScanCb);
   scan.setInterval(1349);
   scan.setWindow(449);
   scan.setActiveScan(true);

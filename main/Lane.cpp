@@ -15,13 +15,13 @@ bool is_dma = false;
 #endif
 
 // the resolution is the clock frequency instead of strip frequency
-const auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
+constexpr auto LED_STRIP_RMT_RES_HZ = (10 * 1000 * 1000); // 10MHz
 
-static inline int meterToLEDsCount(float meter, float LEDs_per_meter) {
+static int meterToLEDsCount(const float meter, const float LEDs_per_meter) {
   return std::abs(static_cast<int>(std::round(meter * LEDs_per_meter))) + 1;
 }
 
-static inline float LEDsCountToMeter(uint32_t count, float LEDs_per_meter) {
+static float LEDsCountToMeter(const uint32_t count, const float LEDs_per_meter) {
   if (count <= 1) {
     return 0;
   } else {
@@ -58,9 +58,9 @@ inline LaneStatus revert_state(LaneStatus state) {
  * @return the next state.
  */
 LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
-  auto TAG        = "lane::nextState";
-  auto zero_state = LaneState::zero();
-  auto stop_case  = [=]() {
+  constexpr auto TAG    = "lane::nextState";
+  const auto zero_state = LaneState::zero();
+  auto stop_case        = [=]() {
     switch (input.status) {
       case LaneStatus::FORWARD: {
         auto ret   = zero_state;
@@ -77,7 +77,6 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
       default:
         return zero_state;
     }
-    return zero_state;
   };
   switch (last_state.status) {
     case LaneStatus::STOP: {
@@ -122,7 +121,7 @@ LaneState nextState(LaneState last_state, LaneConfig cfg, LaneParams &input) {
 }
 
 void Lane::stop() const {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
     return;
   }
@@ -149,7 +148,7 @@ void Lane::loop() {
   auto constexpr DEBUG_INTERVAL = std::chrono::seconds(1);
   ESP_LOGI(TAG, "start loop");
   for (;;) {
-    if (strip == nullptr){
+    if (strip == nullptr) {
       ESP_LOGE(TAG, "strip is null");
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
@@ -215,7 +214,7 @@ void Lane::loop() {
 
 /// i.e. Circle LEDs
 void Lane::setMaxLEDs(uint32_t new_max_LEDs) {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
     return;
   }
@@ -236,7 +235,7 @@ Lane *Lane::get() {
  * @return StripError::OK if the strip is not inited, otherwise StripError::HAS_INITIALIZED.
  */
 esp_err_t Lane::begin() {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     return ESP_ERR_INVALID_STATE;
   }
   strip->begin();
@@ -258,7 +257,7 @@ void Lane::notifyState(LaneState s) {
   st.speed          = s.speed;
   st.status         = static_cast<::LaneStatus>(s.status);
   auto stream       = pb_ostream_from_buffer(buf.data(), buf.size());
-  auto ok           = pb_encode(&stream, LaneState_fields, &st);
+  const auto ok     = pb_encode(&stream, LaneState_fields, &st);
   if (!ok) {
     ESP_LOGE(TAG, "Failed to encode the state");
     return;
@@ -295,29 +294,25 @@ float Lane::LEDsPerMeter() const {
 // I have no idea why `tx_chan->cur_trans->encoder` would cause a segmentation fault. (null pointer dereference obviously)
 // I guess it's because some data race shit. dereference it and save `rmt_tx_channel_t` to stack could solve it.
 void Lane::iterate() {
-  if (strip == nullptr){
+  if (strip == nullptr) {
     ESP_LOGE(TAG, "strip is null");
     return;
   }
-  auto next_state = nextState(this->state, this->cfg, this->params);
+  const auto next_state = nextState(this->state, this->cfg, this->params);
   // meter
-  auto head       = this->state.head.count();
-  auto tail       = this->state.tail.count();
-  auto length     = head - tail >= 0 ? head - tail : 0;
-  auto head_index = meterToLEDsCount(head, LEDsPerMeter());
-  auto tail_index = meterToLEDsCount(tail, LEDsPerMeter());
-  auto count      = meterToLEDsCount(length, LEDsPerMeter());
-  if (head_index > this->cfg.line_LEDs_num) {
-    head_index = this->cfg.line_LEDs_num;
-  }
-  this->state = next_state;
-  auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
+  const auto head        = this->state.head.count();
+  const auto tail        = this->state.tail.count();
+  const auto length      = head - tail >= 0 ? head - tail : 0;
+  const auto tail_index  = meterToLEDsCount(tail, LEDsPerMeter());
+  const auto count       = meterToLEDsCount(length, LEDsPerMeter());
+  this->state            = next_state;
+  const auto interval_ms = std::chrono::milliseconds(static_cast<int64_t>((1 / cfg.fps) * 1000));
   switch (next_state.status) {
     case LaneStatus::FORWARD: {
       auto instant = Instant();
       strip->fill_and_show_forward(tail_index, count, cfg.color);
       auto e = instant.elapsed();
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
         ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
       }
       break;
@@ -326,13 +321,13 @@ void Lane::iterate() {
       auto instant = Instant();
       strip->fill_and_show_backward(tail_index, count, cfg.color);
       auto e = instant.elapsed();
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms){
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(e) > interval_ms) {
         ESP_LOGW(TAG, "show timeout %lld ms > %lld ms (%f FPS)", e.count(), interval_ms.count(), cfg.fps);
       }
       break;
     }
     default:
-      return;
+      break;
   }
 }
 }

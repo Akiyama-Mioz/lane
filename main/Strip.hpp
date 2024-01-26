@@ -22,7 +22,7 @@ public:
    */
   virtual bool fill_and_show_forward(size_t start, size_t count, uint32_t color) {
     auto res = clear();
-    if (!res){
+    if (!res) {
       return false;
     }
     res = fill(start, count, color);
@@ -41,8 +41,8 @@ public:
    */
   virtual bool fill_and_show_backward(size_t start, size_t count, uint32_t color) {
     auto total = get_max_LEDs();
-    auto res = clear();
-    if (!res){
+    auto res   = clear();
+    if (!res) {
       return false;
     }
     if (total < start + count) {
@@ -60,7 +60,7 @@ public:
   virtual bool begin()                                          = 0;
   virtual bool set_max_LEDs(size_t new_max_LEDs)                = 0;
   virtual size_t get_max_LEDs() const                           = 0;
-  // resolve some  complain in destructor
+  // resolve some complain in destructor
   virtual ~IStrip() = default;
 };
 
@@ -175,36 +175,32 @@ public:
 };
 #endif
 
-class AdafruitPixel : public IStrip {
+class AdafruitPixel final : public IStrip {
 private:
   size_t max_LEDs = 0;
   uint8_t pin     = GPIO_NUM_NC;
   neoPixelType pixelType;
-  Adafruit_NeoPixel *pixel = nullptr;
+  std::unique_ptr<Adafruit_NeoPixel> pixel = nullptr;
 
 public:
   static constexpr neoPixelType default_pixel_type = NEO_RGB + NEO_KHZ800;
   explicit AdafruitPixel(size_t max_LEDs, uint8_t pin, neoPixelType pixel_type) : max_LEDs(max_LEDs), pin(pin), pixelType(pixel_type) {
-    pixel = new Adafruit_NeoPixel(max_LEDs, pin, pixel_type);
+    pixel = std::make_unique<Adafruit_NeoPixel>(max_LEDs, pin, pixel_type);
     pixel->setBrightness(255);
   }
 
-  /// move constructor
+  // move constructor
   AdafruitPixel(AdafruitPixel &&rhs) noexcept {
     this->max_LEDs  = rhs.max_LEDs;
     this->pin       = rhs.pin;
     this->pixelType = rhs.pixelType;
-    this->pixel     = rhs.pixel;
+    this->pixel     = std::move(rhs.pixel);
     rhs.pixel       = nullptr;
   };
   AdafruitPixel(AdafruitPixel const &rhs)  = delete;
   void operator=(AdafruitPixel const &rhs) = delete;
 
-  ~AdafruitPixel() noexcept {
-    delete pixel;
-  }
-
-  bool begin() {
+  bool begin() override {
     pixel->begin();
     return true;
   }
@@ -221,9 +217,8 @@ public:
     if (pixel == nullptr) {
       return false;
     }
-    delete pixel;
     this->max_LEDs = new_max_LEDs;
-    pixel          = new Adafruit_NeoPixel(new_max_LEDs, pin, pixelType);
+    pixel          = std::make_unique<Adafruit_NeoPixel>(new_max_LEDs, pin, pixelType);
     pixel->setBrightness(255);
     return true;
   }
@@ -239,7 +234,7 @@ public:
     pixel->clear();
     return true;
   }
-  bool show() {
+  bool show() override {
     if (pixel == nullptr) {
       return false;
     }
